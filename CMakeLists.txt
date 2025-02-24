@@ -4,7 +4,8 @@ project(newbase)
 option(NB_VENDORED "Use vendored libraries" ON)
 
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
-add_subdirectory(vendored/rapidyaml)
+add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
+add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 
 add_executable(newbase WIN32
     # entry points

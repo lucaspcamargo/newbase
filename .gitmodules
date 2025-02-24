@@ -10,3 +10,9 @@
 [submodule "vendored/rapidyaml"]
 	path = vendored/rapidyaml
 	url = https://github.com/biojppm/rapidyaml.git
+[submodule "vendored/eigen"]
+	path = vendored/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "vendored/glm"]
+	path = vendored/glm
+	url = https://github.com/g-truc/glm.git
