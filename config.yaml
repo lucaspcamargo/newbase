@@ -1,0 +1,8 @@
+systems:
+ render_simple:
+    w: 1280
+    h: 720
+ audio:
+    streams:
+        - sfx
+        - bgm

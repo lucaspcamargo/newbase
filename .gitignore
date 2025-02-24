@@ -1,0 +1,6 @@
+build 
+**.kdev4
+.kdev4/
+**.kate-swp
+**/**.kate-swp
+imgui.ini

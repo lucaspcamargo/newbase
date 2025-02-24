@@ -1,0 +1,136 @@
+#include <newbase/engine.h>
+#include <newbase/system.h>
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_init.h>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+
+using namespace nb;
+
+struct nb::engine_p {
+    ryml::Tree cfg;
+    std::string cfile;
+    SDL_InitFlags initflags;
+};
+
+engine::engine()
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] constructing");
+
+    _d = new engine_p();
+    _d->initflags = 0;
+
+    std::ifstream t("config.yaml");
+    if(!t.is_open())
+    {
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not find config file!");
+        exit(1);
+    }
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+    _d->cfile = buffer.str();
+    _d->cfg = ryml::parse_in_place(_d->cfile.data());
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] config:\n%s",
+                ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
+
+    auto systems = _d->cfg["systems"];
+    for(ryml::ConstNodeRef n : systems.children())
+    {
+        std::string sysname;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] creating system: %s", sysname.c_str());
+        c4::from_chars(n.key(), &sysname);
+        std::shared_ptr<system> sys = system::build(sysname.c_str(), n.tree());
+        if(!sys)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not create system: %s", sysname.c_str());
+        }
+        else
+        {
+            _d->initflags |= sys->sdl_subsystems();
+            _systems.emplace_back(sys);
+        }
+    }
+
+}
+
+engine::~engine()
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroying");
+
+    // destroy all system shared_ptrs
+    _systems.clear();
+    delete _d;
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroyed");
+}
+
+bool engine::init(int argc, char ** argv)
+{
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] init");
+
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "newbase demo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, "v0.0.0");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "br.eng.camargo.newbase.demo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Lucas Camargo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Lucas Camargo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://camargo.eng.br/");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
+
+    // TODO collect SDL systems to init from systems
+    if(!SDL_Init(_d->initflags))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error: SDL_Init(%d): %s", static_cast<int>(_d->initflags), SDL_GetError());
+        return false;
+    }
+
+    for(auto s: _systems)
+    {
+        if(!s->init(argc, argv))
+            return false;
+    }
+
+    return true;
+}
+
+bool engine::step()
+{
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "[engine] step");\
+
+    for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
+    {
+        for(auto s: _systems)
+        {
+        // TODO check if system uses this phase (use some sort of mask?)
+            if(!s->step(static_cast<nb::step_phase>(i)))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+bool engine::event(SDL_Event *evt)
+{
+    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "[engine] event");
+    if(evt->type == SDL_EVENT_KEY_DOWN)
+        if(evt->key.key == SDLK_ESCAPE)
+            return false;
+
+    for(auto s: _systems)
+    {
+        // TODO check if system takes event (use some sort of mask?)
+        if(!s->event(evt))
+            return false;
+    }
+
+    return true;
+}
