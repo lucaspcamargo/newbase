@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.5)
 project(newbase)
 
-option(NB_VENDORED "Use vendored libraries" ON)
-
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
+set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
+set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
 
-add_executable(newbase WIN32
+add_library(newbase STATIC
+
     # entry points
-    src/main.c
     src/sdl/engine_hooks.cpp
 
     # engine base
@@ -40,4 +40,15 @@ add_executable(newbase WIN32
 
 target_include_directories(newbase PUBLIC include vendored/stb vendored/imgui vendored/imgui)
 
-target_link_libraries(newbase PRIVATE SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)
+
+
+# BINARIES
+add_subdirectory(demo)    # our demo game/app
+add_subdirectory(runner)  # an application made to run games that don't need additional code
+
+
+# EXPORTS
+# let games use newbase and dependencies straight from the build folder
+export(EXPORT glm FILE glm-export.cmake) # glm has no export itself, this needs to be done here
+export(TARGETS newbase NAMESPACE newbase FILE newbase-export.cmake )

@@ -8,7 +8,7 @@ TODO fill this up as it grows
 Plans to have:
 - SDL\_GPU-based renderer for 2D and 3D (uses Vulkan, DX12, or Metal depeing on the platform)
     + later goal, should be attainable
-- SDL\_Renderer for basic 2D (uses OpenGL [ES] for software rendering)
+- SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
 - Resource manager
 - Data-driven entity-Component-System
 - Physics and collision handling
