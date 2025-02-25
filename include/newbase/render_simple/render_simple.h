@@ -16,6 +16,8 @@ public:
     SDL_InitFlags sdl_subsystems() override;
 
 private:
+    void draw_perf();
+
     SDL_Window *_win;
     SDL_Renderer* _render;
 };

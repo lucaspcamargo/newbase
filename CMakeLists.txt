@@ -6,11 +6,12 @@ option(NB_VENDORED "Use vendored libraries" ON)
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
+add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
 
 add_executable(newbase WIN32
     # entry points
     src/main.c
-    src/engine_hooks.cpp
+    src/sdl/engine_hooks.cpp
 
     # engine base
     src/engine.cpp
@@ -39,4 +40,4 @@ add_executable(newbase WIN32
 
 target_include_directories(newbase PUBLIC include vendored/stb vendored/imgui vendored/imgui)
 
-target_link_libraries(newbase PRIVATE SDL3::SDL3 ryml::ryml -lm)
+target_link_libraries(newbase PRIVATE SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)

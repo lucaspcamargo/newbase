@@ -1,4 +1,4 @@
-#include <newbase/engine_hooks.h>
+#include <newbase/sdl/engine_hooks.h>
 #include <newbase/engine.h>
 
 #include <cassert>

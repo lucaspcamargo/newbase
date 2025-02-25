@@ -45,8 +45,8 @@ engine::engine()
     for(ryml::ConstNodeRef n : systems.children())
     {
         std::string sysname;
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] creating system: %s", sysname.c_str());
         c4::from_chars(n.key(), &sysname);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] creating system: %s", sysname.c_str());
         std::shared_ptr<system> sys = system::build(sysname.c_str(), n.tree());
         if(!sys)
         {
