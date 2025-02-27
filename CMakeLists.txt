@@ -29,12 +29,17 @@ add_library(newbase STATIC
     # engine base
     src/engine.cpp
     src/system_factory.cpp
+    src/ecs.cpp
 
     # system: render_simple
     src/render_simple/render_simple.cpp
 
     # system: audio
     src/audio/audio.cpp
+
+    # resource system
+    src/res/manager.cpp
+    src/res/loaders.cpp
 
     # stb
     src/stb_impl.c

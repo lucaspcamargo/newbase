@@ -6,3 +6,5 @@ systems:
     streams:
         - sfx
         - bgm
+resources:
+ scan: "./res/"

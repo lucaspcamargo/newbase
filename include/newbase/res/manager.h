@@ -1,10 +1,24 @@
 #pragma once
 
+#include <newbase/res/fwd.h>
+#include <entt/resource/cache.hpp>
+#include <entt/resource/resource.hpp>
+#include <ryml.hpp>
+
 namespace nb {
 
-class res_man {
+class rmanager {
+public:
+    rmanager();
 
+    bool configure(ryml::Tree *);
+    entt::id_type resolve(const char *path);
+
+    entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
+    entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
 };
+
+rmanager& rman();
 
 }
 
