@@ -7,6 +7,19 @@ set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
+set(IMGUI_SOURCES
+    vendored/imgui/imgui.cpp
+    vendored/imgui/imgui_draw.cpp
+    vendored/imgui/imgui_widgets.cpp
+    vendored/imgui/imgui_tables.cpp
+    vendored/imgui/imgui_demo.cpp  # TODO remove when needed
+    vendored/imgui/backends/imgui_impl_sdl3.cpp
+    vendored/imgui/backends/imgui_impl_sdlrenderer3.cpp
+    vendored/imgui/backends/imgui_impl_sdlgpu3.cpp
+    )
+set(IMGUI_INCLUDES
+    vendored/imgui)
+
 
 add_library(newbase STATIC
 
@@ -27,18 +40,10 @@ add_library(newbase STATIC
     src/stb_impl.c
 
     # Dear ImGui
-    vendored/imgui/imgui.cpp
-    vendored/imgui/imgui_draw.cpp
-    vendored/imgui/imgui_widgets.cpp
-    vendored/imgui/imgui_tables.cpp
-    vendored/imgui/imgui_demo.cpp  # TODO remove when needed
-
-    vendored/imgui/backends/imgui_impl_sdl3.cpp
-    vendored/imgui/backends/imgui_impl_sdlrenderer3.cpp
-    vendored/imgui/backends/imgui_impl_sdlgpu3.cpp
+    ${IMGUI_SOURCES}
 )
 
-target_include_directories(newbase PUBLIC include vendored/stb vendored/imgui vendored/imgui)
+target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES})
 
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)
 
@@ -46,6 +51,9 @@ target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -
 # BINARIES
 add_subdirectory(demo)    # our demo game/app
 add_subdirectory(runner)  # an application made to run games that don't need additional code
+add_executable(dpi_test src/etc/imgui_dpi_test.cpp ${IMGUI_SOURCES})
+target_link_libraries(dpi_test SDL3::SDL3)
+target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 
 
 # EXPORTS

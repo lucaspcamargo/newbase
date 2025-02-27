@@ -13,6 +13,14 @@ inline static enum SDL_AppResult bool_to_app_result(bool val)
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "newbase demo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, "v0.0.0");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "br.eng.camargo.newbase.demo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Lucas Camargo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Lucas Camargo");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://camargo.eng.br/");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
 	(*appstate) = NULL;
 	return bool_to_app_result(_nb_engine_init(appstate, argc, argv));
 }

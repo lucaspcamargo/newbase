@@ -20,6 +20,7 @@ private:
 
     SDL_Window *_win;
     SDL_Renderer* _render;
+    float _scale;
 };
 
 }

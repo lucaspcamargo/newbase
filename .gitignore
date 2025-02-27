@@ -4,3 +4,4 @@ build
 **.kate-swp
 **/**.kate-swp
 imgui.ini
+.vscode

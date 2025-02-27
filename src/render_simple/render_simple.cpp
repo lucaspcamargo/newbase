@@ -11,9 +11,10 @@
 using namespace nb;
 
 render_simple::render_simple():
-_win(nullptr)
+_win(nullptr),
+_scale(1.0)
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] constructing");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] constructed");
 }
 
 render_simple::~render_simple()
@@ -57,14 +58,17 @@ bool render_simple::init(int argc, char **argv)
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] available drivers: %s", driver_names.c_str());
 
-    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window* _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), 1280, 720, window_flags);
     if (_win == nullptr)
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] SDL_CreateWindow(): %s\n", SDL_GetError());
         return false;
     }
+    _scale = SDL_GetWindowDisplayScale(_win);
     _render = SDL_CreateRenderer(_win, nullptr);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] window scale: %f", _scale);
+
     SDL_SetRenderVSync(_render, 1);
     if (_render == nullptr)
     {
@@ -86,7 +90,7 @@ bool render_simple::init(int argc, char **argv)
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
-
+    
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
     ImGui_ImplSDLRenderer3_Init(_render);
@@ -104,6 +108,12 @@ bool render_simple::step(nb::step_phase phase)
         ImGui::NewFrame();
 
     }
+    else if(phase == step_phase::PRE_RENDER)
+    {
+        // scale all rendering from logical coordinates, in case of HiDPI 
+        if(_scale != 1.0f)
+            SDL_SetRenderScale(_render, _scale, _scale);
+    }
     else if(phase == step_phase::RENDER)
     {
         draw_perf();
@@ -115,6 +125,10 @@ bool render_simple::step(nb::step_phase phase)
         SDL_RenderClear(_render);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), _render);
         SDL_RenderPresent(_render);
+
+        // reset render scale for HiDPI
+        if(_scale != 1.0f)
+            SDL_SetRenderScale(_render, 1.0f, 1.0f);
     }
     return true;
 }

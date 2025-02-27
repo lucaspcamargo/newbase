@@ -76,15 +76,6 @@ bool engine::init(int argc, char ** argv)
 {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] init");
 
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "newbase demo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, "v0.0.0");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "br.eng.camargo.newbase.demo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Lucas Camargo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Lucas Camargo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://camargo.eng.br/");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
-
-
     // TODO collect SDL systems to init from systems
     if(!SDL_Init(_d->initflags))
     {
