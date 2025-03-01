@@ -47,7 +47,7 @@ add_library(newbase STATIC
     # Dear ImGui
     ${IMGUI_SOURCES}
 )
-
+set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES})
 
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)

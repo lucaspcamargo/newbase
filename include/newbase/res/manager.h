@@ -11,7 +11,7 @@ class rmanager {
 public:
     rmanager();
 
-    bool configure(ryml::Tree *);
+    bool configure(const char *scanpath = nullptr);
     entt::id_type resolve(const char *path);
 
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
