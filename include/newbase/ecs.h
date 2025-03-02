@@ -4,4 +4,6 @@
 
 namespace nb {
     entt::registry &reg();
+
+    //entt::id_type build_tree
 }

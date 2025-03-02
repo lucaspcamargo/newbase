@@ -10,6 +10,7 @@ namespace nb{
 static rmanager _rman_inst;
 rmanager& rman() {return _rman_inst;}
 
+static entt::resource_cache<retree, rloader_etree> _cache_etree{};
 static entt::resource_cache<rsprite, rloader_sprite> _cache_sprite{};
 static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
 
@@ -36,7 +37,7 @@ bool rmanager::configure(const char *scanpath)
         for(char **curr = files; *curr; curr++)
         {
             auto hash = entt::hashed_string(*curr);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] saw: %s (%x)", curr);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] saw: %s (%x)", *curr);
             _pathmap.emplace(hash, *curr);
         }
 
@@ -49,12 +50,18 @@ entt::id_type rmanager::resolve(const char *path)
 {
     return entt::tombstone;
 }
+
+entt::resource<retree> rmanager::get_etree(entt::id_type id, bool forceload)
+{
+    return (C4_UNLIKELY(forceload)? _cache_etree.force_load(id, id)
+                                 : _cache_etree.load(id, id)).first->second;
+}
+
 entt::resource<rsprite> rmanager::get_sprite(entt::id_type id, bool forceload)
 {
     return (C4_UNLIKELY(forceload)? _cache_sprite.force_load(id, id)
                                  : _cache_sprite.load(id, id)).first->second;
 }
-
 
 entt::resource<rtexture> rmanager::get_texture(entt::id_type id, bool forceload)
 {

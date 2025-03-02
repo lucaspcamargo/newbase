@@ -1,5 +1,6 @@
 #include <newbase/engine.h>
 #include <newbase/system.h>
+#include <newbase/res/manager.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_init.h>
@@ -40,6 +41,15 @@ engine::engine()
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] config:\n%s",
                 ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
+
+    auto resources = _d->cfg["resources"];
+    std::string scanpath;
+    c4::from_chars(resources["scan"].val(), &scanpath);
+    if(!rman().configure(scanpath.c_str()))
+    {
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not initialize resource manager!");
+        exit(1);
+    }
 
     auto systems = _d->cfg["systems"];
     for(ryml::ConstNodeRef n : systems.children())
@@ -88,6 +98,9 @@ bool engine::init(int argc, char ** argv)
         if(!s->init(argc, argv))
             return false;
     }
+
+    // load initial entity tree
+    //auto res = rman().load_etree("root.et.yaml"_hs);
 
     return true;
 }

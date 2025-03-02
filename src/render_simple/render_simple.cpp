@@ -141,6 +141,8 @@ bool render_simple::event(SDL_Event * evt)
 
 void render_simple::draw_perf()
 {
+
+    //ImGui::ShowDemoWindow(nullptr);
     // TODO make proper perfcounters
     static int location = 3;
     ImGuiIO& io = ImGui::GetIO();

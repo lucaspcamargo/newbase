@@ -6,6 +6,11 @@
 
 namespace nb {
 
+struct rloader_etree {
+    using result_type = std::shared_ptr<retree>;
+    result_type operator()(entt::id_type) const;
+};
+
 struct rloader_sprite {
     using result_type = std::shared_ptr<rsprite>;
     result_type operator()(entt::id_type) const;

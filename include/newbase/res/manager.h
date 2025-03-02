@@ -14,6 +14,7 @@ public:
     bool configure(const char *scanpath = nullptr);
     entt::id_type resolve(const char *path);
 
+    entt::resource<retree> get_etree(entt::id_type id, bool forceload = false);
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
     entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
 };
