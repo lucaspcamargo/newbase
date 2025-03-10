@@ -1,8 +1,16 @@
 - name: background
   comps:
-  - spatial:
+    spatial:
       pos: [0, 0, 100]
       rot: [0, 0, 0]
-  - sprite:
-      res: "background.jpg"
-  
+      scale: [0.75, 0.75, 0.75]
+    sprite:
+      res: "@res/background.png"
+- name: spr0
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 180]
+      scale: [1, 1, 1]
+    sprite:
+      res: "@res/sprites/rocket.png"

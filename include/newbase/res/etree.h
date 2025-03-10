@@ -6,8 +6,9 @@
 namespace nb {
 
     struct retree {
+        bool valid {false};
+        std::vector<char> data;
         ryml::Tree tree;
-        std::vector<uint8_t> data;
     };
 
 };

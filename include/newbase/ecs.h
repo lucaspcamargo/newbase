@@ -5,5 +5,5 @@
 namespace nb {
     entt::registry &reg();
 
-    //entt::id_type build_tree
+    entt::id_type build_etree(entt::id_type retree_id);
 }

@@ -1,19 +1,21 @@
 #include <newbase/engine.h>
 #include <newbase/system.h>
 #include <newbase/res/manager.h>
+#include <newbase/ecs.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_init.h>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
+#include <entt/entt.hpp>
 
 #include <string>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
-
 using namespace nb;
+using entt::operator""_hs;
 
 struct nb::engine_p {
     ryml::Tree cfg;
@@ -43,9 +45,7 @@ engine::engine()
                 ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
 
     auto resources = _d->cfg["resources"];
-    std::string scanpath;
-    c4::from_chars(resources["scan"].val(), &scanpath);
-    if(!rman().configure(scanpath.c_str()))
+    if(!rman().configure(resources))
     {
         SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not initialize resource manager!");
         exit(1);
@@ -69,6 +69,7 @@ engine::engine()
         }
     }
 
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] constructed");
 }
 
 engine::~engine()
@@ -89,7 +90,7 @@ bool engine::init(int argc, char ** argv)
     // TODO collect SDL systems to init from systems
     if(!SDL_Init(_d->initflags))
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error: SDL_Init(%d): %s", static_cast<int>(_d->initflags), SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] SDL_Init error: (%d): %s", static_cast<int>(_d->initflags), SDL_GetError());
         return false;
     }
 
@@ -100,8 +101,10 @@ bool engine::init(int argc, char ** argv)
     }
 
     // load initial entity tree
-    //auto res = rman().load_etree("root.et.yaml"_hs);
+    auto root_ent = build_etree("@res/root.et.yaml"_hs);
+    
 
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] initialized");
     return true;
 }
 

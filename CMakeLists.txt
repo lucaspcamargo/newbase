@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 project(newbase)
 
+set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
+option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
+
+include(cmake/NewbaseFunctions.cmake)
+
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
@@ -22,7 +27,6 @@ set(IMGUI_INCLUDES
 
 
 add_library(newbase STATIC
-
     # entry points
     src/sdl/engine_hooks.cpp
 
@@ -30,6 +34,9 @@ add_library(newbase STATIC
     src/engine.cpp
     src/system_factory.cpp
     src/ecs.cpp
+
+    # components
+    src/components/builders.cpp
 
     # system: render_simple
     src/render_simple/render_simple.cpp
@@ -41,6 +48,9 @@ add_library(newbase STATIC
     src/res/manager.cpp
     src/res/loaders.cpp
 
+    # yaml conversions
+    src/yaml/glm.cpp
+
     # stb
     src/stb_impl.c
 
@@ -49,8 +59,12 @@ add_library(newbase STATIC
 )
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES})
-
+target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL)
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)
+
+# CONFIG HEADER
+configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
+target_include_directories(newbase PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 
 # BINARIES

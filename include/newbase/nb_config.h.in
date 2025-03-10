@@ -1,0 +1,14 @@
+#pragma once
+
+// newbase config header
+// auto-generated from nb_config.h.in at configuration time
+
+#cmakedefine NEWBASE_TRACING
+
+
+// some lib metadata
+#cmakedefine NEWBASE_VERSION "@NEWBASE_VERSION@"
+#define NEWBASE_ID_STRING "br.eng.camargo.newbase.demo"
+#define NEWBASE_URL "https://camargo.eng.br/"
+#define NEWBASE_COPYRIGHT "Copyright (c) Lucas Camargo"
+#define NEWBASE_AUTHORS "Lucas Camargo"

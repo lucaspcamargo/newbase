@@ -7,5 +7,5 @@
 
 ## Nice-to-have
 
-- [ ] some low-prio things
+- [ ] some low-prio things should go here (in due time)
 

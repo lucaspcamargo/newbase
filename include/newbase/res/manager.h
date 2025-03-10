@@ -7,12 +7,15 @@
 
 namespace nb {
 
-class rmanager {
+class rmanager final {
 public:
     rmanager();
+    ~rmanager();
 
-    bool configure(const char *scanpath = nullptr);
-    entt::id_type resolve(const char *path);
+    bool configure(const ryml::NodeRef &config);
+
+    bool known(entt::id_type id); // whether this resource hash is known
+    bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_term = false) const; // read all data into byte vector
 
     entt::resource<retree> get_etree(entt::id_type id, bool forceload = false);
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);

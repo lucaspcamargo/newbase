@@ -1,4 +1,5 @@
 #include <newbase/sdl/engine_hooks.h>
+#include <newbase/nb_config.h>
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
@@ -14,11 +15,11 @@ inline static enum SDL_AppResult bool_to_app_result(bool val)
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "newbase demo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, "v0.0.0");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "br.eng.camargo.newbase.demo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Lucas Camargo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) Lucas Camargo");
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://camargo.eng.br/");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, NEWBASE_VERSION);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, NEWBASE_ID_STRING);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, NEWBASE_AUTHORS);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, NEWBASE_COPYRIGHT);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, NEWBASE_URL);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
 	(*appstate) = NULL;
