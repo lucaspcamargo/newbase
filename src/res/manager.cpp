@@ -1,5 +1,6 @@
 #include <newbase/res/manager.h>
 #include <newbase/res/loaders.h>
+#include <newbase/nb_config.h>
 
 #include <entt/entt.hpp>
 #include <SDL3/SDL_storage.h>
@@ -44,7 +45,12 @@ bool rmanager::configure(const ryml::NodeRef &config)
 {
     // TODO rework with "source" plugins and use yaml config
 
-    _store_title = SDL_OpenTitleStorage(nullptr, SDL_CreateProperties());
+    _store_title = SDL_OpenTitleStorage(NEWBASE_DEFAULT_RES_PREFIX, SDL_CreateProperties());
+    if(!_store_title)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot title storage. Falling back to raw fs...");
+        _store_title = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
+    }
     if(_store_title)
     {
         char ** vfiles = SDL_GlobStorageDirectory(_store_title, nullptr, nullptr, 0, nullptr);
@@ -60,7 +66,8 @@ bool rmanager::configure(const ryml::NodeRef &config)
                     continue;
                 
                 std::string prefixed{"@"};
-                prefixed.append(*curr);
+                bool absolute = (*curr)[0] == '/';
+                prefixed.append( *curr + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
                 auto hash = entt::hashed_string(prefixed.c_str());
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
                 _pathmap.emplace(std::make_pair(hash.value(), locator{prefixed, _store_title}));
@@ -68,13 +75,13 @@ bool rmanager::configure(const ryml::NodeRef &config)
         }
         else
         {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot enumerate title storage!");
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot enumerate title storage: %s", SDL_GetError());
             return false;
         }
     }
     else 
     {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot open title storage!");
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot open any title storage!");
         return false;
     }
 

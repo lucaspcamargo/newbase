@@ -10,7 +10,7 @@
   comps:
     spatial:
       pos: [0, 0, 0]
-      rot: [0, 0, 180]
+      rot: [0, 0, -45]
       scale: [1, 1, 1]
     sprite:
       res: "@res/sprites/rocket.png"

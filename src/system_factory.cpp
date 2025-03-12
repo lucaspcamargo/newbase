@@ -2,7 +2,7 @@
 #include <newbase/render_simple/render_simple.h>
 #include <newbase/audio/audio.h>
 
-std::shared_ptr<nb::system> nb::system::build(const std::string &id, __attribute_maybe_unused__ const void *cfgnode)
+std::shared_ptr<nb::system> nb::system::build(const std::string &id, const void *cfgnode)
 {
     if(id == "render_simple")
     {

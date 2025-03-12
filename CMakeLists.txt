@@ -3,8 +3,22 @@ project(newbase)
 
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
+option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
+set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
+set(NEWBASE_NATIVE_RES_PREFIX "./nb" CACHE STRING "Path prefix for installing and searching for resources")
+
+# resolve option configuration
+if(DEFINED EMSCRIPTEN)
+    if(NEWBASE_EMSCRIPTEN_HTML)
+        set(CMAKE_EXECUTABLE_SUFFIX ".html")
+    endif()
+    set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_EMSCRIPTEN_RES_PREFIX}")
+else()
+    set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_NATIVE_RES_PREFIX}")
+endif()
 
 include(cmake/NewbaseFunctions.cmake)
+include(cmake/NewbaseImGui.cmake)
 
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
@@ -12,23 +26,12 @@ set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
-set(IMGUI_SOURCES
-    vendored/imgui/imgui.cpp
-    vendored/imgui/imgui_draw.cpp
-    vendored/imgui/imgui_widgets.cpp
-    vendored/imgui/imgui_tables.cpp
-    vendored/imgui/imgui_demo.cpp  # TODO remove when needed
-    vendored/imgui/backends/imgui_impl_sdl3.cpp
-    vendored/imgui/backends/imgui_impl_sdlrenderer3.cpp
-    vendored/imgui/backends/imgui_impl_sdlgpu3.cpp
-    )
-set(IMGUI_INCLUDES
-    vendored/imgui)
-
 
 add_library(newbase STATIC
-    # entry points
+
+    # entry points and platform support
     src/sdl/engine_hooks.cpp
+    src/sdl/logging_handler.cpp
 
     # engine base
     src/engine.cpp
@@ -51,10 +54,8 @@ add_library(newbase STATIC
     # yaml conversions
     src/yaml/glm.cpp
 
-    # stb
+    # dependencies: stb and Dear ImGui
     src/stb_impl.c
-
-    # Dear ImGui
     ${IMGUI_SOURCES}
 )
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)

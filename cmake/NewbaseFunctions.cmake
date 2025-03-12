@@ -1,24 +1,44 @@
 # cmake functions used by newbase
 
+function(newbase_prepare_executable target)
+    if(DEFINED EMSCRIPTEN)
+        set(target_opts "-sALLOW_MEMORY_GROWTH")
+        message("[newbase_prepare_executable] setting emscripten options for '${target}': ${target_opts}")
+        target_link_options(${target} PRIVATE ${target_opts})
+    endif()
+endfunction()
+
 function(newbase_declare_resources)
     set(options BUILD_SYMLINKS NO_INSTALL)
-    set(oneValueArgs "")
+    set(oneValueArgs TARGET)
     set(multiValueArgs FILES)
     cmake_parse_arguments(PARSE_ARGV 0 arg 
         "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
     message("[newbase_declare_resources] from: " ${CMAKE_CURRENT_SOURCE_DIR})
+    message("[newbase_declare_resources] destination prefix is: " ${NEWBASE_DEFAULT_RES_PREFIX})
+
+    if(arg_BUILD_SYMLINKS)
+        set(links_dest_dir "${CMAKE_CURRENT_BINARY_DIR}/${NEWBASE_DEFAULT_RES_PREFIX}")
+        message("[newbase_declare_resources] ensuring symlink dest dir: ${links_dest_dir}")
+        file(MAKE_DIRECTORY "${links_dest_dir}")
+    endif()
 
     foreach(file ${arg_FILES})
         message("[newbase_declare_resources] file/folder: " ${file})
         file(REAL_PATH "${file}" file_real BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+        if(DEFINED EMSCRIPTEN)
+            if(DEFINED arg_TARGET)
+            message("[newbase_declare_resources] \tembedding to emscripten executable target")
+                target_link_options(${arg_TARGET} PRIVATE "--embed-file=${file_real}@${NEWBASE_DEFAULT_RES_PREFIX}/${file}")
+            endif()
+        endif()
         if(arg_BUILD_SYMLINKS)
             message("[newbase_declare_resources] \tadding symlink to binary dir")
-            file(RELATIVE_PATH file_build_rel "${CMAKE_CURRENT_BINARY_DIR}" "${file_real}")
+            file(RELATIVE_PATH file_build_rel "${links_dest_dir}" "${file_real}")
             message("[newbase_declare_resources] \treal path: " ${file_real})
             message("[newbase_declare_resources] \tbuild-relative path: " ${file_build_rel})
-            file(CREATE_LINK "${file_build_rel}" "${CMAKE_CURRENT_BINARY_DIR}/${file}" SYMBOLIC)
+            file(CREATE_LINK "${file_build_rel}" "${links_dest_dir}/${file}" SYMBOLIC)
         endif()
     endforeach()
-
 endfunction()

@@ -22,6 +22,9 @@ public:
     bool step();
     bool event(SDL_Event *);
 
+    // default engine log handler
+    void log_handler(int category, int prio, const char *msg);
+
 private:
     engine_p *_d;
     std::vector<std::shared_ptr<system>> _systems;

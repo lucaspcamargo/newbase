@@ -2,6 +2,8 @@
 #include <newbase/system.h>
 #include <newbase/res/manager.h>
 #include <newbase/ecs.h>
+#include <newbase/sdl/logging_handler.h>
+#include <newbase/nb_config.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_init.h>
@@ -9,6 +11,7 @@
 #include <ryml_std.hpp>
 #include <entt/entt.hpp>
 
+#include <functional>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -21,6 +24,7 @@ struct nb::engine_p {
     ryml::Tree cfg;
     std::string cfile;
     SDL_InitFlags initflags;
+    int log_handler_handle;
 };
 
 engine::engine()
@@ -30,10 +34,17 @@ engine::engine()
     _d = new engine_p();
     _d->initflags = 0;
 
-    std::ifstream t("config.yaml");
+    log::setup_handler();
+    _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
+
+    std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
+    std::ifstream t(cfgpath);
     if(!t.is_open())
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not find config file!");
+        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not find config file: %s", cfgpath.c_str());
         exit(1);
     }
     std::stringstream buffer;
@@ -41,8 +52,9 @@ engine::engine()
     _d->cfile = buffer.str();
     _d->cfg = ryml::parse_in_place(_d->cfile.data());
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] config:\n%s",
-                ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
+    // could be useful but no
+    //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] config:\n%s",
+    //            ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
 
     auto resources = _d->cfg["resources"];
     if(!rman().configure(resources))
@@ -78,6 +90,9 @@ engine::~engine()
 
     // destroy all system shared_ptrs
     _systems.clear();
+
+    log::unregister_observer(_d->log_handler_handle);
+
     delete _d;
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroyed");
@@ -140,4 +155,9 @@ bool engine::event(SDL_Event *evt)
     }
 
     return true;
+}
+
+void engine::log_handler(int category, int prio, const char *msg)
+{
+    std::cerr << category << ":" << prio << ": "<< msg << std::endl;
 }

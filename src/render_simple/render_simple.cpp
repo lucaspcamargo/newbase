@@ -178,7 +178,7 @@ bool render_simple::step(nb::step_phase phase)
                 const SDL_FPoint right{view_right.x, view_right.y};
                 const SDL_FPoint down{view_down.x, view_down.y};
 
-                /*std::cerr << _wx << " "<< _wy << std::endl;/*
+                /*std::cerr << _wx << " "<< _wy << std::endl;
                 std::cerr << spr_res->anchor.x << " "<< spr_res->anchor.y << std::endl;
                 std::cerr << anchor_delta.x << " "<< anchor_delta.y << std::endl;
                 std::cerr << loc_origin.x << " "<< loc_origin.y << " "<< loc_origin.z << " " << std::endl;

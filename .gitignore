@@ -1,4 +1,8 @@
-build 
+build
+build_ems
+out
+CMake*.json
+emsdk
 **.kdev4
 .kdev4/
 **.kate-swp
