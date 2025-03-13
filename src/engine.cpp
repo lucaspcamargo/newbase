@@ -38,7 +38,11 @@ engine::engine()
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
+    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
+    SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
     std::ifstream t(cfgpath);
@@ -159,5 +163,7 @@ bool engine::event(SDL_Event *evt)
 
 void engine::log_handler(int category, int prio, const char *msg)
 {
-    std::cerr << category << ":" << prio << ": "<< msg << std::endl;
+    auto ansi = ::nb::log::priority_ansi_decor(static_cast<::nb::log::priority>(prio));
+    std::cout << (ansi.first? ansi.first : "") <<"["<< ::nb::log::priority_str(static_cast<::nb::log::priority>(prio)) <<
+         "] [" << ::nb::log::category_str(static_cast<::nb::log::category>(category)) << "] "<< msg << (ansi.second? ansi.second : "") << std::endl;
 }

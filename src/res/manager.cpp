@@ -24,7 +24,7 @@ static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
 
 SDL_Storage *_store_title{ nullptr };
 
-std::map<entt::id_type, locator> _pathmap;
+static std::unordered_map<entt::id_type, locator> _pathmap;
 
 rmanager::rmanager()
 {
@@ -33,7 +33,6 @@ rmanager::rmanager()
 
 rmanager::~rmanager()
 {
-    _pathmap.clear();
     if(_store_title)
     {
         SDL_CloseStorage(_store_title);
@@ -70,7 +69,7 @@ bool rmanager::configure(const ryml::NodeRef &config)
                 prefixed.append( *curr + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
                 auto hash = entt::hashed_string(prefixed.c_str());
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
-                _pathmap.emplace(std::make_pair(hash.value(), locator{prefixed, _store_title}));
+                _pathmap.insert(std::make_pair(hash.value(), locator{prefixed, _store_title}));
             }
         }
         else
