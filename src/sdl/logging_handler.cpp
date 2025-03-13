@@ -100,7 +100,7 @@ namespace log {
         else if(color == 3)
             return {"\033[91m", "\033[0m"};
         else if(color == 4)
-            return {"\033[91,1m", "\033[0m"};
+            return {"\033[91;1m", "\033[0m"};
         else 
             return {nullptr, nullptr};
         
