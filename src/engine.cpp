@@ -17,6 +17,8 @@
 #include <sstream>
 #include <iostream>
 
+#include <SDL3/SDL_stdinc.h>
+
 using namespace nb;
 using entt::operator""_hs;
 
@@ -163,6 +165,16 @@ bool engine::event(SDL_Event *evt)
 
 void engine::log_handler(int category, int prio, const char *msg)
 {
+    static bool checked_color = false;
+    static bool use_color = false;
+    if(!checked_color)
+    {
+        // maybe move check to ::nb::log?
+        const char * term = SDL_getenv("TERM");
+        if(term && strstr(term, "xterm") == term)
+            use_color = true;
+        checked_color = true;
+    }
     auto ansi = ::nb::log::priority_ansi_decor(static_cast<::nb::log::priority>(prio));
     std::cout << (ansi.first? ansi.first : "") <<"["<< ::nb::log::priority_str(static_cast<::nb::log::priority>(prio)) <<
          "] [" << ::nb::log::category_str(static_cast<::nb::log::category>(category)) << "] "<< msg << (ansi.second? ansi.second : "") << std::endl;
