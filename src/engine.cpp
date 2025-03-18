@@ -40,11 +40,7 @@ engine::engine()
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-    SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
-    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
-    SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] base logging ready");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
     std::ifstream t(cfgpath);
