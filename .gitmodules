@@ -19,3 +19,6 @@
 [submodule "vendored/entt"]
 	path = vendored/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "vendored/lua"]
+	path = vendored/lua
+	url = https://github.com/lua/lua.git
