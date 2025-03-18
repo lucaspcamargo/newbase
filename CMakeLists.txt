@@ -19,6 +19,7 @@ endif()
 
 include(cmake/NewbaseFunctions.cmake)
 include(cmake/NewbaseImGui.cmake)
+include(cmake/NewbaseLua.cmake)
 
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
