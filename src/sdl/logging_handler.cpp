@@ -91,6 +91,7 @@ namespace log {
         case priority::CRITICAL:
             color = 4;
             break;
+        default:;
         }
 
         if(color == 1)
