@@ -3,9 +3,11 @@
 #include <newbase/res/etree.h>
 #include <newbase/res/texture.h>
 #include <newbase/res/sprite.h>
+#include <newbase/res/script.h>
 
 #include <SDL3/SDL.h>
 #include <stb_image.h>
+#include <lua.h>
 
 #include <memory>
 
@@ -46,7 +48,8 @@ namespace nb {
     {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rloader_texture] loading: %x", id);
         std::vector<char> data;
-        rman().read_all_sync(id, data);
+        if(!rman().read_all_sync(id, data))
+            SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[rloader_texture] data loading failed: %x", id);
         SDL_Surface *surf;
         int w, h, chs;
         auto ptr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(data.data()), data.size(), &w, &h, &chs, 4);
@@ -79,4 +82,23 @@ namespace nb {
         return tex;
     }
 
+    rloader_script::result_type rloader_script::operator()(entt::id_type id) const
+    {
+        auto script = std::make_shared<rscript>();
+        script->valid = false;
+        if(!rman().read_all_sync(id, script->raw))
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[rloader_script] data loading failed: %x", id);
+            return script;
+        }
+        
+        // TODO allow for loading stored bytecode?
+        script->type = script_type::LUA_SOURCE;
+        script->state = script_state::UNPARSED_SOURCE;
+
+        // TODO allow to use some sort of workqueue to parse source in parallel?
+        
+
+        return script;
+    }
 }

@@ -20,6 +20,7 @@ public:
     entt::resource<retree> get_etree(entt::id_type id, bool forceload = false);
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
     entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
+    entt::resource<rscript> get_script(entt::id_type id, bool forceload = false);
 };
 
 rmanager& rman();

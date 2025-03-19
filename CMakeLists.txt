@@ -48,6 +48,9 @@ add_library(newbase STATIC
     # system: audio
     src/audio/audio.cpp
 
+    # system: script_lua
+    src/script_lua/script_lua.cpp
+
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp
@@ -60,9 +63,9 @@ add_library(newbase STATIC
     ${IMGUI_SOURCES}
 )
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
-target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES})
+target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES} ${LUA_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL)
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)

@@ -6,6 +6,7 @@ systems:
     streams:
         - sfx
         - bgm
+ script_lua: {}
 resources:
  scanners:
  - type: "fs_raw"

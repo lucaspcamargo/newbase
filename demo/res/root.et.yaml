@@ -14,3 +14,5 @@
       scale: [1, 1, 1]
     sprite:
       res: "@res/sprites/rocket.png"
+    script:
+      lua: "@res/rocket.lua"

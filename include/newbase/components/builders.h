@@ -7,4 +7,5 @@ namespace nb
 {
     bool build_spatial(ryml::ConstNodeRef data, cspatial &dst);
     bool build_sprite(ryml::ConstNodeRef data, csprite &dst);
+    bool build_script(ryml::ConstNodeRef data, cscript &dst);
 }

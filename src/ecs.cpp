@@ -4,6 +4,7 @@
 #include <newbase/components/builders.h>
 #include <newbase/components/spatial.h>
 #include <newbase/components/sprite.h>
+#include <newbase/components/script.h>
 #include <newbase/res/etree.h>
 
 #include <entt/entt.hpp>
@@ -55,6 +56,11 @@ entt::id_type nb::build_etree(entt::id_type retree_id)
             {
                 auto &s = _reg.emplace<nb::csprite>(eid);
                 nb::build_sprite(comp, s);
+            }
+            else if(compname == "script")
+            {
+                auto &s = _reg.emplace<nb::cscript>(eid);
+                nb::build_script(comp, s);
             }
             else assert(0);
         }

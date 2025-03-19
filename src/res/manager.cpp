@@ -21,6 +21,7 @@ rmanager& rman() {return _rman_inst;}
 static entt::resource_cache<retree, rloader_etree> _cache_etree{};
 static entt::resource_cache<rsprite, rloader_sprite> _cache_sprite{};
 static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
+static entt::resource_cache<rscript, rloader_script> _cache_script{};
 
 SDL_Storage *_store_title{ nullptr };
 
@@ -117,6 +118,7 @@ bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero
         if(!SDL_ReadStorageFile(_store_title, path.c_str(), dst.data(), info.size))
         {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot read: %s (%x)", path.c_str(), id);
+            dst.resize(0);
             return false;
         }
         else
@@ -156,6 +158,12 @@ entt::resource<rtexture> rmanager::get_texture(entt::id_type id, bool forceload)
 {
     return (C4_UNLIKELY(forceload)? _cache_texture.force_load(id, id)
                                  : _cache_texture.load(id, id)).first->second;
+}
+
+entt::resource<rscript> rmanager::get_script(entt::id_type id, bool forceload)
+{
+    return (C4_UNLIKELY(forceload)? _cache_script.force_load(id, id)
+                                 : _cache_script.load(id, id)).first->second;
 }
 
 }

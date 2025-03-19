@@ -21,4 +21,9 @@ struct rloader_texture {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_script {
+    using result_type = std::shared_ptr<rscript>;
+    result_type operator()(entt::id_type) const;
+};
+
 }
