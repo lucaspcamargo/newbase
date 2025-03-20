@@ -84,6 +84,7 @@ namespace nb {
 
     rloader_script::result_type rloader_script::operator()(entt::id_type id) const
     {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rloader_script] loading: %x", id);
         auto script = std::make_shared<rscript>();
         script->valid = false;
         if(!rman().read_all_sync(id, script->raw))
@@ -94,8 +95,7 @@ namespace nb {
         
         // TODO allow for loading stored bytecode?
         script->type = script_type::LUA_SOURCE;
-        script->state = script_state::UNPARSED_SOURCE;
-
+        script->valid = true;
         // TODO allow to use some sort of workqueue to parse source in parallel?
         
 

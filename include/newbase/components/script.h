@@ -2,11 +2,15 @@
 
 #include <newbase/res/script.h>
 #include <entt/resource/resource.hpp>
-#include <glm/glm.hpp>
+extern "C" {
+#include <lua.h>
+}
 
 namespace nb {
     struct cscript {
         entt::resource<rscript> script {};
-        void * state {nullptr};
+        lua_State *state {nullptr};
+        bool ready {false};
+        bool skip {false};
     };
 }
