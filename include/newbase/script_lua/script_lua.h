@@ -14,6 +14,10 @@ public:
     bool init(int argc, char **argv) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
+
+private:
+    // our own allocator provided to lua
+    static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize);
 };
 
 }

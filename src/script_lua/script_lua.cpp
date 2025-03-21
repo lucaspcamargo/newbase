@@ -32,7 +32,7 @@ bool script_lua::init(int argc, char **argv)
 
 bool script_lua::step(step_phase phase)
 {
-    // TODO maybe not scan everything
+    // TODO maybe not scan everything every frame (use reactive storage)
     if(phase == step_phase::PREPARE)
     {
         auto view = reg().view<cscript>();
@@ -48,7 +48,7 @@ bool script_lua::step(step_phase phase)
                 if(script.state == nullptr)
                 {
                     // create new lua state if needed
-                    script.state = luaL_newstate();
+                    script.state = lua_newstate(&l_alloc, this);
                     luaL_openlibs(script.state);    // TODO make optional?
                     // TODO prepare global table
                     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[script_lua] new state: %x", id);
@@ -104,6 +104,18 @@ bool script_lua::step(step_phase phase)
 bool script_lua::event(SDL_Event*) 
 {
     return true;
+}
+
+void* script_lua::l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
+{
+    // TODO use a pool allocator? entt provides some stuff
+    (void) ud;  (void) osize;  /* unused */
+    if (nsize == 0) {
+        free(ptr);
+        return NULL;
+    }
+    else
+        return realloc(ptr, nsize);
 }
 
 const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* size)
