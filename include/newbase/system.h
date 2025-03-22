@@ -1,7 +1,7 @@
 #pragma once
 
+#include <newbase/mixins.h>
 #include <SDL3/SDL.h>
-
 #include <string>
 #include <memory>
 
@@ -19,7 +19,7 @@ enum step_phase {
     _STEP_PHASE_COUNT
 };
 
-class system {
+class system : public nocopy {
 public:
     system() = default;
     virtual ~system() {}

@@ -1,7 +1,7 @@
 #include <newbase/engine.h>
 #include <newbase/system.h>
 #include <newbase/res/manager.h>
-#include <newbase/ecs.h>
+#include <newbase/scene.h>
 #include <newbase/sdl/logging_handler.h>
 #include <newbase/nb_config.h>
 
@@ -27,6 +27,7 @@ struct nb::engine_p {
     std::string cfile;
     SDL_InitFlags initflags;
     int log_handler_handle;
+    scene default_scene;
 };
 
 engine::engine()
@@ -90,11 +91,10 @@ engine::~engine()
 {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroying");
 
-    // destroy all system shared_ptrs
+    // ensure there are not more system references from the engine
     _systems.clear();
 
     log::unregister_observer(_d->log_handler_handle);
-
     delete _d;
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroyed");
@@ -118,10 +118,17 @@ bool engine::init(int argc, char ** argv)
     }
 
     // load initial entity tree
-    auto root_ent = build_etree("@res/root.et.yaml"_hs);
+    auto root_ent = _d->default_scene.build_etree("@res/root.et.yaml"_hs);
     
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] initialized");
+    return true;
+}
+
+bool engine::teardown()
+{
+    // destroy all system shared_ptrs
+    _systems.clear();
     return true;
 }
 
@@ -159,6 +166,12 @@ bool engine::event(SDL_Event *evt)
     return true;
 }
 
+::nb::scene& engine::default_scene()
+{
+    return _d->default_scene;
+}
+
+
 void engine::log_handler(int category, int prio, const char *msg)
 {
     static bool checked_color = false;
@@ -174,4 +187,10 @@ void engine::log_handler(int category, int prio, const char *msg)
     auto ansi = ::nb::log::priority_ansi_decor(static_cast<::nb::log::priority>(prio));
     std::cout << (ansi.first? ansi.first : "") <<"["<< ::nb::log::priority_str(static_cast<::nb::log::priority>(prio)) <<
          "] [" << ::nb::log::category_str(static_cast<::nb::log::category>(category)) << "] "<< msg << (ansi.second? ansi.second : "") << std::endl;
+}
+
+engine& engine::instance()
+{
+    static engine e;
+    return e;
 }

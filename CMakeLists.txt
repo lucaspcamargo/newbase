@@ -23,6 +23,7 @@ include(cmake/NewbaseLua.cmake)
 
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
+add_subdirectory(vendored/sol2 EXCLUDE_FROM_ALL)
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 set(ENTT_INSTALL ON) # needed for export
@@ -36,8 +37,8 @@ add_library(newbase STATIC
 
     # engine base
     src/engine.cpp
+    src/scene.cpp
     src/system_factory.cpp
-    src/ecs.cpp
 
     # components
     src/components/builders.cpp
@@ -65,7 +66,7 @@ add_library(newbase STATIC
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES} ${LUA_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL)
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)

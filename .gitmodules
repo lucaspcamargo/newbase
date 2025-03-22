@@ -19,3 +19,6 @@
 [submodule "vendored/entt"]
 	path = vendored/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "vendored/sol2"]
+	path = vendored/sol2
+	url = https://github.com/ThePhD/sol2.git

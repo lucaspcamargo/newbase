@@ -1,7 +1,7 @@
 #include <newbase/script_lua/script_lua.h>
 #include <newbase/components/script.h>
-#include <newbase/ecs.h>
-
+#include <newbase/scene.h>
+#include <newbase/engine.h>
 #include <SDL3/SDL_log.h>
 #include <entt/entt.hpp>
 extern "C" {
@@ -9,7 +9,6 @@ extern "C" {
 #include <lualib.h>
 #include <lauxlib.h>
 }
-
 #include <vector>
 
 using namespace nb;
@@ -18,6 +17,20 @@ typedef std::pair<size_t, std::vector<char>*> reader_state_t;
 
 const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* size);
 
+struct nb::script_lua_p {
+    lua_State * L {nullptr};
+};
+
+
+script_lua::script_lua()
+{
+    _d = new script_lua_p();
+}
+
+script_lua::~script_lua()
+{
+    delete _d;
+}
 
 SDL_InitFlags script_lua::sdl_subsystems()
 {
@@ -27,6 +40,10 @@ SDL_InitFlags script_lua::sdl_subsystems()
 bool script_lua::init(int argc, char **argv)
 {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[script_lua] init");
+    _d->L = lua_newstate(&l_alloc, this);
+    luaL_openlibs(_d->L);
+    // TODO prepare global table
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[script_lua] initialized");
     return true;
 }
 
@@ -35,7 +52,7 @@ bool script_lua::step(step_phase phase)
     // TODO maybe not scan everything every frame (use reactive storage)
     if(phase == step_phase::PREPARE)
     {
-        auto view = reg().view<cscript>();
+        auto view = engine::instance().default_scene().registry().view<cscript>(); // TODO change this
         for (auto [id, script]: view.each())
         {
             auto &script_res = script.script;
@@ -48,9 +65,7 @@ bool script_lua::step(step_phase phase)
                 if(script.state == nullptr)
                 {
                     // create new lua state if needed
-                    script.state = lua_newstate(&l_alloc, this);
-                    luaL_openlibs(script.state);    // TODO make optional?
-                    // TODO prepare global table
+                    script.state = _d->L;
                     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[script_lua] new state: %x", id);
                 }
                 bool valid_chunk = false;

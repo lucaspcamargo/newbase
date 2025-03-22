@@ -1,4 +1,4 @@
-#include <newbase/ecs.h>
+#include <newbase/scene.h>
 #include <newbase/res/manager.h>
 #include <newbase/res/etree.h>
 #include <newbase/components/builders.h>
@@ -11,15 +11,33 @@
 #include <ryml_std.hpp>
 #include <SDL3/SDL.h>
 
-static entt::registry _reg;
+struct nb::scene_p {
+    entt::id_type id;
+    entt::registry reg;
+};
 
-entt::registry &nb::reg()
+
+nb::scene::scene(entt::id_type scene_id) : nocopy()
 {
-    return _reg;
+    _d = new nb::scene_p();
+    _d->id = scene_id;
 }
 
-entt::id_type nb::build_etree(entt::id_type retree_id)
+nb::scene::~scene()
 {
+    _d->reg.clear();
+    delete _d;
+}
+
+entt::registry& nb::scene::registry()
+{
+    return _d->reg;
+}
+
+entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type parent)
+{
+    (void) parent; // TODO hirerarchy stuff
+    auto &reg = _d->reg;
     auto res = rman().get_etree(retree_id, false);
     if(!res)
     {
@@ -39,7 +57,7 @@ entt::id_type nb::build_etree(entt::id_type retree_id)
     {
         std::string entname;
         c4::from_chars(ent["name"].val(), &entname);
-        auto eid = _reg.create();
+        auto eid = reg.create();
 
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: ent %s", entname.c_str());
         for(auto comp: ent["comps"])
@@ -49,17 +67,17 @@ entt::id_type nb::build_etree(entt::id_type retree_id)
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: comp %s", compname.c_str());
             if(compname == "spatial")
             {
-                auto &s = _reg.emplace<nb::cspatial>(eid);
+                auto &s = reg.emplace<nb::cspatial>(eid);
                 nb::build_spatial(comp, s);
             }
             else if(compname == "sprite")
             {
-                auto &s = _reg.emplace<nb::csprite>(eid);
+                auto &s = reg.emplace<nb::csprite>(eid);
                 nb::build_sprite(comp, s);
             }
             else if(compname == "script")
             {
-                auto &s = _reg.emplace<nb::cscript>(eid);
+                auto &s = reg.emplace<nb::cscript>(eid);
                 nb::build_script(comp, s);
             }
             else assert(0);

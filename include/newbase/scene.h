@@ -1,20 +1,23 @@
 #pragma once
 
+#include <newbase/mixins.h>
 #include <entt/fwd.hpp>
 #include <entt/entity/entity.hpp>
 
 namespace nb {
 
-class scene final {
-public:
-    explicit scene();
-    scene(const scene&) = delete;
-    scene(scene&&) = delete;
-    ~scene();
+struct scene_p;
 
-    entt::registry &registry();
+class scene final : public nocopy {
+public:
+    explicit scene(entt::id_type scene_id = entt::null);
+    virtual ~scene();
+
+    entt::registry& registry();
 
     entt::id_type build_etree(entt::id_type retree_id, entt::id_type parent = entt::null);
+private:
+    scene_p *_d;
 };
 
 }

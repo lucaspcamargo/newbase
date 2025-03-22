@@ -1,5 +1,6 @@
 #include <newbase/render_simple/render_simple.h>
-#include <newbase/ecs.h>
+#include <newbase/engine.h>
+#include <newbase/scene.h>
 #include <newbase/components/sprite.h>
 #include <newbase/components/spatial.h>
 #include <newbase/res/sprite.h>
@@ -58,7 +59,7 @@ bool render_simple::init(int argc, char **argv)
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] init");
     const auto num_drivers = SDL_GetNumRenderDrivers();
     
-    /* Listing available drivers: disabled because it is slow
+    /* Listing available drivers: disabled because it may be slow
     
     std::vector<std::string> drivers;
     std::string driver_names;
@@ -137,13 +138,15 @@ bool render_simple::step(nb::step_phase phase)
         // Rendering
         glm::mat4x4 viewproj{glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f })};
         
+        auto &reg = engine::instance().default_scene().registry(); // TODO change this
+
         // order spatial components
-        reg().sort<cspatial>([](const cspatial &lhs, const cspatial &rhs) {
+        reg.sort<cspatial>([](const cspatial &lhs, const cspatial &rhs) {
             return lhs.pos[2] > rhs.pos[2];
         });
         //reg().sort<csprite, cspatial>(); // apply spatial ordering to sprite components 
         
-        auto view = reg().view<const cspatial, const csprite>();
+        auto view = reg.view<const cspatial, const csprite>();
         view.use<const cspatial>();
         for(auto [id, spatial, sprite]: view.each()) {
             auto spr_res = sprite.spr;
