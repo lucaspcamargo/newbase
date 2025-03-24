@@ -1,23 +1,16 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.9.0)
 project(newbase)
 
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
 set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
+option(NEWBASE_LTO "Enable LTO if available" OFF)
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
 option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
+option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
 set(NEWBASE_NATIVE_RES_PREFIX "./nb" CACHE STRING "Path prefix for installing and searching for resources")
 
-# resolve option configuration
-if(DEFINED EMSCRIPTEN)
-    if(NEWBASE_EMSCRIPTEN_HTML)
-        set(CMAKE_EXECUTABLE_SUFFIX ".html")
-    endif()
-    set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_EMSCRIPTEN_RES_PREFIX}")
-else()
-    set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_NATIVE_RES_PREFIX}")
-endif()
-
+include(cmake/NewbaseOptions.cmake)
 include(cmake/NewbaseFunctions.cmake)
 include(cmake/NewbaseLogging.cmake)
 include(cmake/NewbaseImGui.cmake)
