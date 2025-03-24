@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(newbase)
 
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
+set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
 option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
@@ -18,6 +19,7 @@ else()
 endif()
 
 include(cmake/NewbaseFunctions.cmake)
+include(cmake/NewbaseLogging.cmake)
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
 
@@ -58,6 +60,9 @@ add_library(newbase STATIC
 
     # yaml conversions
     src/yaml/glm.cpp
+
+    # rtti
+    src/reflection/contexts.cpp
 
     # dependencies: stb and Dear ImGui
     src/stb_impl.c

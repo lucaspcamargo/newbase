@@ -6,6 +6,9 @@
 #include <newbase/res/sprite.h>
 #include <newbase/res/texture.h>
 #include <newbase/res/manager.h>
+#include <newbase/reflection/contexts.h>
+#include <newbase/reflection/data.h>
+#include <newbase/log.h>
 
 #include "imgui.h"
 #include "backends/imgui_impl_sdl3.h"
@@ -19,6 +22,7 @@
 
 
 using namespace nb;
+using entt::operator""_hs;
 
 render_simple::render_simple():
 _win(nullptr),
@@ -26,12 +30,12 @@ _render(nullptr),
 _scale(1.0),
 _wx(0), _wy(0)
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] constructed");
+    log::info("[render_simple] constructed");
 }
 
 render_simple::~render_simple()
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] destroying");
+    log::info("[render_simple] destroying");
     if(_render)
     {
         ImGui_ImplSDLRenderer3_Shutdown();
@@ -44,7 +48,7 @@ render_simple::~render_simple()
     if(_win)
         SDL_DestroyWindow(_win);
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] destroyed");
+    log::info("[render_simple] destroyed");
 }
 
 
@@ -56,7 +60,7 @@ SDL_InitFlags render_simple::sdl_subsystems()
 
 bool render_simple::init(int argc, char **argv)
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] init");
+    log::info("[render_simple] init");
     const auto num_drivers = SDL_GetNumRenderDrivers();
     
     /* Listing available drivers: disabled because it may be slow
@@ -71,30 +75,30 @@ bool render_simple::init(int argc, char **argv)
         driver_names += " ";
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] available drivers: %s", driver_names.c_str());
+    log::info("[render_simple] available drivers: %s", driver_names.c_str());
     */
 
     Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), 1024, 768, window_flags);
     if (_win == nullptr)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] SDL_CreateWindow(): %s\n", SDL_GetError());
+        log::error("[render_simple] SDL_CreateWindow(): %s\n", SDL_GetError());
         return false;
     }
     _scale = SDL_GetWindowDisplayScale(_win);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] window scale: %f", _scale);
+    log::info("[render_simple] window scale: %f", _scale);
 
     _render = SDL_CreateRenderer(_win, nullptr);
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] renderer: %s", SDL_GetRendererName(_render));
+    log::info("[render_simple] renderer: %s", SDL_GetRendererName(_render));
     
     SDL_SetRenderVSync(_render, 1);
     if (_render == nullptr)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] SDL_CreateRenderer(): %s\n", SDL_GetError());
+        log::error("[render_simple] SDL_CreateRenderer(): %s\n", SDL_GetError());
         return false;
     }
     else
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[render_simple] created renderer: %s", SDL_GetRendererName(_render));
+        log::info("[render_simple] created renderer: %s", SDL_GetRendererName(_render));
     SDL_SetWindowPosition(_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(_win);
     SDL_GetWindowSize(_win, &_wx, &_wy);
@@ -270,3 +274,22 @@ void render_simple::draw_perf()
     }
     ImGui::End();
 }
+
+
+
+// RTTI metadata
+
+[[nodiscard]] static bool _rtti_register()
+{
+    entt::meta_factory<nb::render_simple>{rtti::ctx_systems()}
+        .type("render_simple"_hs)
+        .custom<rtti::cstr>("render_simple")
+        .base<nb::system>();
+    entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
+        .type("render_simple_shared"_hs)
+        .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
+        .conv<std::shared_ptr<nb::system>>();
+    return true;
+}
+
+static bool _rtti_registered_render_simple = _rtti_register();

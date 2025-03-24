@@ -1,7 +1,11 @@
 #include <newbase/audio/audio.h>
 #include <newbase/sdl/utils.h>
+#include <newbase/reflection/contexts.h>
+#include <newbase/reflection/data.h>
+#include <entt/meta/factory.hpp>
 
 using namespace nb;
+using entt::operator""_hs;
 
 static SDL_AudioDeviceID _dev_out{ 0 };
 static SDL_AudioSpec _spec_out;
@@ -64,3 +68,19 @@ bool audio::event(SDL_Event*)
 }
 
 
+// RTTI metadata
+
+[[nodiscard]] static bool _rtti_register()
+{
+    entt::meta_factory<nb::audio>{rtti::ctx_systems()}
+        .type("audio"_hs)
+        .custom<rtti::cstr>("audio")
+        .base<nb::system>();
+    entt::meta_factory<std::shared_ptr<nb::audio>>{rtti::ctx_systems()}
+        .type("audio_shared"_hs)
+        .ctor<&rtti::shared_ptr_builder<nb::audio>>()
+        .conv<std::shared_ptr<nb::system>>();
+    return true;
+}
+
+static bool _rtti_registered_audio = _rtti_register();

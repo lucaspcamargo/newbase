@@ -1,36 +1,11 @@
 #pragma once
 
+#include <newbase/log.h>
 #include <functional>
 #include <map>
 
 namespace nb {
 namespace log {
-
-    enum class category : int {
-        APPLICATION,
-        ERROR,
-        ASSERT,
-        SYSTEM,
-        AUDIO,
-        VIDEO,
-        RENDER,
-        INPUT,
-        TEST,
-        GPU,
-        _COUNT
-    };
-
-    enum class priority : int {
-        INVALID,
-        TRACE,
-        VERBOSE,
-        DEBUG,
-        INFO,
-        WARN,
-        ERROR,
-        CRITICAL,
-        _COUNT
-    };
 
     typedef std::function<void(int category, int prio, const char *msg)> observer_t;
 

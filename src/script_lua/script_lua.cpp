@@ -2,6 +2,8 @@
 #include <newbase/components/script.h>
 #include <newbase/scene.h>
 #include <newbase/engine.h>
+#include <newbase/reflection/contexts.h>
+#include <newbase/reflection/data.h>
 #include <SDL3/SDL_log.h>
 #include <entt/entt.hpp>
 extern "C" {
@@ -12,6 +14,7 @@ extern "C" {
 #include <vector>
 
 using namespace nb;
+using entt::operator""_hs;
 
 typedef std::pair<size_t, std::vector<char>*> reader_state_t;
 
@@ -149,3 +152,21 @@ const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* 
     }
     return nullptr;
 }
+
+
+// RTTI metadata
+
+[[nodiscard]] static bool _rtti_register()
+{
+    entt::meta_factory<script_lua>{rtti::ctx_systems()}
+        .type("script_lua"_hs)
+        .custom<rtti::cstr>("script_lua")
+        .base<nb::system>();
+    entt::meta_factory<std::shared_ptr<nb::script_lua>>{rtti::ctx_systems()}
+        .type("script_lua_shared"_hs)
+        .ctor<&rtti::shared_ptr_builder<nb::script_lua>>()
+        .conv<std::shared_ptr<nb::system>>();
+    return true;
+}
+
+static bool _rtti_registered_script_lua = _rtti_register();

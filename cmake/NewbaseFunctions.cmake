@@ -1,11 +1,48 @@
 # cmake functions used by newbase
+set(NEWBASE_ALL_SYSTEMS
+    script_lua
+    render_simple
+    audio
+    )
 
-function(newbase_prepare_executable target)
+function(newbase_prepare_executable)
+    set(options BUILD_SYMLINKS NO_INSTALL)
+    set(oneValueArgs TARGET)
+    set(multiValueArgs SYSTEMS)
+    cmake_parse_arguments(PARSE_ARGV 0 arg 
+        "${options}" "${oneValueArgs}" "${multiValueArgs}")
+    if(NOT DEFINED arg_TARGET)
+        message(FATAL_ERROR "[newbase_prepare_executable] no target was given!")
+    endif()
+
     if(DEFINED EMSCRIPTEN)
         set(target_opts "-sALLOW_MEMORY_GROWTH")
-        message("[newbase_prepare_executable] setting emscripten options for '${target}': ${target_opts}")
-        target_link_options(${target} PRIVATE ${target_opts})
+        message("[newbase_prepare_executable] setting emscripten options for '${arg_TARGET}': ${target_opts}")
+        target_link_options(${arg_TARGET} PRIVATE ${target_opts})
     endif()
+
+    if((NOT DEFINED arg_SYSTEMS))
+        message(FATAL_ERROR "[newbase_prepare_executable] no systems are listed for target '${arg_TARGET}'")
+    endif()
+
+    # implement dynamic system lists
+    list(LENGTH arg_SYSTEMS arg_SYSTEMS_LEN)
+    if(arg_SYSTEMS_LEN EQUAL 1)
+        if(arg_SYSTEMS EQUAL "ALL")
+            set(arg_SYSTEMS ${NEWBASE_ALL_SYSTEMS})
+        elseif(arg_SYSTEMS EQUAL "AUTO")
+            # TODO
+            message(FATAL_ERROR "[newbase_prepare_executable] AUTO: not implemented, we have to make something that reads the yaml config")
+        endif()
+    endif()
+
+    
+    message("[newbase_prepare_executable] setting systems for target '${arg_TARGET}': ${arg_SYSTEMS}")
+    foreach(sysname ${arg_SYSTEMS})
+        # require static symbol that causes rtti initialization
+        # this ensures the system is discoverable and is linked into the executable
+        target_link_options(${arg_TARGET} BEFORE PRIVATE "SHELL:-u _rtti_registered_${sysname}") 
+    endforeach()
 endfunction()
 
 function(newbase_declare_resources)

@@ -4,6 +4,7 @@
 #include <newbase/scene.h>
 #include <newbase/sdl/logging_handler.h>
 #include <newbase/nb_config.h>
+#include <newbase/log.h>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_init.h>
@@ -32,7 +33,7 @@ struct nb::engine_p {
 
 engine::engine()
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] constructing");
+    log::info("[engine] constructing");
 
     _d = new engine_p();
     _d->initflags = 0;
@@ -41,13 +42,13 @@ engine::engine()
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] logging ready");
+    log::info("[engine] logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
     std::ifstream t(cfgpath);
     if(!t.is_open())
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not find config file: %s", cfgpath.c_str());
+        log::critical("[engine] could not find config file: %s", cfgpath.c_str());
         exit(1);
     }
     std::stringstream buffer;
@@ -56,13 +57,13 @@ engine::engine()
     _d->cfg = ryml::parse_in_place(_d->cfile.data());
 
     // could be useful but no
-    //SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] config:\n%s",
+    //log::info("[engine] config:\n%s",
     //            ryml::emitrs_yaml<std::string>(_d->cfg).c_str());
 
     auto resources = _d->cfg["resources"];
     if(!rman().configure(resources))
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not initialize resource manager!");
+        log::critical("[engine] could not initialize resource manager!");
         exit(1);
     }
 
@@ -71,11 +72,11 @@ engine::engine()
     {
         std::string sysname;
         c4::from_chars(n.key(), &sysname);
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] creating system: %s", sysname.c_str());
+        log::info("[engine] creating system: %s", sysname.c_str());
         std::shared_ptr<system> sys = system::build(sysname.c_str(), n.tree());
         if(!sys)
         {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] could not create system: %s", sysname.c_str());
+            log::error("[engine] could not create system: %s", sysname.c_str());
         }
         else
         {
@@ -84,12 +85,12 @@ engine::engine()
         }
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] constructed");
+    log::info("[engine] constructed");
 }
 
 engine::~engine()
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroying");
+    log::info("[engine] destroying");
 
     // ensure there are not more system references from the engine
     _systems.clear();
@@ -97,17 +98,17 @@ engine::~engine()
     log::unregister_observer(_d->log_handler_handle);
     delete _d;
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] destroyed");
+    log::info("[engine] destroyed");
 }
 
 bool engine::init(int argc, char ** argv)
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] init");
+    log::info("[engine] init");
 
     // TODO collect SDL systems to init from systems
     if(!SDL_Init(_d->initflags))
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[engine] SDL_Init error: (%d): %s", static_cast<int>(_d->initflags), SDL_GetError());
+        log::error("[engine] SDL_Init error: (%d): %s", static_cast<int>(_d->initflags), SDL_GetError());
         return false;
     }
 
@@ -121,7 +122,7 @@ bool engine::init(int argc, char ** argv)
     auto root_ent = _d->default_scene.build_etree("@res/root.et.yaml"_hs);
     
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[engine] initialized");
+    log::info("[engine] initialized");
     return true;
 }
 
@@ -134,7 +135,7 @@ bool engine::teardown()
 
 bool engine::step()
 {
-    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "[engine] step");\
+    log::debug("[engine] step");\
 
     for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
     {
@@ -151,10 +152,13 @@ bool engine::step()
 
 bool engine::event(SDL_Event *evt)
 {
-    SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "[engine] event");
+    log::debug("[engine] event");
     if(evt->type == SDL_EVENT_KEY_DOWN)
         if(evt->key.key == SDLK_ESCAPE)
             return false;
+    
+    if(evt->type == SDL_EVENT_QUIT)
+        return false;
 
     for(auto s: _systems)
     {
