@@ -5,24 +5,44 @@ set(NEWBASE_ALL_SYSTEMS
     audio
     )
 
+function(newbase_add_executable)
+    set(options "")
+    set(oneValueArgs TARGET)
+    set(multiValueArgs SOURCES)
+    cmake_parse_arguments(PARSE_ARGV 0 arg 
+        "${options}" "${oneValueArgs}" "${multiValueArgs}")
+
+    if(NOT DEFINED arg_TARGET)
+        message(FATAL_ERROR "[newbase_prepare_executable] no target was given!")
+    endif()
+    if(NOT DEFINED arg_SOURCES)
+        message(FATAL_ERROR "[newbase_prepare_executable] no sources were given!")
+    endif()
+
+    # TODO check if this target is the android main executable
+    add_executable(${arg_TARGET} WIN32 ${arg_SOURCES})
+    
+endfunction()
+
+# TODO fold into newbase_add_executable
 function(newbase_prepare_executable)
     set(options BUILD_SYMLINKS NO_INSTALL)
     set(oneValueArgs TARGET)
     set(multiValueArgs SYSTEMS)
     cmake_parse_arguments(PARSE_ARGV 0 arg 
         "${options}" "${oneValueArgs}" "${multiValueArgs}")
+
     if(NOT DEFINED arg_TARGET)
         message(FATAL_ERROR "[newbase_prepare_executable] no target was given!")
+    endif()
+    if((NOT DEFINED arg_SYSTEMS))
+        message(FATAL_ERROR "[newbase_prepare_executable] no systems are listed for target '${arg_TARGET}'")
     endif()
 
     if(DEFINED EMSCRIPTEN)
         set(target_opts "-sALLOW_MEMORY_GROWTH")
         message("[newbase_prepare_executable] setting emscripten options for '${arg_TARGET}': ${target_opts}")
         target_link_options(${arg_TARGET} PRIVATE ${target_opts})
-    endif()
-
-    if((NOT DEFINED arg_SYSTEMS))
-        message(FATAL_ERROR "[newbase_prepare_executable] no systems are listed for target '${arg_TARGET}'")
     endif()
 
     # implement dynamic system lists
