@@ -20,7 +20,14 @@ function(newbase_add_executable)
     endif()
 
     # TODO check if this target is the android main executable
-    add_executable(${arg_TARGET} WIN32 ${arg_SOURCES})
+    if(NEWBASE_ANDROID_MAIN STREQUAL "${arg_TARGET}")
+        add_library(${arg_TARGET} SHARED ${arg_SOURCES})
+        add_library(main ALIAS ${arg_TARGET})
+    else()
+        add_executable(${arg_TARGET} WIN32 ${arg_SOURCES})
+    endif()
+
+    target_link_libraries(${arg_TARGET} PRIVATE newbase)
     
 endfunction()
 
