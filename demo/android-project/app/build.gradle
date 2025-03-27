@@ -12,9 +12,10 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                arguments "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_PLATFORM=android-19", "-DANDROID_STL=c++_static"
+                arguments /*"--trace",*/ "-DNEWBASE_SDL_STATIC=OFF", "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_PLATFORM=android-19", "-DANDROID_STL=c++_static"
                 // abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-                abiFilters 'arm64-v8a'
+                abiFilters 'arm64-v8a', 'x86_64'
+                targets "main"
             }
         }
     }
@@ -31,6 +32,7 @@ android {
     if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
         sourceSets.main {
             jniLibs.srcDir 'libs'
+            assets.srcDirs += ['./assets']
         }
         externalNativeBuild {
             cmake {
@@ -41,6 +43,9 @@ android {
     }
     lint {
         abortOnError false
+    }
+    afterEvaluate {
+        android.sourceSets.main.assets.srcDirs.each{println it}
     }
 }
 

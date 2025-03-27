@@ -38,13 +38,18 @@ engine::engine()
     _d = new engine_p();
     _d->initflags = 0;
 
+#ifndef ANDROID
+    // crash on android for some reason...
     log::setup_handler();
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+#endif
 
     log::info("[engine] logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
+
+#ifndef ANDROID
     std::ifstream t(cfgpath);
     if(!t.is_open())
     {
@@ -54,6 +59,17 @@ engine::engine()
     std::stringstream buffer;
     buffer << t.rdbuf();
     _d->cfile = buffer.str();
+#else
+    void *data = SDL_LoadFile(cfgpath.c_str(), nullptr);
+    if(!data)
+    {
+        log::critical("[engine] could not open config file: %s", cfgpath.c_str());
+        exit(1);
+    }
+    _d->cfile = std::string{reinterpret_cast<const char *>(data)};
+    SDL_free(data);
+
+#endif
     _d->cfg = ryml::parse_in_place(_d->cfile.data());
 
     // could be useful but no

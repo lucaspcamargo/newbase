@@ -5,6 +5,8 @@
 #include <entt/resource/resource.hpp>
 #include <ryml.hpp>
 
+struct SDL_Storage;
+
 namespace nb {
 
 class rmanager final {
@@ -21,6 +23,9 @@ public:
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
     entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
     entt::resource<rscript> get_script(entt::id_type id, bool forceload = false);
+
+private:
+    void registerStorageFile(SDL_Storage *storage, const char *path);
 };
 
 rmanager& rman();

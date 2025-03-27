@@ -69,8 +69,7 @@ bool audio::event(SDL_Event*)
 
 
 // RTTI metadata
-
-[[nodiscard]] static bool _rtti_register()
+extern "C" void _rtti_init_audio()
 {
     entt::meta_factory<nb::audio>{rtti::ctx_systems()}
         .type("audio"_hs)
@@ -80,7 +79,4 @@ bool audio::event(SDL_Event*)
         .type("audio_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::audio>>()
         .conv<std::shared_ptr<nb::system>>();
-    return true;
 }
-
-static bool _rtti_registered_audio = _rtti_register();

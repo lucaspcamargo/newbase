@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.9.0)
+
 project(newbase)
 
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
@@ -9,7 +10,7 @@ option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone 
 option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
-set(NEWBASE_NATIVE_RES_PREFIX "./nb" CACHE STRING "Path prefix for installing and searching for resources")
+set(NEWBASE_NATIVE_RES_PREFIX "nb" CACHE STRING "Path prefix for installing and searching for resources")
 
 include(cmake/NewbaseOptions.cmake)
 include(cmake/NewbaseFunctions.cmake)
@@ -17,11 +18,16 @@ include(cmake/NewbaseLogging.cmake)
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
 
+message("[newbase] adding SDL")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
+message("[newbase] adding rapidyaml")
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
+message("[newbase] adding sol2")
 add_subdirectory(vendored/sol2 EXCLUDE_FROM_ALL)
+message("[newbase] adding glm")
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
+message("[newbase] adding entt")
 set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
 

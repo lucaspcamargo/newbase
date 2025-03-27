@@ -58,25 +58,22 @@ bool rmanager::configure(const ryml::NodeRef &config)
         {
             for(char **curr = vfiles; *curr; curr++)
             {
-
-                SDL_PathInfo pinfo;
-                if(!SDL_GetStoragePathInfo(_store_title, *curr, &pinfo))
-                    continue;
-                if(pinfo.type != SDL_PATHTYPE_FILE)
-                    continue;
-                
-                std::string prefixed{"@"};
-                bool absolute = (*curr)[0] == '/';
-                prefixed.append( *curr + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
-                auto hash = entt::hashed_string(prefixed.c_str());
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
-                _pathmap.insert(std::make_pair(hash.value(), locator{prefixed, _store_title}));
+                registerStorageFile(_store_title, *curr);
             }
         }
         else
         {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot enumerate title storage: %s", SDL_GetError());
-            return false;
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] USING HACK");
+            // HACK HERE
+            // We really need proper resource providers, with optional indices
+            registerStorageFile(_store_title, "res/bgm/ObservingTheStar.ogg");
+            registerStorageFile(_store_title, "res/sprites/rocket.png");
+            registerStorageFile(_store_title, "res/background.png");
+            registerStorageFile(_store_title, "res/background.jpg");
+            registerStorageFile(_store_title, "res/rocket.lua");
+
+            return true; // HACK should be false;
         }
     }
     else 
@@ -88,6 +85,23 @@ bool rmanager::configure(const ryml::NodeRef &config)
     return true;
 }
 
+void rmanager::registerStorageFile(SDL_Storage *storage, const char *path)
+{
+    if(!path)
+        return;
+    SDL_PathInfo pinfo;
+    if(!SDL_GetStoragePathInfo(_store_title, path, &pinfo))
+        return;
+    if(pinfo.type != SDL_PATHTYPE_FILE)
+        return;
+
+    std::string prefixed{"@"};
+    bool absolute = path[0] == '/';
+    prefixed.append( path + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
+    auto hash = entt::hashed_string(prefixed.c_str());
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
+    _pathmap.insert(std::make_pair(hash.value(), locator{prefixed, _store_title}));
+}
 
 bool rmanager::known(entt::id_type id)
 {

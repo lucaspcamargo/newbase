@@ -34,3 +34,28 @@ It stands on the shoulder of giants by leveraging the following (lightweight) te
 These dependencies were carefully chosen for a good mix of power, flexibility, and portability.
 
 Without having to reimplement already-solved problems, this allows us to focus on providing only the necessary functionality, depending on projecty goals and needs.
+
+### Build-time dependencies
+
+In addition to the above libraries, which should all be able to be statically compiled-in, 
+we also use the following tools during build time:
+
+- CMake
+- Python 3
+    + Jinja2
+
+All of the python module dependencis
+
+# Building
+
+## Linux
+
+// TODO
+
+## Android
+
+// TODO
+
+## Important Build Options
+
+// TODO

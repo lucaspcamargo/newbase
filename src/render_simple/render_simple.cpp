@@ -278,8 +278,7 @@ void render_simple::draw_perf()
 
 
 // RTTI metadata
-
-[[nodiscard]] static bool _rtti_register()
+extern "C" void _rtti_init_render_simple()
 {
     entt::meta_factory<nb::render_simple>{rtti::ctx_systems()}
         .type("render_simple"_hs)
@@ -289,7 +288,4 @@ void render_simple::draw_perf()
         .type("render_simple_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
         .conv<std::shared_ptr<nb::system>>();
-    return true;
 }
-
-static bool _rtti_registered_render_simple = _rtti_register();

@@ -1,3 +1,11 @@
+if(DEFINED ANDROID_NDK)
+    # clang is very annoying
+    add_compile_options(
+            -Wno-format-nonliteral # for log wrappers
+            -Wno-format-security   # ditto
+    )
+endif()
+
 if(NEWBASE_LTO)
     message("[newbase] LTO requested, checking support...")
     include(CheckIPOSupported)

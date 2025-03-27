@@ -21,8 +21,9 @@ function(newbase_add_executable)
 
     # TODO check if this target is the android main executable
     if(NEWBASE_ANDROID_MAIN STREQUAL "${arg_TARGET}")
-        add_library(${arg_TARGET} SHARED ${arg_SOURCES})
-        add_library(main ALIAS ${arg_TARGET})
+        add_library(main SHARED ${arg_SOURCES})
+        add_library(${arg_TARGET} ALIAS main)
+        set(arg_TARGET main)
     else()
         add_executable(${arg_TARGET} WIN32 ${arg_SOURCES})
     endif()
@@ -46,6 +47,11 @@ function(newbase_prepare_executable)
         message(FATAL_ERROR "[newbase_prepare_executable] no systems are listed for target '${arg_TARGET}'")
     endif()
 
+    if(NEWBASE_ANDROID_MAIN STREQUAL "${arg_TARGET}")
+        # do stuff to "main" target instead
+        set(arg_TARGET main)
+    endif()
+
     if(DEFINED EMSCRIPTEN)
         set(target_opts "-sALLOW_MEMORY_GROWTH")
         message("[newbase_prepare_executable] setting emscripten options for '${arg_TARGET}': ${target_opts}")
@@ -63,13 +69,23 @@ function(newbase_prepare_executable)
         endif()
     endif()
 
-    
-    message("[newbase_prepare_executable] setting systems for target '${arg_TARGET}': ${arg_SYSTEMS}")
-    foreach(sysname ${arg_SYSTEMS})
-        # require static symbol that causes rtti initialization
-        # this ensures the system is discoverable and is linked into the executable
-        target_link_options(${arg_TARGET} BEFORE PRIVATE "SHELL:-u _rtti_registered_${sysname}") 
-    endforeach()
+    set(rtti_entry_target ${arg_TARGET}_rtti_entry_gen)
+    set(rtti_entry_file_template ${CMAKE_SOURCE_DIR}/include/newbase/reflection/initialization_template.h.in)
+    set(rtti_entry_file_output ${CMAKE_CURRENT_BINARY_DIR}/include/newbase/reflection/init.h)
+    message("[newbase_prepare_executable] RTTI entry points: from '${rtti_entry_file_template}'")
+    message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
+    add_custom_target( ${rtti_entry_target} ALL
+        COMMAND ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
+            "${rtti_entry_file_template}" 
+            "${rtti_entry_file_output}" 
+            "${arg_SYSTEMS}"
+        BYPRODUCTS "${rtti_entry_file_output}"
+        DEPENDS "${rtti_entry_file_template}"
+        VERBATIM
+    )
+    add_dependencies(${arg_TARGET} ${rtti_entry_target})
+    target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
 endfunction()
 
 function(newbase_declare_resources)
@@ -81,6 +97,11 @@ function(newbase_declare_resources)
 
     message("[newbase_declare_resources] from: " ${CMAKE_CURRENT_SOURCE_DIR})
     message("[newbase_declare_resources] destination prefix is: " ${NEWBASE_DEFAULT_RES_PREFIX})
+
+    if(NEWBASE_ANDROID_MAIN STREQUAL "${arg_TARGET}")
+        # do stuff to "main" target instead
+        set(arg_TARGET main)
+    endif()
 
     if(arg_BUILD_SYMLINKS)
         set(links_dest_dir "${CMAKE_CURRENT_BINARY_DIR}/${NEWBASE_DEFAULT_RES_PREFIX}")

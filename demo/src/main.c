@@ -5,6 +5,7 @@
 #include "SDL3/SDL_main.h"
 
 #include <stdio.h>
+#include <newbase/reflection/init.h>
 
 
 inline static enum SDL_AppResult bool_to_app_result(bool val)
@@ -21,6 +22,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, NEWBASE_COPYRIGHT);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, NEWBASE_URL);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
+    _rtti_init_newbase();
 
 	(*appstate) = NULL;
 	return bool_to_app_result(_nb_engine_init(appstate, argc, argv));

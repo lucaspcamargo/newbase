@@ -155,8 +155,7 @@ const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* 
 
 
 // RTTI metadata
-
-[[nodiscard]] static bool _rtti_register()
+extern "C" void _rtti_init_script_lua()
 {
     entt::meta_factory<script_lua>{rtti::ctx_systems()}
         .type("script_lua"_hs)
@@ -166,7 +165,4 @@ const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* 
         .type("script_lua_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::script_lua>>()
         .conv<std::shared_ptr<nb::system>>();
-    return true;
 }
-
-static bool _rtti_registered_script_lua = _rtti_register();
