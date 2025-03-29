@@ -16,6 +16,7 @@ struct engine_p;
 
 class engine final : public nocopy {
 public:
+
     // entry points
     bool init(int argc, char **argv);
     bool step();

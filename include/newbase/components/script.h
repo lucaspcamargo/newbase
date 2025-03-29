@@ -2,9 +2,7 @@
 
 #include <newbase/res/script.h>
 #include <entt/resource/resource.hpp>
-extern "C" {
-#include <lua.h>
-}
+#include <newbase/script_lua/lua.h>
 
 namespace nb {
     struct cscript {

@@ -6,11 +6,7 @@
 #include <newbase/reflection/data.h>
 #include <SDL3/SDL_log.h>
 #include <entt/entt.hpp>
-extern "C" {
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
-}
+#include <newbase/script_lua/lua.h>
 #include <vector>
 
 using namespace nb;

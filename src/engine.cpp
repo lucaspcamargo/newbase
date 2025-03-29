@@ -3,6 +3,8 @@
 #include <newbase/res/manager.h>
 #include <newbase/scene.h>
 #include <newbase/sdl/logging_handler.h>
+#include <newbase/reflection/contexts.h>
+#include <newbase/reflection/data.h>
 #include <newbase/nb_config.h>
 #include <newbase/log.h>
 
@@ -23,12 +25,19 @@
 using namespace nb;
 using entt::operator""_hs;
 
+
 struct nb::engine_p {
     ryml::Tree cfg;
     std::string cfile;
     SDL_InitFlags initflags;
     int log_handler_handle;
     scene default_scene;
+
+    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_start;
+    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_end;
+    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_min_event_start;
+    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_max_event_end;
+    int framecounter_start;
 };
 
 engine::engine()
@@ -39,7 +48,7 @@ engine::engine()
     _d->initflags = 0;
 
 #ifndef ANDROID
-    // crash on android for some reason...
+    // leave android using default log handler
     log::setup_handler();
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
@@ -48,18 +57,6 @@ engine::engine()
     log::info("[engine] logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
-
-#ifndef ANDROID
-    std::ifstream t(cfgpath);
-    if(!t.is_open())
-    {
-        log::critical("[engine] could not find config file: %s", cfgpath.c_str());
-        exit(1);
-    }
-    std::stringstream buffer;
-    buffer << t.rdbuf();
-    _d->cfile = buffer.str();
-#else
     void *data = SDL_LoadFile(cfgpath.c_str(), nullptr);
     if(!data)
     {
@@ -69,7 +66,6 @@ engine::engine()
     _d->cfile = std::string{reinterpret_cast<const char *>(data)};
     SDL_free(data);
 
-#endif
     _d->cfg = ryml::parse_in_place(_d->cfile.data());
 
     // could be useful but no
@@ -213,4 +209,9 @@ engine& engine::instance()
 {
     static engine e;
     return e;
+}
+
+extern "C" void _rtti_init_engine()
+{
+    // TODO
 }

@@ -1,19 +1,18 @@
 #include <newbase/res/manager.h>
 #include <newbase/res/loaders.h>
 #include <newbase/nb_config.h>
+#include <newbase/log.h>
 
 #include <entt/entt.hpp>
 #include <SDL3/SDL_storage.h>
 #include <SDL3/SDL_filesystem.h>
+#include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_log.h>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
 #include <iostream> // temp
 
 namespace nb{
-
-struct locator {
-    std::string path{};             // corresponding path
-    SDL_Storage* store{ nullptr };  // storage where data is from
-};
 
 static rmanager _rman_inst;
 rmanager& rman() {return _rman_inst;}
@@ -22,10 +21,11 @@ static entt::resource_cache<retree, rloader_etree> _cache_etree{};
 static entt::resource_cache<rsprite, rloader_sprite> _cache_sprite{};
 static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
 static entt::resource_cache<rscript, rloader_script> _cache_script{};
+static entt::resource_cache<rvorbis, rloader_vorbis> _cache_vorbis{};
 
 SDL_Storage *_store_title{ nullptr };
 
-static std::unordered_map<entt::id_type, locator> _pathmap;
+static std::unordered_map<entt::id_type, rmanager::descriptor> _pathmap;
 
 rmanager::rmanager()
 {
@@ -44,13 +44,22 @@ rmanager::~rmanager()
 bool rmanager::configure(const ryml::NodeRef &config)
 {
     // TODO rework with "source" plugins and use yaml config
-
+#ifndef ANDROID
     _store_title = SDL_OpenTitleStorage(NEWBASE_DEFAULT_RES_PREFIX, SDL_CreateProperties());
     if(!_store_title)
     {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot title storage. Falling back to raw fs...");
+        log::warn("[rmanager] cannot open title storage. Falling back to raw fs...");
         _store_title = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
     }
+#else
+    // Always use FileStorage on Android, as asset reading is tied to RWOps
+    _store_title = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
+    if(!_store_title) {
+        log::critical("[rmanager] [android] cannot open file storage...");
+        return false;
+    }
+#endif
+
     if(_store_title)
     {
         char ** vfiles = SDL_GlobStorageDirectory(_store_title, nullptr, nullptr, 0, nullptr);
@@ -58,49 +67,81 @@ bool rmanager::configure(const ryml::NodeRef &config)
         {
             for(char **curr = vfiles; *curr; curr++)
             {
-                registerStorageFile(_store_title, *curr);
+                Uint64 sz;
+                if(SDL_GetStorageFileSize(_store_title, *curr, &sz))
+                    register_file(_store_title, *curr, static_cast<size_t>(sz));
             }
+            SDL_free(vfiles);
         }
         else
         {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot enumerate title storage: %s", SDL_GetError());
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] USING HACK");
-            // HACK HERE
-            // We really need proper resource providers, with optional indices
-            registerStorageFile(_store_title, "res/bgm/ObservingTheStar.ogg");
-            registerStorageFile(_store_title, "res/sprites/rocket.png");
-            registerStorageFile(_store_title, "res/background.png");
-            registerStorageFile(_store_title, "res/background.jpg");
-            registerStorageFile(_store_title, "res/rocket.lua");
-
-            return true; // HACK should be false;
+            log::warn("[rmanager] cannot enumerate title storage: %s", SDL_GetError());
+            log::warn("[rmanager] searching index file");
+            std::string idx_path {"index.yaml"};
+            Uint64 idx_len;
+            std::vector<char> buf;
+#ifndef ANDROID
+            if (SDL_GetStorageFileSize(_store_title, idx_path.c_str(), &idx_len) && idx_len > 0)
+            {
+                buf.resize(static_cast<size_t>(idx_len));
+                if (SDL_ReadStorageFile(_store_title, idx_path.c_str(), buf.data(), idx_len))
+                {
+#else
+            void *data = SDL_LoadFile(NEWBASE_DEFAULT_RES_PREFIX"/index.yaml", &idx_len);
+            if(data)
+            {
+                buf.resize(static_cast<size_t>(idx_len));
+                memcpy(buf.data(), data, static_cast<size_t>(idx_len));
+                {
+#endif
+                    auto tree = ryml::parse_in_place(buf.data());
+                    assert(tree.rootref().has_children());
+                    for(ryml::ConstNodeRef n : tree.rootref().cchildren())
+                    {
+                        std::string path;
+                        size_t sz;
+                        n[0] >> path;
+                        n[1] >> sz;
+                        register_file(_store_title, path.c_str(), sz);
+                    }
+                    return true;
+                }
+#ifndef ANDROID
+                else 
+                {
+                    log::error("[rmanager] cannot open index.yaml!");
+                    return false;
+                }
+#else
+                SDL_free(data);
+#endif
+            }
+            else
+            {
+                log::error("[rmanager] cannot stat index.yaml!");
+                return false;
+            }
         }
     }
     else 
     {
-        SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot open any title storage!");
+        log::critical("[rmanager] cannot open any title storage!");
         return false;
     }
 
     return true;
 }
 
-void rmanager::registerStorageFile(SDL_Storage *storage, const char *path)
+void rmanager::register_file(SDL_Storage *storage, const char *path, size_t sz)
 {
     if(!path)
         return;
-    SDL_PathInfo pinfo;
-    if(!SDL_GetStoragePathInfo(_store_title, path, &pinfo))
-        return;
-    if(pinfo.type != SDL_PATHTYPE_FILE)
-        return;
-
     std::string prefixed{"@"};
     bool absolute = path[0] == '/';
     prefixed.append( path + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
     auto hash = entt::hashed_string(prefixed.c_str());
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
-    _pathmap.insert(std::make_pair(hash.value(), locator{prefixed, _store_title}));
+    log::info("[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
+    _pathmap.insert(std::make_pair(hash.value(), rmanager::descriptor{prefixed, sz, nullptr}));
 }
 
 bool rmanager::known(entt::id_type id)
@@ -113,36 +154,47 @@ bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero
     auto it = _pathmap.find(id);
     if(it == _pathmap.end())
     {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] unregistered id: (%x)", id);
+        log::info("[rmanager] unregistered id: (%x)", id);
         return false;
     }
 
     const auto &loc = it->second;
 
-    SDL_PathInfo info;
     std::string path = loc.path.substr(1);
-    if(!SDL_GetStoragePathInfo(_store_title, path.c_str(), &info))
+    dst.resize(static_cast<size_t>(loc.size)+(zero_terminate? 1 : 0));
+#ifndef ANDROID
+    if(!SDL_ReadStorageFile(_store_title, path.c_str(), dst.data(), loc.size))
+#else
+    std::string fpath {NEWBASE_DEFAULT_RES_PREFIX};
+    fpath += "/";
+    fpath += path;
+    Uint64 sz;
+    void *data = SDL_LoadFile(fpath.c_str(), &sz);
+    bool ok = data && (sz == loc.size);
+    if(data)
     {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot stat: %s (%x)", path.c_str(), id);
+        if(ok)
+            memcpy(dst.data(), data, sz);
+        SDL_free(data);
+    }
+    if(!ok)
+#endif
+    {
+        log::info("[rmanager] cannot read: %s (%x)", path.c_str(), id);
+        dst.resize(0);
         return false;
     }
     else
     {
-        dst.resize(static_cast<size_t>(info.size)+(zero_terminate? 1 : 0));
-        if(!SDL_ReadStorageFile(_store_title, path.c_str(), dst.data(), info.size))
-        {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[rmanager] cannot read: %s (%x)", path.c_str(), id);
-            dst.resize(0);
-            return false;
-        }
-        else
-        {
-            if(zero_terminate)
-                dst[info.size] = '\0';
-            //std::cerr << std::string(dst.data()) << std::endl;
-            return true;
-        }
+        if(zero_terminate)
+            dst[loc.size] = '\0';
+        return true;
     }  
+}
+
+const std::unordered_map<entt::id_type, rmanager::descriptor>& rmanager::descriptors() const
+{
+    return _pathmap;
 }
 
 
@@ -178,6 +230,12 @@ entt::resource<rscript> rmanager::get_script(entt::id_type id, bool forceload)
 {
     return (C4_UNLIKELY(forceload)? _cache_script.force_load(id, id)
                                  : _cache_script.load(id, id)).first->second;
+}
+
+entt::resource<rvorbis> rmanager::get_vorbis(entt::id_type id, bool forceload)
+{
+    return (C4_UNLIKELY(forceload)? _cache_vorbis.force_load(id, id)
+                                 : _cache_vorbis.load(id, id)).first->second;
 }
 
 }

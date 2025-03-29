@@ -5,4 +5,5 @@ namespace nb {
     struct rsprite;
     struct rtexture;
     struct rscript;
+    struct rvorbis;
 }

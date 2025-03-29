@@ -112,12 +112,23 @@ bool render_simple::init(int argc, char **argv)
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
-    
+
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
     ImGui_ImplSDLRenderer3_Init(_render);
 
+#ifdef ANDROID
+    ImGui::GetStyle().ScaleAllSizes(_scale);
+    ImGui::GetIO().FontGlobalScale = _scale;
+#endif
+
+    SDL_Rect safe;
+    SDL_GetWindowSafeArea(_win, &safe);
+    log::info("[render_simple] safe area: %dx%d@%d,%d", safe.w, safe.h, safe.x, safe.y);
+    ImGui::GetMainViewport()->WorkPos.x = safe.x;
+    ImGui::GetMainViewport()->WorkPos.y = safe.y;
+    ImGui::GetMainViewport()->WorkSize.x = safe.w;
+    ImGui::GetMainViewport()->WorkSize.y = safe.h;
     return true;
 }
 
@@ -129,19 +140,16 @@ bool render_simple::step(nb::step_phase phase)
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-
     }
     else if(phase == step_phase::PRE_RENDER)
     {
-        // scale all rendering from logical coordinates, in case of HiDPI 
-        if(_scale != 1.0f)
-            SDL_SetRenderScale(_render, _scale, _scale);
+
     }
     else if(phase == step_phase::RENDER)
     {
         // Rendering
         glm::mat4x4 viewproj{glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f })};
-        
+
         auto &reg = engine::instance().default_scene().registry(); // TODO change this
 
         // order spatial components
@@ -198,13 +206,20 @@ bool render_simple::step(nb::step_phase phase)
         // GUI
         draw_perf();
         ImGui::Render();
-        
+
+#ifndef ANDROID
+        if(_scale != 1.0f)
+            SDL_SetRenderScale(_render, _scale, _scale);
+#endif
+        // fixed overlays
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), _render);
-        SDL_RenderPresent(_render);
-        
         // reset render scale for HiDPI
+#ifndef ANDROID
         if(_scale != 1.0f)
             SDL_SetRenderScale(_render, 1.0f, 1.0f);
+#endif
+
+        SDL_RenderPresent(_render);
     }
     return true;
 }
@@ -219,7 +234,14 @@ bool render_simple::event(SDL_Event * evt)
         {
             _wx = evt->window.data1;
             _wy = evt->window.data2;
-            std::cerr << "Resized to " << _wx << "x" << _wy << std::endl;
+            log::info("[render_simple] resized to %dx%d", _wx, _wy);
+            SDL_Rect safe;
+            SDL_GetWindowSafeArea(_win, &safe);
+            log::info("[render_simple] safe area: %dx%d@%d,%d", safe.w, safe.h, safe.x, safe.y);
+            ImGui::GetMainViewport()->WorkPos.x = safe.x;
+            ImGui::GetMainViewport()->WorkPos.y = safe.y;
+            ImGui::GetMainViewport()->WorkSize.x = safe.w;
+            ImGui::GetMainViewport()->WorkSize.y = safe.h;
         }
     }
 
@@ -228,8 +250,11 @@ bool render_simple::event(SDL_Event * evt)
 
 void render_simple::draw_perf()
 {
+    // TODO move to editor system maybe
+    static bool show_demo = false;
+    if(show_demo)
+        ImGui::ShowDemoWindow(&show_demo);
 
-    //ImGui::ShowDemoWindow(nullptr);
     // TODO make proper perfcounters
     static int location = 3;
     ImGuiIO& io = ImGui::GetIO();
@@ -269,6 +294,7 @@ void render_simple::draw_perf()
             if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
             if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
             if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
+            if (ImGui::MenuItem("Show demo", NULL, show_demo)) show_demo = !show_demo;
             ImGui::EndPopup();
         }
     }

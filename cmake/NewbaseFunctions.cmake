@@ -60,12 +60,20 @@ function(newbase_prepare_executable)
 
     # implement dynamic system lists
     list(LENGTH arg_SYSTEMS arg_SYSTEMS_LEN)
+    message(${arg_SYSTEMS_LEN})
     if(arg_SYSTEMS_LEN EQUAL 1)
-        if(arg_SYSTEMS EQUAL "ALL")
+        if(arg_SYSTEMS STREQUAL "ALL")
             set(arg_SYSTEMS ${NEWBASE_ALL_SYSTEMS})
-        elseif(arg_SYSTEMS EQUAL "AUTO")
-            # TODO
-            message(FATAL_ERROR "[newbase_prepare_executable] AUTO: not implemented, we have to make something that reads the yaml config")
+        elseif(arg_SYSTEMS STREQUAL "AUTO")
+            execute_process(
+                COMMAND "${CMAKE_SOURCE_DIR}/scripts/config_get_systems.py" 
+                        "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml"
+                TIMEOUT 5
+                OUTPUT_VARIABLE arg_SYSTEMS
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            message("[newbase_prepare_executable] got systems from 'config.yaml' for '${arg_TARGET}': ${arg_SYSTEMS}")
+            set(rtti_extra_depends "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml")
         endif()
     endif()
 
@@ -80,7 +88,7 @@ function(newbase_prepare_executable)
             "${rtti_entry_file_output}" 
             "${arg_SYSTEMS}"
         BYPRODUCTS "${rtti_entry_file_output}"
-        DEPENDS "${rtti_entry_file_template}"
+        DEPENDS "${rtti_entry_file_template}" "${rtti_extra_depends}"
         VERBATIM
     )
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
@@ -89,7 +97,7 @@ function(newbase_prepare_executable)
 endfunction()
 
 function(newbase_declare_resources)
-    set(options BUILD_SYMLINKS NO_INSTALL)
+    set(options BUILD_SYMLINKS NO_INSTALL INDEX)
     set(oneValueArgs TARGET)
     set(multiValueArgs FILES)
     cmake_parse_arguments(PARSE_ARGV 0 arg 
@@ -126,4 +134,18 @@ function(newbase_declare_resources)
             file(CREATE_LINK "${file_build_rel}" "${links_dest_dir}/${file}" SYMBOLIC)
         endif()
     endforeach()
+
+    if(arg_INDEX)
+    message("[newbase_declare_resources] creating target index")
+        set(res_index_target ${arg_TARGET}_res_index)
+        add_custom_target( ${res_index_target} ALL
+            COMMAND ${CMAKE_SOURCE_DIR}/scripts/res_indexer.py
+                "${links_dest_dir}"
+            # BYPRODUCTS index file, if needed (?)
+            # DEPENDS if another target is processing or generating resources
+            VERBATIM
+        )
+        add_dependencies(${arg_TARGET} ${res_index_target})
+    endif()
+
 endfunction()

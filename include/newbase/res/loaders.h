@@ -26,4 +26,9 @@ struct rloader_script {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_vorbis {
+    using result_type = std::shared_ptr<rvorbis>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

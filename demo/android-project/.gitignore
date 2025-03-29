@@ -1,0 +1,9 @@
+local.properties
+app/.cxx
+app/assets/nb
+.gradle
+.idea
+build
+gradlew
+gradlew.bat
+gradle/

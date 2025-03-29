@@ -35,7 +35,7 @@ namespace log {
     template<typename... Params>
     inline void verb(const char *msg, Params... params)
     {
-        if constexpr(NEWBASE_STATIC_LOG_LEVEL_INT <= static_cast<int>(priority::VERBOSE))
+        if constexpr(NB_STATIC_LOG_LEVEL_INT <= static_cast<int>(priority::VERBOSE))
             SDL_LogVerbose(SDL_LOG_CATEGORY_APPLICATION, msg, params...);
     }
 

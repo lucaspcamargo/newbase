@@ -7,6 +7,7 @@ systems:
         - sfx
         - bgm
  script_lua: {}
+ editor: {}
 resources:
  scanners:
  - type: "fs_raw"

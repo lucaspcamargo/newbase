@@ -54,6 +54,9 @@ add_library(newbase STATIC
     # system: script_lua
     src/script_lua/script_lua.cpp
 
+    # system: editor
+    src/editor/editor.cpp
+
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp
