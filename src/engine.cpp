@@ -131,8 +131,8 @@ bool engine::init(int argc, char ** argv)
     }
 
     // load initial entity tree
-    auto root_ent = _d->default_scene.build_etree("@res/root.et.yaml"_hs);
-    
+    auto root_ent = _d->default_scene.build_etree("res/root.et.yaml"_hs);
+    log::info("[engine] root tree: %x", root_ent);
 
     log::info("[engine] initialized");
     return true;

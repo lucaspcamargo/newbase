@@ -24,6 +24,8 @@
 using namespace nb;
 using entt::operator""_hs;
 
+static SDL_Rect _safe{};
+
 render_simple::render_simple():
 _win(nullptr),
 _render(nullptr),
@@ -122,13 +124,8 @@ bool render_simple::init(int argc, char **argv)
     ImGui::GetIO().FontGlobalScale = _scale;
 #endif
 
-    SDL_Rect safe;
-    SDL_GetWindowSafeArea(_win, &safe);
-    log::info("[render_simple] safe area: %dx%d@%d,%d", safe.w, safe.h, safe.x, safe.y);
-    ImGui::GetMainViewport()->WorkPos.x = safe.x;
-    ImGui::GetMainViewport()->WorkPos.y = safe.y;
-    ImGui::GetMainViewport()->WorkSize.x = safe.w;
-    ImGui::GetMainViewport()->WorkSize.y = safe.h;
+    SDL_GetWindowSafeArea(_win, &_safe);
+    log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
     return true;
 }
 
@@ -140,6 +137,10 @@ bool render_simple::step(nb::step_phase phase)
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+        ImGui::GetMainViewport()->WorkPos.x = _safe.x;
+        ImGui::GetMainViewport()->WorkPos.y = _safe.y;
+        ImGui::GetMainViewport()->WorkSize.x = _safe.w;
+        ImGui::GetMainViewport()->WorkSize.y = _safe.h;
     }
     else if(phase == step_phase::PRE_RENDER)
     {
@@ -235,13 +236,8 @@ bool render_simple::event(SDL_Event * evt)
             _wx = evt->window.data1;
             _wy = evt->window.data2;
             log::info("[render_simple] resized to %dx%d", _wx, _wy);
-            SDL_Rect safe;
-            SDL_GetWindowSafeArea(_win, &safe);
-            log::info("[render_simple] safe area: %dx%d@%d,%d", safe.w, safe.h, safe.x, safe.y);
-            ImGui::GetMainViewport()->WorkPos.x = safe.x;
-            ImGui::GetMainViewport()->WorkPos.y = safe.y;
-            ImGui::GetMainViewport()->WorkSize.x = safe.w;
-            ImGui::GetMainViewport()->WorkSize.y = safe.h;
+            SDL_GetWindowSafeArea(_win, &_safe);
+            log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
         }
     }
 
@@ -286,7 +282,7 @@ void render_simple::draw_perf()
                     SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
         ImGui::Separator();
         ImGui::Text("FPS: %.1f", io.Framerate);
-        if (ImGui::BeginPopupContextWindow())
+        if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
         {
             if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
             if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
@@ -294,7 +290,7 @@ void render_simple::draw_perf()
             if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
             if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
             if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
-            if (ImGui::MenuItem("Show demo", NULL, show_demo)) show_demo = !show_demo;
+            if (ImGui::MenuItem("ImGui demo", NULL, show_demo)) show_demo = !show_demo;
             ImGui::EndPopup();
         }
     }

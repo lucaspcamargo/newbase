@@ -3,9 +3,9 @@
     spatial:
       pos: [0, 0, 100]
       rot: [0, 0, 0]
-      scale: [0.75, 0.75, 0.75]
+      scale: [1, 1, 1]
     sprite:
-      res: "@res/background.png"
+      res: "res/background.jpg"
 - name: spr0
   comps:
     spatial:
@@ -13,6 +13,6 @@
       rot: [0, 0, -45]
       scale: [1, 1, 1]
     sprite:
-      res: "@res/sprites/rocket.png"
+      res: "res/sprites/rocket.png"
     script:
-      lua: "@res/rocket.lua"
+      lua: "res/rocket.lua"

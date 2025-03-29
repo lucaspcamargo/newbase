@@ -134,14 +134,13 @@ bool rmanager::configure(const ryml::NodeRef &config)
 
 void rmanager::register_file(SDL_Storage *storage, const char *path, size_t sz)
 {
-    if(!path)
+    if(!path || !path[0])
         return;
-    std::string prefixed{"@"};
     bool absolute = path[0] == '/';
-    prefixed.append( path + (absolute? 1 : 0)); // if path is absolute (usually emscripten, omit root)
-    auto hash = entt::hashed_string(prefixed.c_str());
-    log::info("[rmanager] storage file: %s (%x)", prefixed.c_str(), hash.value());
-    _pathmap.insert(std::make_pair(hash.value(), rmanager::descriptor{prefixed, sz, nullptr}));
+    path += absolute? 1 : 0;
+    auto hash = entt::hashed_string(path);
+    log::info("[rmanager] storage file: %s (%x)", path, hash.value());
+    _pathmap.insert(std::make_pair(hash.value(), rmanager::descriptor{path, sz, nullptr}));
 }
 
 bool rmanager::known(entt::id_type id)
@@ -160,7 +159,7 @@ bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero
 
     const auto &loc = it->second;
 
-    std::string path = loc.path.substr(1);
+    const std::string &path = loc.path;
     dst.resize(static_cast<size_t>(loc.size)+(zero_terminate? 1 : 0));
 #ifndef ANDROID
     if(!SDL_ReadStorageFile(_store_title, path.c_str(), dst.data(), loc.size))

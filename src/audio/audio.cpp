@@ -77,7 +77,7 @@ bool audio::step(step_phase phase)
         if(first)
         {
             first = false;
-            bgm_play(entt::hashed_string{"@res/bgm/ObservingTheStar/ObservingTheStar.ogg"});
+            bgm_play(entt::hashed_string{"res/bgm/ObservingTheStar/ObservingTheStar.ogg"});
         }
     }
     return true;

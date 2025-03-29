@@ -11,7 +11,7 @@ public:
     ~editor() {}
 
 
-    SDL_InitFlags sdl_subsystems() {return 0;}
+    SDL_InitFlags sdl_subsystems() override {return 0;}
     bool init(int argc, char **argv) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;

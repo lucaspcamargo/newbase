@@ -61,7 +61,7 @@ namespace nb {
         assert(ptr);
         log::info("[rloader_texture] loaded: %dx%d, %dchs", w, h, chs);
         int pitch;
-        pitch = w * chs;
+        pitch = w * 4;
         
         SDL_PixelFormat fmt;
         switch(chs)

@@ -60,7 +60,7 @@ bool editor::step(step_phase phase)
                     ImGui::TableNextColumn();
                     ImGui::Text("%s", pair.second.path.c_str());
                     ImGui::TableNextColumn();
-                    ImGui::Text("%u", pair.second.size);
+                    ImGui::Text("%zu", pair.second.size);
                     ImGui::TableNextRow();
                 }
                 ImGui::EndTable();
