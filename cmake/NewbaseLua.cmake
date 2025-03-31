@@ -34,12 +34,16 @@ function( newbase_lua_setup_ext )
 endfunction()
 
 function( newbase_lua_setup_fetch )
-    include( FetchContent )
-    FetchContent_Declare( lua_fetch
-        URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
-        URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
-    )
-    FetchContent_MakeAvailable(lua_fetch)
+    if(NEWBASE_LUA_ROOT STREQUAL "")
+        include( FetchContent )
+        FetchContent_Declare( lua_fetch
+            URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
+            URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+        )
+        FetchContent_MakeAvailable(lua_fetch)
+    else()
+        set(lua_fetch_SOURCE_DIR "${NEWBASE_LUA_ROOT}")
+    endif()
 
     add_library(lua STATIC
         ${lua_fetch_SOURCE_DIR}/src/lapi.c
