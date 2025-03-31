@@ -7,7 +7,8 @@ newbase_add_executable(
 newbase_prepare_executable(TARGET newbase_demo SYSTEMS AUTO)
 newbase_declare_resources(TARGET newbase_demo BUILD_SYMLINKS INDEX 
     FILES 
-        res 
+        ${CMAKE_SOURCE_DIR}/res/_nb_core
+        res
         config.yaml
 )
 

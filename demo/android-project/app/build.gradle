@@ -43,8 +43,9 @@ android {
     sourceSets.main {
         assets.srcDirs += ["./assets"]
     }
-    tasks.register('reslink') {
-        ant.symlink(externalNativeBuild.cmake.getBuildStagingDirectory() + "/demo/nb", "./aseets/nb")
+    aaptOptions{
+        // we may have assets beginning with _, which are ignored by default. Override.
+        ignoreAssetsPattern  '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
     lint {
         abortOnError false

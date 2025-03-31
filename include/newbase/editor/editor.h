@@ -11,8 +11,10 @@ public:
     ~editor() {}
 
 
-    SDL_InitFlags sdl_subsystems() override {return 0;}
-    bool init(int argc, char **argv) override;
+    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override {return 0;}
+    entt::id_type metatype_id() override { return entt::hashed_string{"editor"}.value(); }
+
+    bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
 

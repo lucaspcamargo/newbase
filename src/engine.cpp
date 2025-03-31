@@ -27,11 +27,17 @@ using entt::operator""_hs;
 
 
 struct nb::engine_p {
+    std::vector<std::shared_ptr<system>> _systems;
+    std::unordered_map<entt::id_type, std::shared_ptr<system>> _systems_meta;
+    std::vector<ryml::ConstNodeRef> _sys_cfgs;
+
     ryml::Tree cfg;
     std::string cfile;
     SDL_InitFlags initflags;
     int log_handler_handle;
     scene default_scene;
+
+    bool exit_requested {false};
 
     std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_start;
     std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_end;
@@ -92,8 +98,10 @@ engine::engine()
         }
         else
         {
-            _d->initflags |= sys->sdl_subsystems();
-            _systems.emplace_back(sys);
+            _d->initflags |= sys->sdl_subsystems(n);
+            _d->_systems.emplace_back(sys);
+            _d->_systems_meta[sys->metatype_id()] = sys;
+            _d->_sys_cfgs.push_back(n);
         }
     }
 
@@ -105,7 +113,8 @@ engine::~engine()
     log::info("[engine] destroying");
 
     // ensure there are not more system references from the engine
-    _systems.clear();
+    _d->_systems.clear();
+    _d->_systems_meta.clear();
 
     log::unregister_observer(_d->log_handler_handle);
     delete _d;
@@ -124,9 +133,10 @@ bool engine::init(int argc, char ** argv)
         return false;
     }
 
-    for(auto s: _systems)
+    auto cfg_it = _d->_sys_cfgs.begin();
+    for(auto s: _d->_systems)
     {
-        if(!s->init(argc, argv))
+        if(!s->init(*cfg_it++))
             return false;
     }
 
@@ -141,17 +151,24 @@ bool engine::init(int argc, char ** argv)
 bool engine::teardown()
 {
     // destroy all system shared_ptrs
-    _systems.clear();
+    _d->_systems.clear();
+    _d->_systems_meta.clear();
     return true;
 }
 
 bool engine::step()
 {
-    log::debug("[engine] step");\
+    log::debug("[engine] step");
+
+    if(_d->exit_requested)
+    {
+        log::info("[engine] exiting");
+        return false;
+    }
 
     for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
     {
-        for(auto s: _systems)
+        for(auto s: _d->_systems)
         {
         // TODO check if system uses this phase (use some sort of mask?)
             if(!s->step(static_cast<nb::step_phase>(i)))
@@ -172,7 +189,7 @@ bool engine::event(SDL_Event *evt)
     if(evt->type == SDL_EVENT_QUIT)
         return false;
 
-    for(auto s: _systems)
+    for(auto s: _d->_systems)
     {
         // TODO check if system takes event (use some sort of mask?)
         if(!s->event(evt))
@@ -185,6 +202,20 @@ bool engine::event(SDL_Event *evt)
 ::nb::scene& engine::default_scene()
 {
     return _d->default_scene;
+}
+
+
+void engine::request_exit()
+{
+    log::info("[engine] exit requested");
+    _d->exit_requested = true;
+}
+
+
+std::shared_ptr<::nb::system> engine::system_from_id(entt::id_type meta_id)
+{
+    auto it = _d->_systems_meta.find(meta_id);
+    return it != _d->_systems_meta.end()? it->second : nullptr;
 }
 
 
@@ -213,5 +244,14 @@ engine& engine::instance()
 
 extern "C" void _rtti_init_engine()
 {
-    // TODO
+    /*  does not work like this because type needs to be movable
+        for now bindings are done by hand :(
+        same for scene
+
+    entt::meta_factory<nb::engine>{}
+        .type("engine"_hs)
+        .custom<rtti::singleton_info>("engine")
+        .func<&nb::engine::request_exit>("request_exit"_hs)
+        .custom<rtti::func_info>("request_exit");
+    */
 }

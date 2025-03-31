@@ -14,12 +14,12 @@ void _rtti_init_{{id}}();
 
 void _rtti_init_newbase()
 {
-    fprintf(stdout, "[rtti] init...");
+    fprintf(stdout, "[rtti] init...\n");
 
     _rtti_init_engine();
     {% for id in identifiers %}
     _rtti_init_{{id}}();
     {% endfor %}
     
-    fprintf(stderr, "[rtti] init OK");
+    fprintf(stdout, "[rtti] init OK\n");
 }

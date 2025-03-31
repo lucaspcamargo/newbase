@@ -16,6 +16,7 @@ static int _bufsize_out;
 
 SDL_AudioStream *_bgm {nullptr};
 float _bgm_gain {1.0f};
+float _sfx_gain {1.0f};
 
 audio::audio()
 {
@@ -37,12 +38,12 @@ audio::~audio()
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] destroyed");
 }
 
-SDL_InitFlags audio::sdl_subsystems()
+SDL_InitFlags audio::sdl_subsystems(ryml::ConstNodeRef)
 {
     return SDL_INIT_AUDIO;
 }
 
-bool audio::init(int argc, char ** argv)
+bool audio::init(ryml::ConstNodeRef cfg)
 {
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] init");
 
@@ -64,6 +65,16 @@ bool audio::init(int argc, char ** argv)
         SDL_ResumeAudioDevice(_dev_out);
     }
 
+    if(!cfg["bgm_gain"].invalid())
+    {
+        cfg["bgm_gain"] >> _bgm_gain; 
+    }
+
+    if(!cfg["sfx_gain"].invalid())
+    {
+        cfg["sfx_gain"] >> _sfx_gain; 
+    }
+
     return true;
 }
 
@@ -77,7 +88,6 @@ bool audio::step(step_phase phase)
         if(first)
         {
             first = false;
-            bgm_play(entt::hashed_string{"res/bgm/ObservingTheStar/ObservingTheStar.ogg"});
         }
     }
     return true;
@@ -109,7 +119,7 @@ bool audio::bgm_play(entt::id_type res_id)
     {
         log::error("[audio] bgm_play: cannot open stream: %s", SDL_GetError());
         return false;
-    } 
+    }
     
     if(!SDL_BindAudioStream(_dev_out, _bgm))
     {
@@ -160,10 +170,10 @@ extern "C" void _rtti_init_audio()
     // main interface
     entt::meta_factory<nb::audio>{}
         .type("audio"_hs)
-        .custom<rtti::cstr>("audio")
+        .custom<rtti::system_info>(rtti::system_info{"audio"})
         .base<nb::system>()
         .func<&audio::bgm_play>("bgm_play"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"bgm_start"})
+        .custom<rtti::func_info>(rtti::func_info{"bgm_play"})
         .func<&audio::bgm_playing>("bgm_playing"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_playing"})
         .func<&audio::bgm_stop>("bgm_stop"_hs)

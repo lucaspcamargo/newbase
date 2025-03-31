@@ -13,6 +13,11 @@ struct cstr {
     const char * _val;
     
     cstr (const char * strptr) : _val (strptr) {}
+
+    const char * c_str() const 
+    {
+        return _val;
+    }
     
     operator const char *() const 
     { 
@@ -35,6 +40,11 @@ struct cstrn {
         std::strncpy(_val, strptr, N);
         _val[N-1] = 0;
     }
+
+    const char * c_str() const 
+    {
+        return _val;
+    }
     
     operator const char *() const 
     { 
@@ -52,10 +62,22 @@ struct system_info
     cstrn<32> identifier;
 };
 
-struct component_type_info
+struct singleton_info
 {
     cstrn<32> identifier;
+};
+
+struct component_type_info
+{
+    // making a lua binding of a component returns the identifier to use for the local reference,
+    // and a function that can be used to create the reference in a state, given the data 
+    using bind_result = std::pair<const char *, std::function<void(void*, void*)>>; 
+
+    cstrn<32> identifier;
     bool can_add;
+    std::function<bind_result(void*)> _bind_func;
+    const char *editor_icon;
+
 };
 
 struct resource_type_info
@@ -76,6 +98,12 @@ struct res_storage_type_info
 };
 
 struct func_info
+{
+    cstrn<32> identifier;
+    // incredibly, entt::meta provides all the rest for us
+};
+
+struct data_info
 {
     cstrn<32> identifier;
     // incredibly, entt::meta provides all the rest for us

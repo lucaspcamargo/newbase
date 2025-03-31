@@ -1,7 +1,6 @@
 #pragma once
 
 #include "newbase/system.h"
-#include <entt/entt.hpp>
 
 namespace nb {
 
@@ -10,9 +9,12 @@ public:
     audio();
     ~audio();
 
-    SDL_InitFlags sdl_subsystems() override;
+    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef) override;
+    entt::id_type metatype_id() override { return entt::hashed_string{"audio"}.value(); }
+    bool can_bind() override { return true; }
+    void bind(void *state) override;
 
-    bool init(int argc, char ** argv) override;
+    bool init(ryml::ConstNodeRef cfg) override;
     bool step(nb::step_phase ) override;
     bool event(SDL_Event * ) override;
 

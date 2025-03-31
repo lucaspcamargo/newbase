@@ -44,15 +44,19 @@ add_library(newbase STATIC
 
     # components
     src/components/builders.cpp
+    src/components/spatial_rtti.cpp
+    src/components/sprite_rtti.cpp
 
     # system: render_simple
     src/render_simple/render_simple.cpp
 
     # system: audio
     src/audio/audio.cpp
+    src/audio/lua_bindings.cpp
 
     # system: script_lua
     src/script_lua/script_lua.cpp
+    src/script_lua/bindings_glm.cpp
 
     # system: editor
     src/editor/editor.cpp
@@ -72,7 +76,7 @@ add_library(newbase STATIC
     ${IMGUI_SOURCES}
 )
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
-target_include_directories(newbase PUBLIC include vendored/stb ${IMGUI_INCLUDES} ${LUA_INCLUDES})
+target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL)
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 -lm)
 

@@ -30,6 +30,10 @@ public:
     //::nb::scene& scene_ref(entt::id_type id);
     //bool destroy_scene(entt::id_type id);
 
+    void request_exit();
+
+    std::shared_ptr<::nb::system> system_from_id(entt::id_type meta_id);
+
     // default engine log handler
     void log_handler(int category, int prio, const char *msg);
     static engine& instance();
@@ -39,7 +43,6 @@ private:
     ~engine();
 
     engine_p *_d;
-    std::vector<std::shared_ptr<system>> _systems;
 };
 
 }

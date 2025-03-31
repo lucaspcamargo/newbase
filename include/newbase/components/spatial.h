@@ -34,6 +34,8 @@ namespace nb {
                 ), pos
             );
         }
+
+        static void _ensure_rtti();
     };
 
 

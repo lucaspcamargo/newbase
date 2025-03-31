@@ -7,5 +7,8 @@
 namespace nb {
     struct csprite {
         entt::resource<rsprite> spr;
+        
+        static void _ensure_rtti();
     };
+
 }

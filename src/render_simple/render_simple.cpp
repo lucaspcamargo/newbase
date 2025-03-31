@@ -11,6 +11,7 @@
 #include <newbase/log.h>
 
 #include "imgui.h"
+#include "IconsForkAwesome.h"
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_sdlrenderer3.h"
 #include <entt/entt.hpp>
@@ -24,7 +25,8 @@
 using namespace nb;
 using entt::operator""_hs;
 
-static SDL_Rect _safe{};
+static std::string _imguiCfgFile {};
+static SDL_Rect _safe {};
 
 render_simple::render_simple():
 _win(nullptr),
@@ -54,16 +56,29 @@ render_simple::~render_simple()
 }
 
 
-SDL_InitFlags render_simple::sdl_subsystems()
+SDL_InitFlags render_simple::sdl_subsystems(ryml::ConstNodeRef cfg)
 {
+    // TODO doesn't seem to work in runtime
+    // No SDL hints have found for this either
+    if(!cfg["prefer"].invalid())
+    {
+        log::info("[render_simple] current driver: %s", SDL_GetCurrentVideoDriver());
+        bool already = getenv("SDL_VIDEODRIVER");
+        std::string preferred;
+        cfg["prefer"] >> preferred;
+        setenv("SDL_VIDEODRIVER", preferred.c_str(), 1); 
+        log::info("[render_simple] preferring: %s%s", preferred.c_str(), already?" (overrides env)":"");
+    }
     return SDL_INIT_VIDEO;
 }
 
 
-bool render_simple::init(int argc, char **argv)
+bool render_simple::init(ryml::ConstNodeRef cfg)
 {
     log::info("[render_simple] init");
     const auto num_drivers = SDL_GetNumRenderDrivers();
+
+    log::info("[render_simple] current driver: %s", SDL_GetCurrentVideoDriver());
     
     /* Listing available drivers: disabled because it may be slow
     
@@ -80,7 +95,8 @@ bool render_simple::init(int argc, char **argv)
     log::info("[render_simple] available drivers: %s", driver_names.c_str());
     */
 
-    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE 
+                        | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_MAXIMIZED;
     _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), 1024, 768, window_flags);
     if (_win == nullptr)
     {
@@ -103,17 +119,33 @@ bool render_simple::init(int argc, char **argv)
         log::info("[render_simple] created renderer: %s", SDL_GetRendererName(_render));
     SDL_SetWindowPosition(_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(_win);
-    SDL_GetWindowSize(_win, &_wx, &_wy);
+    SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
 
     // Setup Dear ImGui context
+    char * prefs = SDL_GetPrefPath(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING), SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING));
+    _imguiCfgFile = prefs;
+    SDL_free(prefs);
+    assert(_imguiCfgFile.size());
+    if(_imguiCfgFile[_imguiCfgFile.size()-1]!='/')
+        _imguiCfgFile += "/";
+    _imguiCfgFile += "ImGui.cfg";
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.IniFilename = _imguiCfgFile.c_str();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    ImGui::StyleColorsClassic();
+    ImGui::GetStyle().WindowRounding = 8;
+    ImGui::GetStyle().FrameRounding = 3;
+    ImGui::GetStyle().GrabRounding = 3;
+    ImGui::GetStyle().PopupRounding = 3;
+    ImGui::GetStyle().ChildRounding = 3;
+    ImGui::GetStyle().GrabMinSize = 8;
+    ImGui::GetStyle().ScrollbarSize = 14;
+
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
@@ -123,6 +155,44 @@ bool render_simple::init(int argc, char **argv)
     ImGui::GetStyle().ScaleAllSizes(_scale);
     ImGui::GetIO().FontGlobalScale = _scale;
 #endif
+
+    std::string mainfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Regular.ttf";
+    std::vector<char> mainfont_data;
+    auto mainfont_hash = entt::hashed_string{mainfont_path.c_str()}.value();
+    log::info("[render_simple] system font: %x", mainfont_hash);
+    if(rman().read_all_sync(mainfont_hash, mainfont_data, false))
+    {
+        ImFontConfig config;
+        config.RasterizerDensity = _scale;
+        void * copy = malloc(mainfont_data.size()); // need to copy, imgui takes ownership
+        memcpy(copy, mainfont_data.data(), mainfont_data.size());
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, mainfont_data.size(), 14, &config);
+    }
+    else
+    {
+        log::error("[render_simple] cannot read system font: %x", mainfont_hash);
+    }
+    
+    std::string iconfont_path = "_nb_core/ttf/forkawesome/forkawesome-webfont.ttf";
+    std::vector<char> iconfont_data;
+    auto iconfont_hash = entt::hashed_string{iconfont_path.c_str()}.value();
+    log::info("[render_simple] icon font: %x", iconfont_hash);
+    if(rman().read_all_sync(iconfont_hash, iconfont_data, false))
+    {
+        ImFontConfig config;
+        config.RasterizerDensity = _scale;
+        config.MergeMode = true;
+        config.GlyphMinAdvanceX = 14.0f;
+        void * copy = malloc(iconfont_data.size()); // need to copy, imgui takes ownership
+        memcpy(copy, iconfont_data.data(), iconfont_data.size());
+        static const ImWchar icon_ranges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont_data.size(), 14, &config, icon_ranges);
+    }
+    else
+    {
+        log::error("[render_simple] cannot read icon font: %x", iconfont_hash);
+    }
+    ImGui::GetIO().Fonts->Build();
 
     SDL_GetWindowSafeArea(_win, &_safe);
     log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
@@ -225,17 +295,23 @@ bool render_simple::step(nb::step_phase phase)
     return true;
 }
 
-bool render_simple::event(SDL_Event * evt)
+bool render_simple::event( SDL_Event * evt)
 {
     ImGui_ImplSDL3_ProcessEvent(evt);
 
-    if(evt->type == SDL_EVENT_WINDOW_RESIZED)
+    if(evt->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
     {
         if(evt->window.windowID == SDL_GetWindowID(_win))
         {
             _wx = evt->window.data1;
             _wy = evt->window.data2;
             log::info("[render_simple] resized to %dx%d", _wx, _wy);
+        }
+    }
+    else if(evt->type == SDL_EVENT_WINDOW_RESIZED)
+    {
+        if(evt->window.windowID == SDL_GetWindowID(_win))
+        {
             SDL_GetWindowSafeArea(_win, &_safe);
             log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
         }
@@ -282,6 +358,9 @@ void render_simple::draw_perf()
                     SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
         ImGui::Separator();
         ImGui::Text("FPS: %.1f", io.Framerate);
+        ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+        ImGui::Separator();
+        ImGui::Text("plot goes here");
         if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
         {
             if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
@@ -302,12 +381,17 @@ void render_simple::draw_perf()
 // RTTI metadata
 extern "C" void _rtti_init_render_simple()
 {
-    entt::meta_factory<nb::render_simple>{rtti::ctx_systems()}
+    entt::meta_factory<nb::render_simple>{}
         .type("render_simple"_hs)
-        .custom<rtti::cstr>("render_simple")
+        .custom<rtti::system_info>(rtti::system_info{"render_simple"})
         .base<nb::system>();
     entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
         .type("render_simple_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
         .conv<std::shared_ptr<nb::system>>();
+
+    // register related components
+    // TODO add component registration mechanism similar to the one used by systems
+    cspatial::_ensure_rtti();
+    csprite::_ensure_rtti();
 }

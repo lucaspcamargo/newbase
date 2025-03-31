@@ -1,11 +1,11 @@
 systems:
  render_simple:
+    prefer: wayland
     w: 1920
     h: 1080
  audio:
-    streams:
-        - sfx
-        - bgm
+    bgm_gain: 0.8
+    sfx_gain: 1.0
  script_lua: {}
  editor: {}
 resources:
