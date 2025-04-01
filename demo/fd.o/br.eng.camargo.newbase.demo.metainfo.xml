@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>br.eng.camargo.newbase.demo</id>
+  
+  <name>newbase demo</name>
+  <summary>Demo for the newbase engine</summary>
+  
+  <metadata_license>MIT</metadata_license>
+  <project_license>MITNFA</project_license>
+  
+  <recommends>
+    <display_length compare="ge">600</display_length>
+  </recommends>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+    <control>gamepad</control>
+    <control>tablet</control>
+  </supports>
+  
+  <description>
+    <p>
+      Demo for the newbase engine.
+    </p>
+    <p>
+      <em>TODO:</em> longer description
+    </p>
+</description>
+
+<launchable type="desktop-id">br.eng.camargo.newbase.demo.desktop</launchable>
+</component>

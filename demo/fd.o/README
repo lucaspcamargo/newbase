@@ -1,0 +1,17 @@
+# INFO
+
+## Metainfo file
+
+Install this file as as /usr/share/metainfo/br.eng.camargo.newbase.demo.metainfo.xml
+
+You can validate this metadata locally by running: appstreamcli validate br.eng.camargo.newbase.demo.metainfo.xml
+
+## Desktop Entry File
+
+Install this file as as /usr/share/applications/br.eng.camargo.newbase.demo.desktop
+
+You can validate this metadata locally by running: desktop-file-validate br.eng.camargo.newbase.demo.desktop
+
+## For more info
+
+Esp. icons, check [here](https://docs.flatpak.org/en/latest/conventions.html#expected-standards).

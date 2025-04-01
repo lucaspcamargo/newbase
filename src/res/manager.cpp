@@ -2,14 +2,19 @@
 #include <newbase/res/loaders.h>
 #include <newbase/nb_config.h>
 #include <newbase/log.h>
+#include <newbase/utility/strings.h>
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+#include <newbase/utility/xdg.h>
+#endif
 
 #include <entt/entt.hpp>
 #include <SDL3/SDL_storage.h>
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_iostream.h>
-#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_init.h>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
+#include <cstdlib>
 #include <iostream> // temp
 
 namespace nb{
@@ -45,7 +50,14 @@ bool rmanager::configure(const ryml::NodeRef &config)
 {
     // TODO rework with "source" plugins and use yaml config
 #ifndef ANDROID
-    _store_title = SDL_OpenTitleStorage(NEWBASE_DEFAULT_RES_PREFIX, SDL_CreateProperties());
+    std::string base_location {NEWBASE_DEFAULT_RES_PREFIX};
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+    if(_nb_xdg_data_dir_found())
+    {
+        base_location = _nb_xdg_data_dirname_get() + std::string{"/"} + base_location;
+    }
+#endif
+    _store_title = SDL_OpenTitleStorage(base_location.c_str(), SDL_CreateProperties());
     if(!_store_title)
     {
         log::warn("[rmanager] cannot open title storage. Falling back to raw fs...");

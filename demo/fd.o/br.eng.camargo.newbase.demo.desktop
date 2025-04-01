@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=newbase demo
+Comment=Demo for the newbase engine
+Categories=Game;
+
+Icon=newbase
+Exec=newbase_demo
+Terminal=false

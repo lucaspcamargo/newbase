@@ -1,8 +1,12 @@
 #include <newbase/sdl/engine_hooks.h>
 #include <newbase/nb_config.h>
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+#include <newbase/utility/xdg.h>
+#endif
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
+#include "SDL3/SDL_properties.h"
 
 #include <stdio.h>
 #include <newbase/reflection/init.h>
@@ -22,6 +26,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, NEWBASE_COPYRIGHT);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, NEWBASE_URL);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+    _nb_xdg_data_dirname_set("newbase_demo");
+#endif
 
     _rtti_init_newbase();
 

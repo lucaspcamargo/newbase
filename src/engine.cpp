@@ -63,6 +63,12 @@ engine::engine()
     log::info("[engine] logging ready");
 
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+    if(_nb_xdg_data_dir_found())
+    {
+        cfgpath = _nb_xdg_data_dirname_get() + std::string{"/"} + cfgpath;
+    }
+#endif
     void *data = SDL_LoadFile(cfgpath.c_str(), nullptr);
     if(!data)
     {
