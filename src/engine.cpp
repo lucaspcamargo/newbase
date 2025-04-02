@@ -7,6 +7,9 @@
 #include <newbase/reflection/data.h>
 #include <newbase/nb_config.h>
 #include <newbase/log.h>
+#ifdef NEWBASE_USE_XDG_DATA_DIRS
+#include <newbase/utility/xdg.h>
+#endif
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_init.h>
