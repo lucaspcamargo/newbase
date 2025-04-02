@@ -6,6 +6,6 @@ Name=newbase demo
 Comment=Demo for the newbase engine
 Categories=Game;
 
-Icon=newbase
+Icon=br.eng.camargo.newbase.demo
 Exec=newbase_demo
 Terminal=false
