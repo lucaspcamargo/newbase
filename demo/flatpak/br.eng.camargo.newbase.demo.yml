@@ -1,0 +1,38 @@
+id: br.eng.camargo.newbase.demo
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: newbase_demo
+finish-args:
+  # X11 + XShm access
+  - --share=ipc
+  - --socket=fallback-x11
+  # Wayland access
+  - --socket=wayland
+  # GPU acceleration if needed
+  - --device=dri
+  # Needs to talk to the network:
+  - --share=network
+  # Needs to save files locally
+  - --filesystem=xdg-documents
+  # Pipewire
+  - --filesystem=xdg-run/pipewire-0:ro
+modules:
+  - name: newbase_demo
+    buildsystem: cmake-ninja
+    config-opts: ["-DNEWBASE_LUA_ROOT=lua", "-DNEWBASE_FDO_FILES=ON", "-DNEWBASE_USE_XDG_DATA_DIRS=ON"]
+    sources:
+      - type: git
+        url: ../..
+        commit: dafb59b5e814e92b06a4b848ac8d6bd0262f652d
+        dest: .
+      - type: archive
+        url: https://www.lua.org/ftp/lua-5.4.7.tar.gz
+        sha256: 9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+        dest: lua
+    modules:
+    - python-build-deps.json
+
+# NOTE: before flatpak build, update above module with:
+# ./scripts/flatpak-pip-generator.py --requirements-file ./scripts/requirements.txt -o ./demo/flatpak/python-build-deps
+
