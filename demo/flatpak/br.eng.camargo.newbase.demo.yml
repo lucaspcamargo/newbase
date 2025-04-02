@@ -24,7 +24,7 @@ modules:
     sources:
       - type: git
         url: ../..
-        commit: dafb59b5e814e92b06a4b848ac8d6bd0262f652d
+        commit: 72a8f339419366c2445644b573309ae55c26fa52
         dest: .
       - type: archive
         url: https://www.lua.org/ftp/lua-5.4.7.tar.gz
