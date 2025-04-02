@@ -1,12 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>br.eng.camargo.newbase.demo</id>
+  <icon type="stock">newbase</icon> 
   
   <name>newbase demo</name>
   <summary>Demo for the newbase engine</summary>
-  
+  <categories>
+    <category>Game</category>
+  </categories>
+
   <metadata_license>MIT</metadata_license>
   <project_license>MITNFA</project_license>
+
+  <developer id="camargo.eng.br">
+    <name translate="no">Lucas Camargo</name>
+  </developer>
+  <url type="homepage">https://camargo.eng.br</url>
+  <content_rating type="oars-1.0" />
+  
+  <description>
+    <p>
+      Demo for the newbase engine. This is a long paragraph because we dont want to to do this and that omg this is so cool. This is a long paragraph because we dont want to to do this and that omg this is so cool. This is a long paragraph because we dont want to to do this and that omg this is so cool. This is a long paragraph because we dont want to to do this and that omg this is so cool.
+    </p>
+    <p>
+      <em>TODO:</em> proper description. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha. Hahahahahahha.
+    </p>
+  </description>
   
   <recommends>
     <display_length compare="ge">600</display_length>
@@ -18,15 +37,6 @@
     <control>gamepad</control>
     <control>tablet</control>
   </supports>
-  
-  <description>
-    <p>
-      Demo for the newbase engine.
-    </p>
-    <p>
-      <em>TODO:</em> longer description
-    </p>
-</description>
 
-<launchable type="desktop-id">br.eng.camargo.newbase.demo.desktop</launchable>
+  <launchable type="desktop-id">br.eng.camargo.newbase.demo.desktop</launchable>
 </component>
