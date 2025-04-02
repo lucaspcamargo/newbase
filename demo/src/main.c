@@ -28,7 +28,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
-    _nb_xdg_data_dirname_set("newbase_demo");
+    _nb_xdg_data_dirname_search("newbase_demo");
 #endif
 
     _rtti_init_newbase();
