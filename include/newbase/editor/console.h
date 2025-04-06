@@ -78,7 +78,7 @@ namespace nb {
             ImGui::SameLine();
     
             // Options menu
-            if (ImGui::BeginPopup(ICON_FK_LIST " Options"))
+            if (ImGui::BeginPopup("Options"))
             {
                 ImGui::Checkbox("Auto-scroll", &AutoScroll);
                 ImGui::EndPopup();
@@ -86,7 +86,7 @@ namespace nb {
     
             // Options, Filter
             ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_Tooltip);
-            if (ImGui::Button("Options"))
+            if (ImGui::Button(ICON_FK_BARS " Options"))
                 ImGui::OpenPopup("Options");
             ImGui::SameLine();
             Filter.Draw(ICON_FK_FILTER " Filter", 180); // "Filter (\"incl,-excl\") (\"error\")"

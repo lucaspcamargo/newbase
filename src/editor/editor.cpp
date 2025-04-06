@@ -52,6 +52,7 @@ bool editor::step(step_phase phase)
                 ImGui::TableHeadersRow();
                 for(auto id: reg.view<entt::entity>())
                 {
+                    ImGui::PushID(static_cast<int>(id));
                     ImGui::TableNextColumn();
                     ImGui::Text("%x", id);
                     ImGui::TableNextColumn();
@@ -75,9 +76,10 @@ bool editor::step(step_phase phase)
                                 continue;
                             }
                             ImGui::SameLine();
-                            ImGui::Text(info->editor_icon);
+                            ImGui::Button(info->editor_icon);
                         }
                     }
+                    ImGui::PopID();
                     ImGui::TableNextRow();
                 }
                 ImGui::EndTable();

@@ -340,6 +340,10 @@ bool render_simple::event( SDL_Event * evt)
         }
     }
 
+
+    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
+        SDL_SetWindowFullscreen(_win, !(SDL_GetWindowFlags(_win)&SDL_WINDOW_FULLSCREEN));
+
     return true;
 }
 
