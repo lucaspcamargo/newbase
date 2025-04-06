@@ -139,7 +139,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsClassic();
+#include <newbase/utility/imgui_style.cpp.inc>
     ImGui::GetStyle().WindowRounding = 8;
     ImGui::GetStyle().FrameRounding = 3;
     ImGui::GetStyle().GrabRounding = 3;
@@ -165,6 +165,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     if(rman().read_all_sync(mainfont_hash, mainfont_data, false))
     {
         ImFontConfig config;
+        strncpy(config.Name, "regular", sizeof(ImFontConfig::Name));
         config.RasterizerDensity = _scale;
         void * copy = malloc(mainfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, mainfont_data.data(), mainfont_data.size());
@@ -182,6 +183,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     if(rman().read_all_sync(iconfont_hash, iconfont_data, false))
     {
         ImFontConfig config;
+        strncpy(config.Name, "icons", sizeof(ImFontConfig::Name));
         config.RasterizerDensity = _scale;
         config.MergeMode = true;
         config.GlyphMinAdvanceX = 14.0f;
@@ -194,6 +196,25 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     {
         log::error("[render_simple] cannot read icon font: %x", iconfont_hash);
     }
+
+    std::string boldfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Bold.ttf";
+    std::vector<char> boldfont_data;
+    auto boldfont_hash = entt::hashed_string{boldfont_path.c_str()}.value();
+    log::info("[render_simple] bold font: %x", boldfont_hash);
+    if(rman().read_all_sync(boldfont_hash, boldfont_data, false))
+    {
+        ImFontConfig config;
+        strncpy(config.Name, "bold", sizeof(ImFontConfig::Name));
+        config.RasterizerDensity = _scale;
+        void * copy = malloc(boldfont_data.size()); // need to copy, imgui takes ownership
+        memcpy(copy, boldfont_data.data(), boldfont_data.size());
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, boldfont_data.size(), 14, &config);
+    }
+    else
+    {
+        log::error("[render_simple] cannot read system font: %x", boldfont_hash);
+    }
+
     ImGui::GetIO().Fonts->Build();
 
     SDL_GetWindowSafeArea(_win, &_safe);

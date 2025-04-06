@@ -1,10 +1,12 @@
 #include <newbase/editor/editor.h>
+#include <newbase/editor/console.h>
 #include <newbase/engine.h>
 #include <newbase/scene.h>
 #include <newbase/reflection/contexts.h>
 #include <newbase/reflection/data.h>
 #include <newbase/res/manager.h>
 #include <newbase/log.h>
+#include <newbase/sdl/logging_handler.h>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
@@ -13,15 +15,26 @@ using namespace nb;
 using entt::operator""_hs;
 
 static bool _enabled = false;
+static bool _console_enabled = false;
+static int _log_observer = -1;
+static console c;
 
 bool editor::init(ryml::ConstNodeRef cfg)
 {
     log::info("[editor] init");
+    _log_observer = log::register_observer([](int category, int prio, const char *msg){
+        c.AddLog("[%s] [%s] %s", log::priority_str(static_cast<log::priority>(prio)), log::category_str(static_cast<log::category>(category)), msg);
+    });
     return true;
 }
 
 bool editor::step(step_phase phase)
 {
+    if(phase == step_phase::POST_UPDATE && _console_enabled)
+    {
+        c.Draw(ICON_FK_TERMINAL " Console", &_console_enabled);
+    }
+
     if(phase == step_phase::POST_UPDATE && _enabled)
     {
         float fnt_size_unit = ImGui::GetFontSize();
@@ -61,6 +74,7 @@ bool editor::step(step_phase phase)
                             {
                                 continue;
                             }
+                            ImGui::SameLine();
                             ImGui::Text(info->editor_icon);
                         }
                     }
@@ -97,8 +111,10 @@ bool editor::step(step_phase phase)
 
 bool editor::event(SDL_Event* evt)
 {
-    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_GRAVE)
+    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F1)
         _enabled = !_enabled;
+    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_GRAVE)
+        _console_enabled = !_console_enabled;
 
     return true;
 }
