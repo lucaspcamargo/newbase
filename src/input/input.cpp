@@ -9,6 +9,9 @@
 using namespace nb;
 using entt::operator""_hs;
 
+static gamepad_button _conv_gp_button(SDL_GamepadButton btn);
+static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis);
+
 struct gamepad_data
 {
     uint32_t id{0};
@@ -83,11 +86,31 @@ bool input::event(SDL_Event *evt)
     }
     else if(evt->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN)
     {
-        // TODO buffer input
+        auto joy_id = evt->gbutton.which;
+        auto gpit = _d->gamepads.find(joy_id);
+        if(gpit != _d->gamepads.end())
+        {
+            const SDL_GamepadButton sdl_btn = static_cast<SDL_GamepadButton>(evt->gbutton.button);
+            gamepad_button btn = _conv_gp_button(sdl_btn);
+            if(btn != gamepad_button::BTN_NONE)
+            {
+                log::info("[input] gp pressed: %d", (int) btn);
+            }
+        }
     }
     else if(evt->type == SDL_EVENT_GAMEPAD_BUTTON_UP)
     {
-        // TODO buffer input
+        auto joy_id = evt->gbutton.which;
+        auto gpit = _d->gamepads.find(joy_id);
+        if(gpit != _d->gamepads.end())
+        {
+            const SDL_GamepadButton sdl_btn = static_cast<SDL_GamepadButton>(evt->gbutton.button);
+            gamepad_button btn = _conv_gp_button(sdl_btn);
+            if(btn != gamepad_button::BTN_NONE)
+            {
+                log::info("[input] gp released: %d", (int) btn);
+            }
+        }
     }
     else if(evt->type == SDL_EVENT_GAMEPAD_AXIS_MOTION)
     {
@@ -101,6 +124,12 @@ bool input::action_add(const input_action &action)
 {
     _d->actions.emplace(action.id, input_action{action});
     return true;
+}
+
+
+void input::action_remove(entt::id_type action_id)
+{
+    _d->actions.erase(action_id);
 }
 
 void input::gamepad_add(uint32_t joy_id)
@@ -118,7 +147,11 @@ void input::gamepad_add(uint32_t joy_id)
             .has_gyro = SDL_GamepadHasSensor(gp, SDL_SENSOR_GYRO),
             .has_accel = SDL_GamepadHasSensor(gp, SDL_SENSOR_ACCEL)
         };
-        log::info("[input] gamepad_add: registered: %d", joy_id);
+        log::info("[input] gamepad_add: registered: %d%s%s%s", 
+            joy_id, 
+            _d->gps_data[joy_id].has_rumble? " rumble":"",
+            _d->gps_data[joy_id].has_gyro? " gyro":"",
+            _d->gps_data[joy_id].has_accel? " accel":"");
     }
     else
         log::warn("[input] gamepad_add: cannot open: %d: %s", joy_id, SDL_GetError());
@@ -143,7 +176,7 @@ void input::setup_default_actions()
     action_add(input_action{
         .id = entt::hashed_string{"dir_primary"},
         .gp_btns = {gamepad_button::BTN_DPAD_UP, gamepad_button::BTN_DPAD_DOWN, gamepad_button::BTN_DPAD_LEFT, gamepad_button::BTN_DPAD_RIGHT},
-        .gp_axii = {gamepad_axis::GPA_AXIS_LEFT_X, gamepad_axis::GPA_AXIS_LEFT_Y},
+        .gp_axii = {gamepad_axis::GPA_ANALOG_LEFT_X, gamepad_axis::GPA_ANALOG_LEFT_Y},
         .kbd_scancodes = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT},
         .directional = true,
         .dir_gp_btns = {
@@ -153,8 +186,8 @@ void input::setup_default_actions()
             {gamepad_button::BTN_DPAD_RIGHT, input_direction::IDIR_RIGHT},
         },
         .dir_gp_axii = {
-            {gamepad_axis::GPA_AXIS_LEFT_X, input_axis::IAXIS_X}, 
-            {gamepad_axis::GPA_AXIS_LEFT_Y, input_axis::IAXIS_Y}
+            {gamepad_axis::GPA_ANALOG_LEFT_X, input_axis::IAXIS_X}, 
+            {gamepad_axis::GPA_ANALOG_LEFT_Y, input_axis::IAXIS_Y}
         },
         .dir_kbd_scancodes = {
             {SDL_SCANCODE_UP, input_direction::IDIR_UP},
@@ -162,6 +195,144 @@ void input::setup_default_actions()
             {SDL_SCANCODE_LEFT, input_direction::IDIR_LEFT},
             {SDL_SCANCODE_RIGHT, input_direction::IDIR_RIGHT},
         },
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"dir_secondary"},
+        .gp_btns = {},
+        .gp_axii = {gamepad_axis::GPA_ANALOG_RIGHT_X, gamepad_axis::GPA_ANALOG_RIGHT_Y},
+        .kbd_scancodes = {SDL_SCANCODE_T, SDL_SCANCODE_G, SDL_SCANCODE_F, SDL_SCANCODE_H},
+        .directional = true,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {
+            {gamepad_axis::GPA_ANALOG_RIGHT_X, input_axis::IAXIS_X}, 
+            {gamepad_axis::GPA_ANALOG_RIGHT_Y, input_axis::IAXIS_Y}
+        },
+        .dir_kbd_scancodes = {
+            {SDL_SCANCODE_T, input_direction::IDIR_UP},
+            {SDL_SCANCODE_G, input_direction::IDIR_DOWN},
+            {SDL_SCANCODE_F, input_direction::IDIR_LEFT},
+            {SDL_SCANCODE_H, input_direction::IDIR_RIGHT},
+        },
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"btn_south"},
+        .gp_btns = {gamepad_button::BTN_SOUTH},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_Z},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"btn_west"},
+        .gp_btns = {gamepad_button::BTN_WEST},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_A},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"btn_east"},
+        .gp_btns = {gamepad_button::BTN_EAST},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_X},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"btn_north"},
+        .gp_btns = {gamepad_button::BTN_NORTH},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_S},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"bumper_l"},
+        .gp_btns = {gamepad_button::BTN_BUMPER_L},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_Q},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"bumper_r"},
+        .gp_btns = {gamepad_button::BTN_BUMPER_R},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_W},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"trigger_l"},
+        .gp_btns = {gamepad_button::BTN_TRIGGER_L},
+        .gp_axii = {gamepad_axis::GPA_TRIGGER_L},
+        .kbd_scancodes = {SDL_SCANCODE_1},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"trigger_r"},
+        .gp_btns = {gamepad_button::BTN_TRIGGER_R},
+        .gp_axii = {gamepad_axis::GPA_TRIGGER_R},
+        .kbd_scancodes = {SDL_SCANCODE_2},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"start"},
+        .gp_btns = {gamepad_button::BTN_START},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_RETURN},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"select"},
+        .gp_btns = {gamepad_button::BTN_SELECT},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_RSHIFT, SDL_SCANCODE_TAB},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"l_stick"},
+        .gp_btns = {gamepad_button::BTN_LS},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_R},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
+    });
+    action_add(input_action{
+        .id = entt::hashed_string{"r_stick"},
+        .gp_btns = {gamepad_button::BTN_RS},
+        .gp_axii = {},
+        .kbd_scancodes = {SDL_SCANCODE_Y},
+        .directional = false,
+        .dir_gp_btns = {},
+        .dir_gp_axii = {},
+        .dir_kbd_scancodes = {},
     });
     log::info("[input] default actions ready");
 }
@@ -178,4 +349,74 @@ extern "C" void _rtti_init_input()
         .type("input_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::input>>()
         .conv<std::shared_ptr<nb::system>>();
+}
+
+// Conversion functions
+
+static gamepad_button _conv_gp_button(SDL_GamepadButton btn)
+{
+    switch(btn)
+    {
+        case SDL_GAMEPAD_BUTTON_DPAD_UP:
+            return gamepad_button::BTN_DPAD_UP;
+        case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+            return gamepad_button::BTN_DPAD_DOWN;
+        case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+            return gamepad_button::BTN_DPAD_LEFT;
+        case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+            return gamepad_button::BTN_DPAD_RIGHT;
+        
+        case SDL_GAMEPAD_BUTTON_SOUTH:
+            return gamepad_button::BTN_SOUTH;
+        case SDL_GAMEPAD_BUTTON_NORTH:
+            return gamepad_button::BTN_NORTH;
+        case SDL_GAMEPAD_BUTTON_WEST:
+            return gamepad_button::BTN_WEST;
+        case SDL_GAMEPAD_BUTTON_EAST:
+            return gamepad_button::BTN_EAST;
+        
+        case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:
+            return gamepad_button::BTN_BUMPER_L;
+        case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER:
+            return gamepad_button::BTN_BUMPER_R;
+
+        case SDL_GAMEPAD_BUTTON_START:
+            return gamepad_button::BTN_START;
+        case SDL_GAMEPAD_BUTTON_BACK:
+            return gamepad_button::BTN_SELECT;
+        case SDL_GAMEPAD_BUTTON_GUIDE:
+            return gamepad_button::BTN_META;
+
+        case SDL_GAMEPAD_BUTTON_LEFT_STICK:
+            return gamepad_button::BTN_LS;
+        case SDL_GAMEPAD_BUTTON_RIGHT_STICK:
+            return gamepad_button::BTN_RS;
+
+        default:
+            return gamepad_button::BTN_NONE;
+    }
+
+    return gamepad_button::BTN_NONE;
+}
+
+static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis)
+{
+    switch(axis)
+    {
+        case SDL_GAMEPAD_AXIS_LEFTX:
+            return gamepad_axis::GPA_ANALOG_LEFT_X;
+        case SDL_GAMEPAD_AXIS_RIGHTX:
+            return gamepad_axis::GPA_ANALOG_RIGHT_X;
+        case SDL_GAMEPAD_AXIS_LEFTY:
+            return gamepad_axis::GPA_ANALOG_LEFT_Y;
+        case SDL_GAMEPAD_AXIS_RIGHTY:
+            return gamepad_axis::GPA_ANALOG_RIGHT_Y;
+        case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:
+            return gamepad_axis::GPA_TRIGGER_L;
+        case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER:
+            return gamepad_axis::GPA_TRIGGER_R;
+        default:
+            return gamepad_axis::GPA_NONE;
+    }
+    return gamepad_axis::GPA_NONE;
 }

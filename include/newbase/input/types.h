@@ -22,8 +22,8 @@ enum class gamepad_button
     BTN_TRIGGER_R,
 
     // analog stick buttons
-    BTN_LS,  // xbox y
-    BTN_RS,  // xbox y
+    BTN_LS,
+    BTN_RS,
     
     // dpad as buttons
     BTN_DPAD_DOWN,
@@ -34,17 +34,22 @@ enum class gamepad_button
     // "center" buttons
     BTN_START,  // plus
     BTN_SELECT, // minus
-    BTN_META   // home, guide, etc
+    BTN_META,   // home, guide, etc
+
+    BTN__COUNT
 };
 
 enum class gamepad_axis
 {
-    GPA_AXIS_LEFT_X,
-    GPA_AXIS_LEFT_Y,
-    GPA_AXIS_RIGHT_X,
-    GPA_AXIS_RIGHT_Y,
-    GPA_AXIS_TRIGGER_X,
-    GPA_AXIS_TRIGGER_Y
+    GPA_NONE,
+    GPA_ANALOG_LEFT_X,
+    GPA_ANALOG_LEFT_Y,
+    GPA_ANALOG_RIGHT_X,
+    GPA_ANALOG_RIGHT_Y,
+    GPA_TRIGGER_L,
+    GPA_TRIGGER_R,
+
+    GPA__COUNT
 };
 
 enum class input_direction

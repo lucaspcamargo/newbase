@@ -9,6 +9,16 @@ namespace nb {
 
 struct input_p;
 
+/**
+ * The input system takes care of all game-related input.
+ * It is responsible for:
+ * - collecting SDL input events
+ * - buffering inputs inbetween frame processing
+ * - mapping input events to game actions
+ * - presenting a consistent view of input methods and actions every frame
+ *      - by parsing the buffered input before simulation updates
+ *      - and then presenting all interested parties the same input state via its API
+ */
 class input : public system 
 {
 public:
@@ -25,6 +35,7 @@ public:
     bool event(SDL_Event*) override;
 
     bool action_add(const input_action &action);
+    void action_remove(entt::id_type action_id);
 
 private:
     void gamepad_add(uint32_t joy_id);
