@@ -57,6 +57,12 @@ add_library(newbase STATIC
     src/audio/audio.cpp
     src/audio/lua_bindings.cpp
 
+    # system: input
+    src/input/input.cpp
+
+    # system: clock
+    src/clock/clock.cpp
+
     # system: script_lua
     src/script_lua/script_lua.cpp
     src/script_lua/bindings_glm.cpp

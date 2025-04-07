@@ -5,7 +5,7 @@
 #include <newbase/components/spatial.h>
 #include <newbase/components/sprite.h>
 #include <newbase/components/script.h>
-#include <newbase/res/etree.h>
+#include <newbase/log.h>
 
 #include <entt/entt.hpp>
 #include <ryml_std.hpp>
@@ -41,17 +41,17 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
     auto res = rman().get_etree(retree_id, false);
     if(!res)
     {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: cannot load: %x", static_cast<uint32_t>(retree_id));
+        log::warn("[scene] build_etree: cannot load: %x", static_cast<uint32_t>(retree_id));
         return entt::tombstone;
     }
 
     if(!res->valid)
     {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: invalid etree: %x", static_cast<uint32_t>(retree_id));
+        log::warn("[scene] build_etree: invalid etree: %x", static_cast<uint32_t>(retree_id));
         return entt::tombstone;
     }
 
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: %x", static_cast<uint32_t>(retree_id));
+    log::info("[scene] build_etree: %x", static_cast<uint32_t>(retree_id));
 
     for(auto ent: res->tree.rootref())
     {
@@ -59,12 +59,12 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
         c4::from_chars(ent["name"].val(), &entname);
         auto eid = reg.create();
 
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: ent %s", entname.c_str());
+        log::info("[scene] build_etree: ent %s", entname.c_str());
         for(auto comp: ent["comps"])
         {
             std::string compname;
             c4::from_chars(comp.key(), &compname);
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[ecs] build_etree: comp %s", compname.c_str());
+            log::info("[scene] build_etree: comp %s", compname.c_str());
             if(compname == "spatial")
             {
                 auto &s = reg.emplace<nb::cspatial>(eid);

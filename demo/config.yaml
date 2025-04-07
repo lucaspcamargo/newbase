@@ -8,6 +8,8 @@ systems:
     sfx_gain: 1.0
  script_lua: {}
  editor: {}
+ input: {}
+ clock: {}
 resources:
  scanners:
  - type: "fs_raw"

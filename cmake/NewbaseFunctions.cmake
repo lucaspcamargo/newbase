@@ -88,7 +88,7 @@ function(newbase_prepare_executable)
             "${rtti_entry_file_output}" 
             "${arg_SYSTEMS}"
         BYPRODUCTS "${rtti_entry_file_output}"
-        DEPENDS "${rtti_entry_file_template}" "${rtti_extra_depends}"
+        DEPENDS "${rtti_entry_file_template}" ${rtti_extra_depends}
         VERBATIM
     )
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
