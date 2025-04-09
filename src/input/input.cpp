@@ -19,13 +19,29 @@ struct gamepad_data
     bool has_rumble {false};
     bool has_gyro {false};
     bool has_accel {false};
+    bool ninty_layout {false};
+    gamepad_stored_state state;
 };
 
 struct nb::input_p 
 {
     std::unordered_map<int, SDL_Gamepad*> gamepads;
-    std::unordered_map<int, gamepad_data> gps_data;
+    std::unordered_map<int, gamepad_data> gp_data;
+    
     std::unordered_map<entt::id_type, input_action> actions;
+    std::unordered_map<entt::id_type, input_action_state> action_states;
+
+    // find actions from specific input
+    // not used internally because of the one-shot processing
+    std::unordered_map<SDL_Scancode, std::set<entt::id_type>> actions_for_kbd;
+    std::unordered_map<gamepad_button, std::set<entt::id_type>> actions_for_gp_btn;
+    std::unordered_map<gamepad_axis, std::set<entt::id_type>> actions_for_gp_axis;
+
+    // buffered keyboard state
+    std::set<SDL_Scancode> kbd_is_pressed;
+    std::set<SDL_Scancode> kbd_was_pressed;
+    std::set<SDL_Scancode> kbd_was_released;
+    std::unordered_map<SDL_Scancode, uint64_t> kbd_when_pressed_ns;
 };
 
 input::input()
@@ -41,11 +57,6 @@ input::~input()
 SDL_InitFlags input::sdl_subsystems(ryml::ConstNodeRef cfg)
 {
     return SDL_INIT_GAMEPAD;
-}
-
-void input::bind(void *state) 
-{
-    log::warn("[input] unimplemented: bind");
 }
 
 bool input::init(ryml::ConstNodeRef cfg) 
@@ -69,9 +80,67 @@ bool input::init(ryml::ConstNodeRef cfg)
     return true;
 }
 
-bool input::step(step_phase) 
+bool input::step(step_phase phase) 
 {
-    // TODO process buffered inputs and emit action events
+    if(phase == step_phase::PRE_UPDATE)
+    {
+        // process buffered inputs and update action states
+        for(auto &action_p: _d->actions)
+        {
+            const auto &action = action_p.second;
+            auto &action_state = _d->action_states[action_p.first];
+            
+            // reset action state
+            action_state = {};
+            
+            
+            // first, gamepads
+            for(auto &gp_p: _d->gamepads)
+            {
+                const auto gp = gp_p.second;
+                const auto &gp_data = _d->gp_data[gp_p.first];
+                const auto &gp_state = gp_data.state;
+                
+                for(gamepad_button gpbtn: action.gp_btns)
+                {
+                    if(gp_state.is_pressed[static_cast<size_t>(gpbtn)])
+                        action_state.is_pressed = true;
+                    if(gp_state.was_pressed[static_cast<size_t>(gpbtn)])
+                        action_state.was_pressed = true;
+                    if(gp_state.was_released[static_cast<size_t>(gpbtn)])
+                        action_state.was_released = true;
+                }
+                
+                if(action.directional)
+                {
+                    // TODO directional processing
+                }
+                
+            }
+
+            // then, keyboard
+            for (uint32_t kbd_u32 : action.kbd_scancodes)
+            {
+                SDL_Scancode kbd_sc = static_cast<SDL_Scancode>(kbd_u32);
+                if (_d->kbd_is_pressed.find(kbd_sc) != _d->kbd_is_pressed.end())
+                    action_state.is_pressed = true;
+                if (_d->kbd_was_pressed.find(kbd_sc) != _d->kbd_was_pressed.end())
+                    action_state.was_pressed = true;
+                if (_d->kbd_was_released.find(kbd_sc) != _d->kbd_was_released.end())
+                    action_state.was_released = true;
+            }
+        }
+        
+        // cleanup stored states for further events
+        _d->kbd_was_pressed.clear();
+        _d->kbd_was_released.clear();
+        for(auto &gp:_d->gp_data)
+        {
+            gp.second.state.was_pressed.fill(false);
+            gp.second.state.was_released.fill(false);
+        }
+    }
+    
     return true;
 }
 
@@ -97,7 +166,12 @@ bool input::event(SDL_Event *evt)
             gamepad_button btn = _conv_gp_button(sdl_btn);
             if(btn != gamepad_button::BTN_NONE)
             {
-                log::info("[input] gp pressed: %d", (int) btn);
+                log::verb("[input] gp pressed: %d", (int) btn);
+                auto &state = _d->gp_data[joy_id].state;
+                state.is_pressed[static_cast<size_t>(btn)] = true;
+                state.was_pressed[static_cast<size_t>(btn)] = true;
+                if(!state.when_pressed_ns[static_cast<size_t>(btn)])
+                    state.when_pressed_ns[static_cast<size_t>(btn)] = evt->gbutton.timestamp;
             }
         }
         else
@@ -113,23 +187,54 @@ bool input::event(SDL_Event *evt)
             gamepad_button btn = _conv_gp_button(sdl_btn);
             if(btn != gamepad_button::BTN_NONE)
             {
-                log::info("[input] gp released: %d", (int) btn);
+                log::verb("[input] gp released: %d", static_cast<int>(btn));
+                auto &state = _d->gp_data[joy_id].state;
+                state.is_pressed[static_cast<size_t>(btn)] = false;
+                state.was_released[static_cast<size_t>(btn)] = true;
             }
         }
+        else
+            log::warn("[input] evt without gp: %d", joy_id);
     }
     else if(evt->type == SDL_EVENT_GAMEPAD_AXIS_MOTION)
     {
-        // TODO buffer input
+        auto joy_id = evt->gaxis.which;
+        auto gpit = _d->gamepads.find(joy_id);
+        if(gpit != _d->gamepads.end())
+        {
+            const SDL_GamepadAxis sdl_axis = static_cast<SDL_GamepadAxis>(evt->gaxis.axis);
+            gamepad_axis axis = _conv_gp_axis(sdl_axis);
+            if(axis != gamepad_axis::GPA_NONE)
+            {
+                float our_value = evt->gaxis.value?
+                                    (evt->gaxis.value>0
+                                        ? evt->gaxis.value/32767.f
+                                        : evt->gaxis.value/32768.f)
+                                    :.0f;
+                log::verb("[input] gp axis: %d %f", static_cast<int>(axis), our_value);
+                auto &state = _d->gp_data[joy_id].state;
+                state.axis_value[static_cast<size_t>(axis)] = our_value;
+            }
+        }
+        else
+            log::warn("[input] evt without gp: %d", joy_id);
     }
     else if(evt->type == SDL_EVENT_KEY_DOWN)
     {
-        // TODO buffer input
-        log::verb("[input] key down: %d", (int)evt->key.scancode);
+        const SDL_Scancode sc = evt->key.scancode;
+        log::verb("[input] key down: %d", static_cast<int>(sc));
+        _d->kbd_is_pressed.insert(sc);
+        _d->kbd_was_pressed.insert(sc);
+        auto it = _d->kbd_when_pressed_ns.find(sc);
+        if(it == _d->kbd_when_pressed_ns.end())
+            _d->kbd_when_pressed_ns.emplace(sc, evt->key.timestamp);
     }
     else if(evt->type == SDL_EVENT_KEY_UP)
     {
-        // TODO buffer input
-        log::verb("[input] key up: %d", (int)evt->key.scancode);
+        const SDL_Scancode sc = evt->key.scancode;
+        log::verb("[input] key up: %d", static_cast<int>(sc));
+        _d->kbd_is_pressed.erase(sc);
+        _d->kbd_was_released.insert(sc);
     }
 
     return true;
@@ -137,14 +242,87 @@ bool input::event(SDL_Event *evt)
 
 bool input::action_add(const input_action &action)
 {
+    log::info("[input] action_add: %s (%x)", action.id.operator const char *(), action.id.value());
     _d->actions.emplace(action.id, input_action{action});
+    for(auto kbd_u32: action.kbd_scancodes)
+    {
+        const auto kbd = static_cast<SDL_Scancode>(kbd_u32);
+        _d->actions_for_kbd[kbd].insert(action.id);
+    }
+    for(auto btn: action.gp_btns)
+    {
+        _d->actions_for_gp_btn[btn].insert(action.id);
+    }
+    for(auto axis: action.gp_axii)
+    {
+        _d->actions_for_gp_axis[axis].insert(action.id);
+    }
+
     return true;
 }
 
 
 void input::action_remove(entt::id_type action_id)
 {
-    _d->actions.erase(action_id);
+    auto it = _d->actions.find(action_id);
+    if(it == _d->actions.end())
+        return;
+
+    const auto &action = it->second;
+
+    for(const auto kbd_u32: action.kbd_scancodes)
+    {
+        const auto kbd = static_cast<SDL_Scancode>(kbd_u32);
+        _d->actions_for_kbd[kbd].erase(action.id);
+        if(_d->actions_for_kbd[kbd].empty())
+            _d->actions_for_kbd.erase(kbd);
+    }
+    for(auto btn: action.gp_btns)
+    {
+        _d->actions_for_gp_btn[btn].erase(action.id);
+        if(_d->actions_for_gp_btn[btn].empty())
+            _d->actions_for_gp_btn.erase(btn);
+    }
+    for(auto axis: action.gp_axii)
+    {
+        _d->actions_for_gp_axis[axis].erase(action.id);
+        if(_d->actions_for_gp_axis[axis].empty())
+            _d->actions_for_gp_axis.erase(axis);
+    }
+    _d->actions.erase(it);
+}
+
+bool input::action_is_pressed(entt::id_type action_id)
+{
+    auto it = _d->action_states.find(action_id);
+    if(it != _d->action_states.end())
+    {
+        if(it->second.is_pressed)
+            return true;
+    }
+    return false;
+}
+
+bool input::action_was_pressed(entt::id_type action_id)
+{
+    auto it = _d->action_states.find(action_id);
+    if(it != _d->action_states.end())
+    {
+        if(it->second.was_pressed)
+            return true;
+    }
+    return false;
+}
+
+bool input::action_was_released(entt::id_type action_id)
+{
+    auto it = _d->action_states.find(action_id);
+    if(it != _d->action_states.end())
+    {
+        if(it->second.was_released)
+            return true;
+    }
+    return false;
 }
 
 void input::gamepad_add(uint32_t joy_id)
@@ -156,19 +334,21 @@ void input::gamepad_add(uint32_t joy_id)
     {
         auto p = SDL_GetGamepadProperties(gp);
         _d->gamepads[joy_id] = gp;
-        _d->gps_data[joy_id] = gamepad_data {
+        _d->gp_data[joy_id] = gamepad_data {
             .id = joy_id,
             .has_rumble = SDL_GetBooleanProperty(p, SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN, false),
             .has_gyro = SDL_GamepadHasSensor(gp, SDL_SENSOR_GYRO),
-            .has_accel = SDL_GamepadHasSensor(gp, SDL_SENSOR_ACCEL)
+            .has_accel = SDL_GamepadHasSensor(gp, SDL_SENSOR_ACCEL),
+            .ninty_layout = SDL_GetGamepadButtonLabel(gp, SDL_GAMEPAD_BUTTON_SOUTH) == SDL_GAMEPAD_BUTTON_LABEL_B
         };
         auto name = SDL_GetGamepadName(gp);
         log::info("[input] gamepad_add: registered: '%s' (%d)%s%s%s %d", 
             name? name : "",
             joy_id, 
-            _d->gps_data[joy_id].has_rumble? " rumble":"",
-            _d->gps_data[joy_id].has_gyro? " gyro":"",
-            _d->gps_data[joy_id].has_accel? " accel":"");
+            _d->gp_data[joy_id].has_rumble? " rumble":"",
+            _d->gp_data[joy_id].has_gyro? " gyro":"",
+            _d->gp_data[joy_id].has_accel? " accel":"",
+            _d->gp_data[joy_id].ninty_layout? " ninty":"");
             SDL_SetGamepadPlayerIndex(gp, 1);
     }
     else
@@ -184,7 +364,7 @@ void input::gamepad_remove(uint32_t joy_id)
         return;
     }
     SDL_CloseGamepad(it->second);
-    _d->gps_data.erase(it->first);
+    _d->gp_data.erase(it->first);
     _d->gamepads.erase(it);
     log::info("[input] gamepad_remove: removed %d", joy_id);
 }

@@ -29,6 +29,8 @@ bool clock::step(step_phase phase)
     if(phase == step_phase::GENERAL_UPDATE)
     {
         // fire update callbacks
+        for(auto it: m_update)
+            it.second(1.0f/60.0f);
     }
 
     return true;

@@ -39,6 +39,8 @@ enum class gamepad_button
     BTN__COUNT
 };
 
+static constexpr size_t GAMEPAD_BUTTON_COUNT = static_cast<size_t>(gamepad_button::BTN__COUNT); 
+
 enum class gamepad_axis
 {
     GPA_NONE,
@@ -51,6 +53,8 @@ enum class gamepad_axis
 
     GPA__COUNT
 };
+
+static constexpr size_t GAMEPAD_AXIS_COUNT = static_cast<size_t>(gamepad_axis::GPA__COUNT); 
 
 enum class input_direction
 {
@@ -76,6 +80,18 @@ struct gamepad_config
     float trigger_threshold {0.3f};
 };
 
+struct gamepad_stored_state
+{
+    // this structure is used to collect gamepad events and store current state
+    // this is to present to the engine a consistent state of the gamepad inbetween updates
+    // ensures that very short presses are not missed, for example
+    std::array<bool, GAMEPAD_BUTTON_COUNT> was_pressed {false};
+    std::array<bool, GAMEPAD_BUTTON_COUNT> was_released {false};
+    std::array<bool, GAMEPAD_BUTTON_COUNT> is_pressed {false};
+    std::array<uint64_t, GAMEPAD_BUTTON_COUNT> when_pressed_ns {0};
+    std::array<float, GAMEPAD_AXIS_COUNT> axis_value;
+};
+
 struct input_action
 {
     entt::hashed_string id {};
@@ -84,10 +100,19 @@ struct input_action
     std::set<uint32_t> kbd_scancodes {};
 
     bool directional {false};   // a directional action can map inputs to directions in mutiple axii
-                                // the resulting event will combine all input states into a resulting direction vector
+                                // the resulting event will combine all input states into a resulting vector
     std::unordered_map<gamepad_button, input_direction> dir_gp_btns;
     std::unordered_map<gamepad_axis, input_axis> dir_gp_axii;
     std::unordered_map<uint32_t, input_direction> dir_kbd_scancodes;
+};
+
+// used by input system to expose action state to engine
+struct input_action_state
+{
+    bool was_pressed {false};
+    bool was_released {false};
+    bool is_pressed {false};
+    std::array<float, 3> direction {.0f, .0f, .0f};
 };
 
 }

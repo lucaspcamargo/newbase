@@ -13,9 +13,12 @@ static rtti::component_type_info::bind_result _csprite_bind(void *state)
     sol::state_view lua{reinterpret_cast<lua_State*>(state)};
     auto ut = lua.new_usertype<csprite>("csprite");
     
-    return rtti::component_type_info::bind_result{ "csprite", [](void *state, void *data){
+    return rtti::component_type_info::bind_result{ "csprite", [](void *state, entt::entity id, entt::registry &reg){
         sol::state_view lua{reinterpret_cast<lua_State*>(state)};
-        lua["sprite"] = reinterpret_cast<csprite*>(data);
+        lua.set_function("csprite", [id, &reg]() -> csprite* {
+            csprite &spr = reg.get<csprite>(id);
+            return &spr;
+        });
     }};
 }
 

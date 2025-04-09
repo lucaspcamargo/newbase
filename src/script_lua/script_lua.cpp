@@ -205,7 +205,7 @@ bool script_lua::step(step_phase phase)
                             auto mt = lua[userdata_id].get<sol::metatable>();
                             assert(mt.valid());
                             assert(storage.value(id));
-                            _d->bound_components[comp_id].second(_d->L, storage.value(id));
+                            _d->bound_components[comp_id].second(_d->L, id, reg);
                             // we have asked the binding to add the component to the current lua state
                         }
                     }

@@ -18,9 +18,12 @@ static rtti::component_type_info::bind_result _cspatial_bind(void *state)
     ut["clear"] = &cspatial::clear;
     ut["apply"] = [](cspatial &spatial){spatial.apply();};
     
-    return rtti::component_type_info::bind_result{ "cspatial", [](void *state, void *data){
+
+    return rtti::component_type_info::bind_result{ "cspatial", [](void *state, entt::entity id, entt::registry &reg){
         sol::state_view lua{reinterpret_cast<lua_State*>(state)};
-        lua["spatial"] = reinterpret_cast<cspatial*>(data);
+        lua.set_function("spatial", [id, &reg]() -> cspatial* {
+            return &(reg.get<cspatial>(id));
+        });
     }};
 }
 

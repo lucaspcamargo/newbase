@@ -37,6 +37,17 @@ public:
     bool action_add(const input_action &action);
     void action_remove(entt::id_type action_id);
 
+    bool action_is_pressed(entt::id_type action_id);
+    bool action_was_pressed(entt::id_type action_id);
+    bool action_was_released(entt::id_type action_id);
+
+    // we need api to identify different input devices
+    // so that it can be assigned to different players
+    // and also action state per player, which changes the above
+    // currently, we assume single-player
+
+    void rumble(float secs, float strength) {}
+
 private:
     void gamepad_add(uint32_t joy_id);
     void gamepad_remove(uint32_t joy_id);

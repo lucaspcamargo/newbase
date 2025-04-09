@@ -59,9 +59,11 @@ add_library(newbase STATIC
 
     # system: input
     src/input/input.cpp
+    src/input/lua_bindings.cpp
 
     # system: clock
     src/clock/clock.cpp
+    src/clock/lua_bindings.cpp
 
     # system: script_lua
     src/script_lua/script_lua.cpp
