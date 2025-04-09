@@ -18,12 +18,11 @@
 #include <glm/gtx/string_cast.hpp>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <string>
 #include <vector>
 #include <iostream> // TODO remove
-
-#include <tracy/Tracy.hpp>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -175,6 +174,7 @@ bool render_simple::step(nb::step_phase phase)
 {
     if(phase == step_phase::PRE_UPDATE)
     {
+        ZoneScopedN("RenderPreUpdate");
         // Start the Dear ImGui frame
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -191,10 +191,11 @@ bool render_simple::step(nb::step_phase phase)
     }
     else if(phase == step_phase::PRE_RENDER)
     {
-
+        ZoneScopedN("RenderPre");
     }
     else if(phase == step_phase::RENDER)
     {
+        ZoneScopedN("Render");
         // Rendering
 
         // clear
@@ -281,7 +282,6 @@ bool render_simple::step(nb::step_phase phase)
         // Call SDL_RenderReadPixels() to fill buffer
         // Send buffer to tracy profiler
 #endif
-
         SDL_RenderPresent(_render);
         FrameMark;
     }

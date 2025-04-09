@@ -4,4 +4,5 @@ if(NEWBASE_TRACING)
         set(TRACY_DEFINES "-DTRACY_ENABLE")
     endif()
 endif()
+
 set(TRACY_INCLUDES "vendored/tracy/public/") # should always be available to avoid mess of ifdefs
