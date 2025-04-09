@@ -20,6 +20,7 @@ include(cmake/NewbaseFunctions.cmake)
 include(cmake/NewbaseLogging.cmake)
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
+include(cmake/NewbaseTracy.cmake)
 
 message("[newbase] adding SDL")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
@@ -82,17 +83,18 @@ add_library(newbase STATIC
     # rtti
     src/reflection/contexts.cpp
 
-    # dependencies: stb and Dear ImGui
+    # dependencies
     src/stb_impl.c
     ${IMGUI_SOURCES}
+    ${TRACY_SOURCES}
 )
 if(NEWBASE_USE_XDG_DATA_DIRS)
     target_sources(newbase PRIVATE src/utility/xdg.cpp)
 endif()
 
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
-target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES})
-target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL)
+target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
+target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 -lm)
 
 # CONFIG HEADER

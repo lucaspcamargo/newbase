@@ -23,6 +23,9 @@
 #include <vector>
 #include <iostream> // TODO remove
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#endif
 
 using namespace nb;
 using entt::operator""_hs;
@@ -314,6 +317,9 @@ bool render_simple::step(nb::step_phase phase)
 #endif
 
         SDL_RenderPresent(_render);
+#ifdef TRACY_ENABLED
+        FrameMark;
+#endif
     }
     return true;
 }
@@ -387,7 +393,9 @@ void render_simple::draw_perf()
         ImGui::Text("FPS: %.1f", io.Framerate);
         ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
         ImGui::Separator();
-        ImGui::Text("plot goes here");
+#ifdef TRACY_ENABLED
+        ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
+#endif
         if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
         {
             if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;

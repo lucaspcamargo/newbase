@@ -1,5 +1,6 @@
 #include <newbase/sdl/engine_hooks.h>
 #include <newbase/nb_config.h>
+#include <newbase/reflection/init.h>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
 #endif
@@ -8,8 +9,11 @@
 #include "SDL3/SDL_main.h"
 #include "SDL3/SDL_properties.h"
 
+#ifdef TRACY_ENABLE
+#include <tracy/TracyC.h>
+#endif
+
 #include <stdio.h>
-#include <newbase/reflection/init.h>
 
 
 inline static enum SDL_AppResult bool_to_app_result(bool val)
@@ -19,6 +23,10 @@ inline static enum SDL_AppResult bool_to_app_result(bool val)
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
+#ifdef TRACY_ENABLE
+    TracyCIsConnected;
+#endif
+
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "newbase demo");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, NEWBASE_VERSION);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "br.eng.camargo.newbase.demo");
