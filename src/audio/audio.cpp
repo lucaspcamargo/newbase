@@ -81,7 +81,7 @@ bool audio::init(ryml::ConstNodeRef cfg)
 
 bool audio::step(step_phase phase)
 {
-    if(phase == step_phase::GENERAL_UPDATE)
+    if(phase == step_phase::POST_UPDATE)
     {
         // some test code for audio goes here, hardcoded
         static bool first = true;

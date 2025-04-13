@@ -73,7 +73,7 @@ struct component_type_info
     // making a lua binding of a component returns the identifier to use for the local getter,
     // and a function that can be used to resolve the reference in a state, given the id and registry
     // we cannot just pass the component pointer to the function. That is faster but components do not
-    // have pointer stability
+    // necessarily have pointer stability
     // maybe we can do something better in the future (e.g. update references when calling into lua again)
     // for sure components that /do have/ pointer stability can bind more simply
     using bind_result = std::pair<const char *, std::function<void(void*, entt::entity, entt::registry&)>>; 
@@ -82,7 +82,8 @@ struct component_type_info
     bool can_add;
     std::function<bind_result(void*)> _bind_func;
     const char *editor_icon;
-
+    bool can_edit {false};
+    std::function<void(void*)> _edit_func;
 };
 
 struct resource_type_info

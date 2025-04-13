@@ -23,15 +23,17 @@
 #include <vector>
 #include <iostream> // TODO remove
 
-#ifdef TRACY_ENABLE
 #include <tracy/Tracy.hpp>
-#endif
 
 using namespace nb;
 using entt::operator""_hs;
 
 static std::string _imguiCfgFile {};
 static SDL_Rect _safe {};
+#ifdef TRACY_ENABLE
+static SDL_Surface *_tracyCopy {nullptr};
+#endif
+
 
 render_simple::render_simple():
 _win(nullptr),
@@ -316,10 +318,15 @@ bool render_simple::step(nb::step_phase phase)
             SDL_SetRenderScale(_render, 1.0f, 1.0f);
 #endif
 
-        SDL_RenderPresent(_render);
 #ifdef TRACY_ENABLED
-        FrameMark;
+        // TODO
+        // rebuild _tracyCopy to be able to hold current framebuffer
+        // Call SDL_RenderReadPixels() to fill buffer
+        // Send buffer to tracy profiler
 #endif
+
+        SDL_RenderPresent(_render);
+        FrameMark;
     }
     return true;
 }
@@ -351,6 +358,17 @@ bool render_simple::event( SDL_Event * evt)
         SDL_SetWindowFullscreen(_win, !(SDL_GetWindowFlags(_win)&SDL_WINDOW_FULLSCREEN));
 
     return true;
+}
+
+
+int render_simple::window_width()
+{
+    return _wx;
+}
+
+int render_simple::window_height()
+{
+    return _wy;
 }
 
 void render_simple::draw_perf()

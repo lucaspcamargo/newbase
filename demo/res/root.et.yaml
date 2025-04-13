@@ -1,7 +1,7 @@
 - name: stage
   comps:
     script:
-      lua: "res/stage.lua"
+      lua: "res/asteroids/stage.lua"
 - name: background
   comps:
     spatial:
@@ -9,14 +9,14 @@
       rot: [0, 0, 0]
       scale: [1, 1, 1]
     sprite:
-      res: "res/background.jpg"
-- name: spr0
+      res: "res/asteroids/background.jpg"
+- name: ship
   comps:
     spatial:
       pos: [0, 0, 0]
-      rot: [0, 0, -45]
+      rot: [0, 0, 0]
       scale: [1, 1, 1]
     sprite:
-      res: "res/sprites/rocket.png"
+      res: "res/asteroids/ship.png"
     script:
-      lua: "res/rocket.lua"
+      lua: "res/asteroids/ship.lua"

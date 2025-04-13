@@ -54,6 +54,7 @@ add_library(newbase STATIC
 
     # system: render_simple
     src/render_simple/render_simple.cpp
+    src/render_simple/lua_bindings.cpp
 
     # system: audio
     src/audio/audio.cpp
