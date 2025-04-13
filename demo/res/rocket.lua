@@ -1,21 +1,18 @@
-local eng = engine.ref()
 
-if system_audio then
-    audio_bgm_play(hs("res/bgm/ObservingTheStar/ObservingTheStar.ogg"));
-    audio_bgm_gain(0.5)
-end
 
-local action_id = hs("btn_south")
+local accel_hs = hs("btn_south")
+local shoot_hs = hs("btn_west")
 local dir_hs = hs("dir")
 
 clock_update_add(function (delta)
     local sp = spatial()
     local dir = input_action_direction(dir_hs)
-    sp.pos = sp.pos + dir*delta*500.0
-    if input_action_is_pressed(action_id) then
-        sp.rot.z = sp.rot.z + 50*delta
+    sp.rot.z = sp.rot.z + delta*50.0*dir.x
+    print(dir.x)
+    if input_action_is_pressed(accel_hs) then
+        -- apply acceleration
     else
-        sp.rot.z = sp.rot.z - 50*delta
+        -- apply drag 👠
     end
     sp:apply()
 end)

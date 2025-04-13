@@ -289,4 +289,6 @@ extern "C" void _rtti_init_script_lua()
         .type("script_lua_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::script_lua>>()
         .conv<std::shared_ptr<nb::system>>();
+
+    cscript::_ensure_rtti();
 }

@@ -10,5 +10,7 @@ namespace nb {
         lua_State *state {nullptr};
         bool ready {false};
         bool skip {false};
+
+        static void _ensure_rtti();
     };
 }

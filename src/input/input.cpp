@@ -152,6 +152,7 @@ bool input::step(step_phase phase)
                         _apply_dir(dir_result, dir);
                 }
 
+                // normalize direction if larger than one
                 float len = sqrtf(dir_result[0]*dir_result[0] +
                             dir_result[1]*dir_result[1] +
                             dir_result[2]*dir_result[2]);
@@ -160,6 +161,12 @@ bool input::step(step_phase phase)
                     dir_result[0] /= len;
                     dir_result[1] /= len;
                     dir_result[2] /= len;
+                }
+                else if(len < 0.1f)
+                {
+                    // deadzone
+                    // TODO not hardcode this
+                    dir_result.fill(0.0f);
                 }
             }
         }

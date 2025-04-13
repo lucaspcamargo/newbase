@@ -48,6 +48,7 @@ add_library(newbase STATIC
 
     # components
     src/components/builders.cpp
+    src/components/script_rtti.cpp
     src/components/spatial_rtti.cpp
     src/components/sprite_rtti.cpp
 

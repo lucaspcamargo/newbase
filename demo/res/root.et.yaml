@@ -1,3 +1,7 @@
+- name: stage
+  comps:
+    script:
+      lua: "res/stage.lua"
 - name: background
   comps:
     spatial:

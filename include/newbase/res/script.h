@@ -4,6 +4,7 @@ extern "C" {
 #include <lua.h>
 }
 #include <vector>
+#include <string>
 
 namespace nb {
 
