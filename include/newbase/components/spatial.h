@@ -23,16 +23,12 @@ namespace nb {
         // TODO move to spatial subsystem? With dirty flag or something?
         inline void apply(const glm::mat4x4 parent = glm::mat4x4{1.0f})
         {
-            world = parent * glm::translate(
-                glm::rotate( 
-                    glm::rotate( 
-                        glm::rotate(
-                            glm::scale(glm::mat4x4{1.f}, scale)
-                            , glm::radians(rot[0]), glm::vec3{1.f,0.f,0.f})
-                        , glm::radians(rot[1]), glm::vec3{0.f,1.f,0.f})
-                    , glm::radians(rot[2]), glm::vec3{0.f,0.f,1.f}
-                ), pos
-            );
+            world = parent;
+            world = glm::translate(world, pos);
+            world = glm::rotate(world, glm::radians(rot[0]), glm::vec3{1.f,0.f,0.f});
+            world = glm::rotate(world, glm::radians(rot[1]), glm::vec3{0.f,1.f,0.f});
+            world = glm::rotate(world, glm::radians(rot[2]), glm::vec3{0.f,0.f,1.f});
+            world = glm::scale(world, scale);
         }
 
         static void _ensure_rtti();

@@ -11,6 +11,8 @@ using entt::operator""_hs;
 
 static gamepad_button _conv_gp_button(SDL_GamepadButton btn);
 static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis);
+static void _apply_dir_axis(std::array<float, 3> &arr, input_axis axis, float value);
+static void _apply_dir(std::array<float, 3> &arr, input_direction dir);
 
 struct gamepad_data
 {
@@ -89,10 +91,11 @@ bool input::step(step_phase phase)
         {
             const auto &action = action_p.second;
             auto &action_state = _d->action_states[action_p.first];
+            std::array<float, 3> &dir_result  = action_state.direction;
             
             // reset action state
             action_state = {};
-            
+            action_state.direction.fill(0.f);
             
             // first, gamepads
             for(auto &gp_p: _d->gamepads)
@@ -113,7 +116,15 @@ bool input::step(step_phase phase)
                 
                 if(action.directional)
                 {
-                    // TODO directional processing
+                    for(auto [btn, dir]: action.dir_gp_btns)
+                    {
+                        if(gp_state.is_pressed[static_cast<size_t>(btn)])
+                            _apply_dir(dir_result, dir);
+                    }
+                    for(auto [axis, iaxis]: action.dir_gp_axii)
+                    {
+                        _apply_dir_axis(dir_result, iaxis, gp_state.axis_value[static_cast<size_t>(axis)]);
+                    }
                 }
                 
             }
@@ -128,6 +139,28 @@ bool input::step(step_phase phase)
                     action_state.was_pressed = true;
                 if (_d->kbd_was_released.find(kbd_sc) != _d->kbd_was_released.end())
                     action_state.was_released = true;
+            }
+
+            // directional general
+            if(action.directional)
+            {
+                // directional global inputs
+                for(auto [sc_u32, dir]: action.dir_kbd_scancodes)
+                {
+                    const SDL_Scancode sc = static_cast<SDL_Scancode>(sc_u32);
+                    if(_d->kbd_is_pressed.find(sc) != _d->kbd_is_pressed.end())
+                        _apply_dir(dir_result, dir);
+                }
+
+                float len = sqrtf(dir_result[0]*dir_result[0] +
+                            dir_result[1]*dir_result[1] +
+                            dir_result[2]*dir_result[2]);
+                if(len > 1.0f)
+                {
+                    dir_result[0] /= len;
+                    dir_result[1] /= len;
+                    dir_result[2] /= len;
+                }
             }
         }
         
@@ -325,6 +358,18 @@ bool input::action_was_released(entt::id_type action_id)
     return false;
 }
 
+
+std::array<float, 3> input::action_direction(entt::id_type action_id)
+{
+
+    auto it = _d->action_states.find(action_id);
+    if(it != _d->action_states.end())
+    {
+        return it->second.direction;
+    }
+    return {.0f, .0f, .0f};
+}
+
 void input::gamepad_add(uint32_t joy_id)
 {
     // a new gamepad was added, register it
@@ -372,7 +417,7 @@ void input::gamepad_remove(uint32_t joy_id)
 void input::setup_default_actions()
 {
     action_add(input_action{
-        .id = entt::hashed_string{"dir_primary"},
+        .id = entt::hashed_string{"dir"},
         .gp_btns = {gamepad_button::BTN_DPAD_UP, gamepad_button::BTN_DPAD_DOWN, gamepad_button::BTN_DPAD_LEFT, gamepad_button::BTN_DPAD_RIGHT},
         .gp_axii = {gamepad_axis::GPA_ANALOG_LEFT_X, gamepad_axis::GPA_ANALOG_LEFT_Y},
         .kbd_scancodes = {SDL_SCANCODE_UP, SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT},
@@ -617,4 +662,46 @@ static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis)
             return gamepad_axis::GPA_NONE;
     }
     return gamepad_axis::GPA_NONE;
+}
+
+static void _apply_dir_axis(std::array<float, 3> &arr, input_axis axis, float val)
+{
+    switch(axis)
+    {
+        case input_axis::IAXIS_X:
+            arr[0] += val;
+            return;
+        case input_axis::IAXIS_Y:
+            arr[1] += val;
+            return;
+        case input_axis::IAXIS_Z:
+            arr[2] += val;
+            return;
+    }
+}
+
+
+static void _apply_dir(std::array<float, 3> &arr, input_direction dir)
+{
+    switch(dir)
+    {
+        case input_direction::IDIR_RIGHT:
+            arr[0] += 1.0f;
+            return;
+        case input_direction::IDIR_LEFT:
+            arr[0] -= 1.0f;
+            return;
+        case input_direction::IDIR_DOWN:
+            arr[1] += 1.0f;
+            return;
+        case input_direction::IDIR_UP:
+            arr[1] -= 1.0f;
+            return;
+        case input_direction::IDIR_FORWARD:
+            arr[2] += 1.0f;
+            return;
+        case input_direction::IDIR_BACKWARD:
+            arr[2] -= 1.0f;
+            return;
+    }
 }
