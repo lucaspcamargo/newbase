@@ -6,6 +6,7 @@ set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
 set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
 option(NEWBASE_LTO "Enable LTO if available" OFF)
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
+option(NEWBASE_SGDK "Enable SGDK compatibility subsystem" ON)
 option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
 option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
@@ -21,6 +22,8 @@ include(cmake/NewbaseLogging.cmake)
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
 include(cmake/NewbaseTracy.cmake)
+include(cmake/NewbaseSGDK.cmake)
+
 
 message("[newbase] adding SDL")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
@@ -85,6 +88,9 @@ add_library(newbase STATIC
     # rtti
     src/reflection/contexts.cpp
 
+    # optional subsystems
+    ${SGDK_SUPPORT_SOURCES}
+
     # dependencies
     src/stb_impl.c
     ${IMGUI_SOURCES}
@@ -97,7 +103,7 @@ endif()
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 ymfm -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
@@ -114,5 +120,5 @@ target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 
 # EXPORTS
 # let games use newbase and dependencies straight from the build folder
-export(EXPORT glm FILE glm-export.cmake) # glm has no export itself, this needs to be done here
+export(EXPORT glm NAMESPACE newbase FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(TARGETS newbase NAMESPACE newbase FILE newbase-export.cmake )
