@@ -19,6 +19,7 @@ public:
         assert(m_prod.operator bool());
         // inner producer must be seekable, or at least resetable if loop frame is zero
         assert(m_prod->is_seekable() || (m_prod->is_resetable() && !loop_frame));
+        // inner producer must be complete, so that we can tell when it is done
     }
 
     ~audio_producer_looper() override = default;
@@ -72,7 +73,29 @@ public:
 
     size_t frames_pull(audio_buffer &buf, size_t max_frames) override
     {
-        assert(0);  // TODO implement
+        assert(0);  // TODO see below
+
+        size_t produced = 0;
+        while(produced < max_frames)
+        {
+            // if we are at the end
+            if(m_prod->frames_left() == 0)
+            {
+                if(m_loop_frame)
+                    seek(m_loop_frame);
+                else
+                    reset();
+            }
+
+            size_t goal = max_frames - produced;
+            size_t produced_now = m_prod->frames_pull(buf, goal);   // TODO produce sound in middle of buffer
+            if(!produced_now)
+                break; // something is fishy
+
+            m_curr += produced_now;
+            produced += produced_now;
+        }
+        return produced;
     }
 
 private:
