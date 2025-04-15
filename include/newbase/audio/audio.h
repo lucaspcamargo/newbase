@@ -22,6 +22,10 @@ public:
     // that is easy to invoke via reflection
     // no need for fancy features, this should be good enough for simple games 
 
+    // top-level control
+    void out_mute(bool muted);
+    void out_gain(float gain);
+
     // background music
     bool bgm_play(entt::id_type res_id);
     bool bgm_playing();
@@ -31,6 +35,8 @@ public:
     // sound effects 
     bool sfx_play(entt::id_type res_id, float gain);
 
+private:
+    void show_debug_ui(bool *);
 };
 
 }

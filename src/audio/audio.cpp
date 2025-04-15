@@ -1,4 +1,5 @@
 #include <newbase/audio/audio.h>
+#include <newbase/engine.h>
 #include <newbase/sdl/utils.h>
 #include <newbase/reflection/contexts.h>
 #include <newbase/reflection/data.h>
@@ -7,6 +8,10 @@
 #include <newbase/log.h>
 #include <entt/meta/factory.hpp>
 
+// for debug ui
+#include "imgui.h"
+#include "IconsForkAwesome.h"
+
 using namespace nb;
 using entt::operator""_hs;
 
@@ -14,9 +19,14 @@ static SDL_AudioDeviceID _dev_out{ 0 };
 static SDL_AudioSpec _spec_out;
 static int _bufsize_out; 
 
+bool _out_mute {false};
+float _out_gain {1.0f};
+
 SDL_AudioStream *_bgm {nullptr};
 float _bgm_gain {1.0f};
 float _sfx_gain {1.0f};
+
+static bool _show_debug_ui {false};
 
 audio::audio()
 {
@@ -75,6 +85,10 @@ bool audio::init(ryml::ConstNodeRef cfg)
         cfg["sfx_gain"] >> _sfx_gain; 
     }
 
+    engine::instance().debug_action_register("audio debug toggle", [](){
+        _show_debug_ui = !_show_debug_ui;
+    }, 9);
+
     return true;
 }
 
@@ -89,6 +103,9 @@ bool audio::step(step_phase phase)
         {
             first = false;
         }
+
+        if(_show_debug_ui)
+            show_debug_ui(&_show_debug_ui);
     }
     return true;
 }
@@ -97,6 +114,18 @@ bool audio::step(step_phase phase)
 bool audio::event(SDL_Event*)
 {
     return true;
+}
+
+void audio::out_mute(bool muted)
+{
+    _out_mute = muted;
+    out_gain(_out_gain);
+}
+
+void audio::out_gain(float gain)
+{
+    _out_gain = gain;
+    SDL_SetAudioDeviceGain(_dev_out, _out_mute? 0.0f: _out_gain);
 }
 
 bool audio::bgm_play(entt::id_type res_id)
@@ -162,7 +191,25 @@ void audio::bgm_gain(float gain)
 }
 
 // sound effects 
-bool sfx_play(entt::id_type res_id, float gain);
+bool audio::sfx_play(entt::id_type res_id, float gain)
+{
+    return false;
+}
+
+// debug
+void audio::show_debug_ui(bool *close)
+{
+    ImGui::Begin(ICON_FK_VOLUME_UP " Audio", close);
+    if(ImGui::Checkbox("Out Mute", &_out_mute))
+        out_mute(_out_mute);
+    if(ImGui::SliderFloat("Out Gain", &_out_gain, 0.f, 1.f))
+        out_gain(_out_gain);
+    if(ImGui::SliderFloat("BGM Gain", &_bgm_gain, 0.f, 1.f))
+        bgm_gain(_bgm_gain);
+    if(ImGui::SliderFloat("SFX Gain", &_sfx_gain, 0.f, 1.f))
+        ;//sfx_gain(_sfx_gain);
+    ImGui::End();
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_audio()

@@ -410,10 +410,17 @@ void render_simple::draw_perf()
         ImGui::Separator();
         ImGui::Text("FPS: %.1f", io.Framerate);
         ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
-        ImGui::Separator();
 #ifdef TRACY_ENABLED
+        ImGui::Separator();
         ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
 #endif
+        ImGui::Separator();
+        for(const auto& [idx, name]: engine::instance().debug_action_names())
+        {
+            char c = idx == 0? '`' : '0' + idx;
+            ImGui::Text("[%c] %s", c, name.c_str());
+        }
+
         if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
         {
             if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;

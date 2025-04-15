@@ -47,6 +47,10 @@ struct nb::engine_p {
     std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_min_event_start;
     std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_max_event_end;
     int framecounter_start;
+
+    std::map<int, std::string> dbg_action_names;
+    std::map<int, std::function<void(void)>> dbg_action_callbacks;
+    int dbg_action_next_idx = 0;
 };
 
 engine::engine()
@@ -192,8 +196,23 @@ bool engine::event(SDL_Event *evt)
 {
     log::debug("[engine] event");
     if(evt->type == SDL_EVENT_KEY_DOWN)
+    {
         if(evt->key.key == SDLK_ESCAPE)
             return false;
+        else if((evt->key.key >= SDLK_0 && evt->key.key <= SDLK_9) || evt->key.scancode == SDL_SCANCODE_GRAVE)
+        {
+            int idx = evt->key.key - SDLK_0;
+            if(evt->key.scancode == SDL_SCANCODE_GRAVE)
+                idx = 0;
+
+            auto it = _d->dbg_action_callbacks.find(idx);
+            if(it != _d->dbg_action_callbacks.end())
+            {
+                log::info("[engine] debug action triggered: (%d) '%s'", it->first, _d->dbg_action_names[idx].c_str());
+                it->second();
+            }
+        }
+    }
     
     if(evt->type == SDL_EVENT_QUIT)
         return false;
@@ -227,6 +246,33 @@ std::shared_ptr<::nb::system> engine::system_from_id(entt::id_type meta_id)
     return it != _d->_systems_meta.end()? it->second : nullptr;
 }
 
+int engine::debug_action_register(std::string name, std::function<void(void)> callback,  int idx)
+{
+    if(idx == -1)
+    {
+        idx = _d->dbg_action_next_idx++;
+    }
+
+    _d->dbg_action_names[idx] = name;
+    _d->dbg_action_callbacks[idx] = callback;
+    return idx;
+}
+
+bool engine::debug_action_unregister(int index)
+{
+    if(_d->dbg_action_names.find(index) != _d->dbg_action_names.end())
+    {
+        _d->dbg_action_names.erase(index);
+        _d->dbg_action_callbacks.erase(index);
+        return true;
+    }
+    return false;
+}
+
+const std::map<int, std::string>& engine::debug_action_names()
+{
+    return _d->dbg_action_names;
+}
 
 void engine::log_handler(int category, int prio, const char *msg)
 {

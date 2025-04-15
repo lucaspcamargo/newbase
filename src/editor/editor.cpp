@@ -25,6 +25,16 @@ bool editor::init(ryml::ConstNodeRef cfg)
     _log_observer = log::register_observer([](int category, int prio, const char *msg){
         c.AddLog("[%s] [%s] %s", log::priority_str(static_cast<log::priority>(prio)), log::category_str(static_cast<log::category>(category)), msg);
     });
+    
+    engine::instance().debug_action_register("console toggle", [](){
+        _console_enabled = !_console_enabled;
+    });
+    
+    engine::instance().debug_action_register("editor toggle", [](){
+        _enabled = !_enabled;
+    });
+
+
     return true;
 }
 
@@ -113,11 +123,6 @@ bool editor::step(step_phase phase)
 
 bool editor::event(SDL_Event* evt)
 {
-    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F1)
-        _enabled = !_enabled;
-    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_GRAVE)
-        _console_enabled = !_console_enabled;
-
     return true;
 }
 
