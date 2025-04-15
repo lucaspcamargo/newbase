@@ -62,6 +62,9 @@ add_library(newbase STATIC
     # system: audio
     src/audio/audio.cpp
     src/audio/lua_bindings.cpp
+    src/audio/buffer.cpp
+    src/audio/producer/buffer.cpp
+    src/audio/producer/vorbis.cpp
 
     # system: input
     src/input/input.cpp
