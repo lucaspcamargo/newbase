@@ -2,12 +2,14 @@
 
 #include <newbase/audio/types.h>
 #include <vector>
+#include <cassert>
 
 namespace nb
 {
 
 // A copyable, movable, generic audio buffer
-// Always stores interleaved data (for now at least)
+// Always stores interleaved data when not mono
+// Channel ordering/assignment is same as SDL3
 class audio_buffer final
 {
 public:
@@ -50,6 +52,89 @@ public:
 
     std::vector<std::byte>& data() { return m_data; }
     const std::vector<std::byte>& data() const { return m_data; }
+
+    // span type
+    // a view of a subsection of a buffer
+    // ideally we'd use ranges but this framework is C++17, not C++20
+    // to be used for producer pull (and other processing purposes :)
+    class span final
+    {
+    public:
+        span() = delete;
+
+        explicit span(const span &other):
+            m_buf(other.m_buf),
+            m_frame_start(other.m_frame_start),
+            m_frame_len(other.m_frame_len)
+        {
+        }
+
+        explicit span(audio_buffer &buf):
+            m_buf(buf),
+            m_frame_start(0),
+            m_frame_len(buf.frames())
+        {
+        }
+
+        explicit span(audio_buffer &buf, size_t start_frame, size_t end_frame):
+            m_buf(buf),
+            m_frame_start(start_frame),
+            m_frame_len(end_frame-start_frame)
+        {
+            assert(end_frame >= start_frame);
+        }
+
+        span(span&&) = delete;
+
+        ~span() = default;
+
+        std::byte& operator[](int i) {
+            return m_buf.data()[(i+m_frame_start)*m_buf.frame_stride()];
+        }
+
+        std::byte const& operator[](int i) const {
+            return m_buf.data()[(i+m_frame_start)*m_buf.frame_stride()];
+        }
+
+        std::size_t size() const {
+            return (m_frame_len)*m_buf.frame_stride();
+        }
+
+        std::byte* begin() {
+            return m_buf.data().data() + (m_frame_start*m_buf.frame_stride());
+        }
+
+        std::byte* end() {
+            return begin() + size();
+        }
+
+        bool empty() const 
+        {
+            return !m_frame_len;
+        }
+
+        /* TODO
+        span from(size_t frame_index)
+        {
+        }
+        
+        span until(size_t frame_index)
+        {
+        }
+        */
+
+        audio_buffer & buffer_ref() {return m_buf;}
+        const audio_buffer & buffer_ref() const {return m_buf;}
+    private:
+        audio_buffer &m_buf;
+        size_t m_frame_start;
+        size_t m_frame_len;
+    };
+
+    span as_span()
+    {
+        return span(*this);
+    }
 
 private:
     audio_spec m_spec {};
