@@ -5,7 +5,7 @@
 namespace nb
 {
 
-// An audio producer that gets data from a stream
+// An audio producer that gets data from a buffer reference
 class audio_producer_buffer : public audio_producer
 {
 public:
