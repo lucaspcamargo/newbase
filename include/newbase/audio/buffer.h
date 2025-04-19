@@ -3,6 +3,7 @@
 #include <newbase/audio/types.h>
 #include <vector>
 #include <cassert>
+#include <cstddef>
 
 namespace nb
 {
@@ -25,7 +26,8 @@ public:
     {
         auto sz = frame_stride()*frames;
         m_data.resize(sz);
-        std::copy(data, data+sz, m_data.begin());
+        if(data)
+            std::copy(data, data+sz, m_data.begin());
     }
     explicit audio_buffer(const audio_buffer &other)
     {

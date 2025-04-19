@@ -30,6 +30,11 @@ struct audio_spec
             && channels == other.channels
             && frequency == other.frequency;
     }
+
+    audio_spec with_format(audio_format fmt)
+    {
+        return audio_spec {fmt, channels, frequency};
+    }
 };
 
 
