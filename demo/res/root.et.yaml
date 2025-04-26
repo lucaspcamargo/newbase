@@ -20,3 +20,8 @@
       res: "res/asteroids/ship.png"
     script:
       lua: "res/asteroids/ship.lua"
+    body2d:
+      type: KINEMATIC
+      shapes:
+       - type: POLY
+         data: [10, 10, 10, -10, -10, -10]

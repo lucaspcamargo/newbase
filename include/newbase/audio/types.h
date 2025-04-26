@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstddef>
 
+struct SDL_AudioSpec;
+
 namespace nb
 {
 
@@ -12,7 +14,6 @@ enum class audio_format
     UNKNOWN,
     FLOAT,
     S16,
-    U16,
     S8,
     U8
 };
@@ -35,6 +36,9 @@ struct audio_spec
     {
         return audio_spec {fmt, channels, frequency};
     }
+
+    void to_sdl(SDL_AudioSpec &out);
+    void from_sdl(const SDL_AudioSpec &in);
 };
 
 
@@ -52,8 +56,6 @@ inline size_t audio_format_size(audio_format fmt)
         case audio_format::FLOAT:
             return sizeof(float);
         case audio_format::S16:
-            [[fallthrough]];
-        case audio_format::U16:
             return sizeof(uint16_t);
         case audio_format::U8:
             [[fallthrough]];

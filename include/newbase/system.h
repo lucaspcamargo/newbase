@@ -12,7 +12,7 @@ namespace nb {
 enum step_phase {
     PREPARE,
     PRE_UPDATE,
-    PHYSISCS_UPDATE,
+    PHYSICS_UPDATE,
     GENERAL_UPDATE,
     POST_UPDATE,
     PRE_RENDER,

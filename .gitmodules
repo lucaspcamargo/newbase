@@ -28,3 +28,6 @@
 [submodule "vendored/ymfm"]
 	path = vendored/ymfm
 	url = https://github.com/aaronsgiles/ymfm.git
+[submodule "vendored/box2d"]
+	path = vendored/box2d
+	url = https://github.com/erincatto/box2d.git

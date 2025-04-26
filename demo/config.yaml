@@ -10,6 +10,8 @@ systems:
  editor: {}
  input: {}
  clock: {}
+ physics2d:
+   world_scale: 10
 resources:
  scanners:
  - type: "fs_raw"

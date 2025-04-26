@@ -24,7 +24,9 @@ public:
     virtual bool reset() {return false;}    // returns whether reset was actually done
     virtual size_t frames_left() {return 0;} // if not complete, must return 0
 
-    virtual size_t frames_pull(audio_buffer &buf, size_t max_frames) = 0;
+    // produce up to max_frames samples into dst
+    // returns the number of actually generated frames, in case the producer is done before
+    virtual size_t frames_pull(audio_buffer::span dst, size_t max_frames) = 0;
 };
 
 }

@@ -1,4 +1,7 @@
 #include <newbase/audio/audio.h>
+#include <newbase/audio/producer/buffer.h>
+#include <newbase/audio/producer/looper.h>
+#include <newbase/audio/producer/vorbis.h>
 #include <newbase/engine.h>
 #include <newbase/sdl/utils.h>
 #include <newbase/reflection/contexts.h>
@@ -23,6 +26,7 @@ bool _out_mute {false};
 float _out_gain {1.0f};
 
 SDL_AudioStream *_bgm {nullptr};
+audio_producer * _bgm_prod {nullptr};
 float _bgm_gain {1.0f};
 float _sfx_gain {1.0f};
 
@@ -75,12 +79,12 @@ bool audio::init(ryml::ConstNodeRef cfg)
         SDL_ResumeAudioDevice(_dev_out);
     }
 
-    if(!cfg["bgm_gain"].invalid())
+    if(cfg.has_child("bgm_gain"))
     {
         cfg["bgm_gain"] >> _bgm_gain; 
     }
 
-    if(!cfg["sfx_gain"].invalid())
+    if(cfg.has_child("sfx_gain"))
     {
         cfg["sfx_gain"] >> _sfx_gain; 
     }
@@ -143,7 +147,9 @@ bool audio::bgm_play(entt::id_type res_id)
         return false;
     }
 
-    _bgm = SDL_CreateAudioStream(&(vorbis_res->spec), nullptr);
+    SDL_AudioSpec spec;
+    vorbis_res->spec.to_sdl(spec);
+    _bgm = SDL_CreateAudioStream(&spec, nullptr);
     if(!_bgm)
     {
         log::error("[audio] bgm_play: cannot open stream: %s", SDL_GetError());

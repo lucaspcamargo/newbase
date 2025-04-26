@@ -1,14 +1,16 @@
 #pragma once
 
-#include <SDL3/SDL_audio.h>
+#include <newbase/audio/types.h>
 
 namespace nb {
 
 struct rwav {
     bool valid {false};
-    SDL_AudioSpec spec{};
-    uint8_t *buf;
-    uint32_t len;
+    audio_spec spec {};
+    uint8_t *buf {nullptr};
+    uint32_t len {0};
+
+    ~rwav();
 };
 
 }

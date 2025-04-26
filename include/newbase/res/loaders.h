@@ -31,4 +31,9 @@ struct rloader_vorbis {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_wav {
+    using result_type = std::shared_ptr<rwav>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

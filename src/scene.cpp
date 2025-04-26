@@ -5,6 +5,7 @@
 #include <newbase/components/spatial.h>
 #include <newbase/components/sprite.h>
 #include <newbase/components/script.h>
+#include <newbase/components/body2d.h>
 #include <newbase/log.h>
 
 #include <entt/entt.hpp>
@@ -79,6 +80,11 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
             {
                 auto &s = reg.emplace<nb::cscript>(eid);
                 nb::build_script(comp, s);
+            }
+            else if(compname == "body2d")
+            {
+                auto &s = reg.emplace<nb::cbody2d>(eid);
+                nb::build_body2d(comp, s);
             }
             else assert(0);
         }

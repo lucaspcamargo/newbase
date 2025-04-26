@@ -32,7 +32,9 @@ public:
     bool reset() override;
     size_t frames_left() override;
 
-    size_t frames_pull(audio_buffer &buf, size_t max_frames) override;
+    // requires that the destination buffer has the same spec
+    // the producer does not do any conversions or resampling
+    size_t frames_pull(audio_buffer::span dst, size_t max_frames) override;
 
 private:
     const audio_buffer &m_buf;

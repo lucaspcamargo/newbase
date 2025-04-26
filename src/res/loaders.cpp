@@ -5,6 +5,7 @@
 #include <newbase/res/sprite.h>
 #include <newbase/res/script.h>
 #include <newbase/res/vorbis.h>
+#include <newbase/res/wav.h>
 #include <newbase/log.h>
 
 #include <SDL3/SDL.h>
@@ -131,7 +132,7 @@ namespace nb {
             memcpy(vorbis->frames.data(), result, size_bytes);
             free(result);
             // NOTE: we always get interleaved, 16-bit signed audio from stb_vorbis
-            vorbis->spec = SDL_AudioSpec{SDL_AUDIO_S16, num_ch, freq};
+            vorbis->spec = audio_spec{audio_format::S16, num_ch, static_cast<unsigned int>(freq)};
             vorbis->decoded = true;
             vorbis->valid = true;
             log::info("[rloader_vorbis] loaded: %x, %d frames at %d Hz, %d channels: %d bytes", id, samplecount, freq, num_ch, vorbis->frames.size());
@@ -142,5 +143,50 @@ namespace nb {
         }
 
         return vorbis;
+    }
+
+
+
+    rloader_wav::result_type rloader_wav::operator()(entt::id_type id) const
+    {
+        log::info("[rloader_wav] loading: %x", id);
+        auto wav = std::make_shared<rwav>();
+        wav->valid = false;
+        std::vector<char> data;
+        if(!rman().read_all_sync(id, data))
+        {
+            log::error("[rloader_wav] data loading failed: %x", id);
+            return wav;
+        }
+
+        auto ios = SDL_IOFromConstMem(data.data(), data.size());
+        if(!ios)
+        {
+            log::error("[rloader_wav] io create failed: %x", id);
+            return wav;
+        }
+        
+        SDL_AudioSpec spec;
+
+        if(SDL_LoadWAV_IO(ios, true, &spec, &wav->buf, &wav->len))
+        {
+            wav->spec.from_sdl(spec);
+            wav->valid = wav->spec.format != audio_format::UNKNOWN;
+        }
+        else
+        {
+            log::error("[rloader_wav] decode failed: %x: %s", id, SDL_GetError());
+            return wav;
+        }
+
+        return wav;
+    }
+
+    rwav::~rwav() 
+    {
+        if(buf)
+        {
+            SDL_free(buf);
+        }
     }
 }

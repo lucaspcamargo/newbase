@@ -37,6 +37,10 @@ add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
 message("[newbase] adding entt")
 set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
+message("[newbase] adding box2d")
+add_subdirectory(vendored/box2d EXCLUDE_FROM_ALL)
+target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
+
 
 add_library(newbase STATIC
 
@@ -54,6 +58,7 @@ add_library(newbase STATIC
     src/components/script_rtti.cpp
     src/components/spatial_rtti.cpp
     src/components/sprite_rtti.cpp
+    src/components/body2d_rtti.cpp
 
     # system: render_simple
     src/render_simple/render_simple.cpp
@@ -63,8 +68,10 @@ add_library(newbase STATIC
     src/audio/audio.cpp
     src/audio/lua_bindings.cpp
     src/audio/buffer.cpp
+    src/audio/converter.cpp
     src/audio/producer/buffer.cpp
     src/audio/producer/vorbis.cpp
+    src/audio/types.cpp
 
     # system: input
     src/input/input.cpp
@@ -77,6 +84,10 @@ add_library(newbase STATIC
     # system: script_lua
     src/script_lua/script_lua.cpp
     src/script_lua/bindings_glm.cpp
+
+    # system: physics2d
+    src/physics2d/physics2d.cpp
+    src/physics2d/debug_draw.cpp
 
     # system: editor
     src/editor/editor.cpp
@@ -106,7 +117,7 @@ endif()
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 ymfm -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 box2d::box2d ymfm -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
@@ -124,4 +135,5 @@ target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 # EXPORTS
 # let games use newbase and dependencies straight from the build folder
 export(EXPORT glm NAMESPACE newbase FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
+export(EXPORT box2dConfig NAMESPACE newbase FILE newbase-box2d-export.cmake) # same for box2d
 export(TARGETS newbase NAMESPACE newbase FILE newbase-export.cmake )

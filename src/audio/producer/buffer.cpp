@@ -24,15 +24,13 @@ size_t audio_producer_buffer::frames_left()
     return m_buf.frames() - m_curr;
 }
 
-size_t audio_producer_buffer::frames_pull(audio_buffer &dst, size_t max_frames)
+size_t audio_producer_buffer::frames_pull(audio_buffer::span dst, size_t max_frames)
 {
-    assert(dst.spec() == m_buf.spec());
+    assert(dst.buffer_ref().spec() == m_buf.spec());
     
-    size_t frame_stride = dst.frame_stride();
+    size_t frame_stride = dst.buffer_ref().frame_stride();
     size_t out_frames = m_loop? max_frames : std::min(frames_left(), max_frames);
     size_t out_bytes = out_frames * frame_stride;
-
-    dst.data().reserve(out_bytes);
 
     if(out_frames)
     {
@@ -40,7 +38,7 @@ size_t audio_producer_buffer::frames_pull(audio_buffer &dst, size_t max_frames)
         {
             m_curr = (m_curr + out_frames) % m_buf.frames();
             size_t to_copy = out_frames;
-            auto dst_it = dst.data().begin();
+            auto dst_it = dst.begin();
             while(to_copy)
             {
                 size_t copy_now = std::min(to_copy, m_buf.frames()-m_curr);
@@ -55,7 +53,7 @@ size_t audio_producer_buffer::frames_pull(audio_buffer &dst, size_t max_frames)
             m_curr += out_frames;
             auto src_start = m_buf.data().begin()+(m_curr*frame_stride);
             auto src_end = src_start + out_bytes;
-            std::copy(src_start, src_end, dst.data().begin());
+            std::copy(src_start, src_end, dst.begin());
         }
     }
 

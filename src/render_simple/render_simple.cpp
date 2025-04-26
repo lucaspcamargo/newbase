@@ -73,7 +73,8 @@ SDL_InitFlags render_simple::sdl_subsystems(ryml::ConstNodeRef cfg)
         bool already = getenv("SDL_VIDEODRIVER");
         std::string preferred;
         cfg["prefer"] >> preferred;
-        setenv("SDL_VIDEODRIVER", preferred.c_str(), 1); 
+        setenv("SDL_VIDEODRIVER", preferred.c_str(), 1);
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, preferred.c_str());
         log::info("[render_simple] preferring: %s%s", preferred.c_str(), already?" (overrides env)":"");
     }
     return SDL_INIT_VIDEO;

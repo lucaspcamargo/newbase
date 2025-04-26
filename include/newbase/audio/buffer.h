@@ -4,6 +4,7 @@
 #include <vector>
 #include <cassert>
 #include <cstddef>
+#include <utility>
 
 namespace nb
 {
@@ -98,6 +99,10 @@ public:
             return m_buf.data()[(i+m_frame_start)*m_buf.frame_stride()];
         }
 
+        std::size_t frames() const {
+            return m_frame_len;
+        }
+
         std::size_t size() const {
             return (m_frame_len)*m_buf.frame_stride();
         }
@@ -106,8 +111,16 @@ public:
             return m_buf.data().data() + (m_frame_start*m_buf.frame_stride());
         }
 
+        const std::byte* begin() const {
+            return m_buf.data().data() + (m_frame_start*m_buf.frame_stride());
+        }
+
         std::byte* end() {
             return begin() + size();
+        }
+
+        const std::byte* end() const {
+            return std::as_const(*this).begin() + size();
         }
 
         bool empty() const 
@@ -115,15 +128,19 @@ public:
             return !m_frame_len;
         }
 
-        /* TODO
         span from(size_t frame_index)
         {
+            return span(m_buf,
+                std::max(m_frame_start+frame_index, m_frame_start),
+                m_frame_start+m_frame_len);
         }
         
         span until(size_t frame_index)
         {
+            return span(m_buf, 
+                m_frame_start, 
+                std::min(m_frame_start+m_frame_len, m_frame_start+frame_index));
         }
-        */
 
         audio_buffer & buffer_ref() {return m_buf;}
         const audio_buffer & buffer_ref() const {return m_buf;}

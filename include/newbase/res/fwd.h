@@ -6,4 +6,5 @@ namespace nb {
     struct rtexture;
     struct rscript;
     struct rvorbis;
+    struct rwav;
 }
