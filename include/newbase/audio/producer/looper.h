@@ -71,7 +71,7 @@ public:
 
     size_t frames_left() override {return 0;} // because loop
 
-    size_t frames_pull(audio_buffer &buf, size_t max_frames) override
+    size_t frames_pull(audio_buffer::span dst, size_t max_frames) override
     {
         assert(0);  // TODO see below
 
@@ -88,7 +88,7 @@ public:
             }
 
             size_t goal = max_frames - produced;
-            size_t produced_now = m_prod->frames_pull(buf, goal);   // TODO produce sound in middle of buffer
+            size_t produced_now = m_prod->frames_pull(dst.from(produced), goal);
             if(!produced_now)
                 break; // something is fishy
 

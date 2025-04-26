@@ -17,7 +17,7 @@
       rot: [0, 0, 0]
       scale: [1, 1, 1]
     sprite:
-      res: "res/asteroids/ship.png"
+      res: "res/asteroids/spr/ship.png"
     script:
       lua: "res/asteroids/ship.lua"
     body2d:
