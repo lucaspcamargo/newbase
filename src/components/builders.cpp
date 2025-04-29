@@ -67,6 +67,11 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
             log::warn("[build_body2d] unknown body type!");
     }
 
+    if(def.has_child("gravity_scale"))
+    {
+        def["gravity_scale"] >> dst.gravity_scale;
+    }
+
     if(def.has_child("shapes") && def["shapes"].is_seq())
     {
         for(ryml::ConstNodeRef sdef: def["shapes"])
@@ -80,6 +85,8 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
                 shape.shape_type = shape2d_type::CIRCLE;
             else if(stype == "POLY")
                 shape.shape_type = shape2d_type::POLY;
+
+            sdef["data"] >> shape.shape_data;
 
             dst.shapes.push_back(shape);
         }

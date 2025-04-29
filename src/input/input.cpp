@@ -72,8 +72,17 @@ bool input::init(ryml::ConstNodeRef cfg)
     }
     else
     {
-        log::error("[input] config parsing unimplemented! using default actions for now!");
-        setup_default_actions();
+        bool default_actions = false;
+        if(cfg.has_child("default_actions"))
+            cfg["default_actions"] >> default_actions;
+        
+        if(default_actions)
+        {
+            log::info("[input] using default actions");
+            setup_default_actions();
+        }
+        else
+            log::warn("[input] config parsing unimplemented!");
     }
 
     SDL_SetGamepadEventsEnabled(true);

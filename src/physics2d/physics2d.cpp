@@ -1,20 +1,42 @@
 #include <newbase/physics2d/physics2d.h>
 #include <newbase/physics2d/debug_draw.h>
+#include <newbase/physics2d/conversions.h>
 #include <newbase/components/body2d.h>
+#include <newbase/components/spatial.h>
 #include <newbase/engine.h>
+#include <newbase/scene.h>
 #include <newbase/log.h>
+#include <newbase/services/viewport_geometry.h>
 #include <newbase/reflection/contexts.h>
 #include <newbase/reflection/data.h>
 #include <entt/entt.hpp>
 #include <box2d/box2d.h>
 #include <imgui.h>
 #include <IconsForkAwesome.h>
+#include <unordered_map>
 
 using namespace nb;
 using entt::operator""_hs;
 
+constexpr auto BODY2D_CONSTRUCT_UPDATE_STORAGE = "body2d_on_construct_update"_hs;
+constexpr auto BODY2D_DESTROY_STORAGE = "body2d_on_destroy"_hs; 
+
 // TODO: right now there's only physics for the default scene
 // we need per-scene physics worlds
+
+template<> 
+struct std::hash<b2BodyId>
+{
+    std::size_t operator()(const b2BodyId &id) const
+    {
+        return static_cast<size_t>(b2StoreBodyId(id));
+    }
+};
+
+bool operator ==(const b2BodyId &a, const b2BodyId &b)
+{
+    return b2StoreBodyId(a) == b2StoreBodyId(b);
+}
 
 struct nb::physics2d_p
 {
@@ -23,6 +45,9 @@ struct nb::physics2d_p
     // per scene
     b2WorldDef world_def;
     b2WorldId world_id {b2_nullWorldId};
+    std::unordered_map<b2BodyId, entt::entity> body_entt {};
+    std::unordered_map<b2BodyId, cbody2d*> body_comp {};
+    std::unordered_map<b2BodyId, cspatial*> body_spatial {};
 
     bool debug_draw_enabled {false};
     b2DebugDraw debug_draw {};
@@ -76,7 +101,14 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
     _d->world_def.gravity.x = 0.0f;
     _d->world_def.gravity.y = 9.81f * _d->world_scale;
     _d->world_id = b2CreateWorld(&_d->world_def);
-    
+
+    // setup reactive storage on scene registry
+    auto &reg = engine::instance().default_scene().registry();
+    auto &on_construct_upd = reg.storage<entt::reactive>(BODY2D_CONSTRUCT_UPDATE_STORAGE);
+    on_construct_upd.on_construct<cbody2d>().on_update<cbody2d>();
+    auto &on_destroy = reg.storage<entt::reactive>(BODY2D_DESTROY_STORAGE);
+    on_destroy.on_destroy<cbody2d>();
+
     return true;
 }
 
@@ -84,6 +116,48 @@ bool physics2d::step(step_phase phase)
 {
     if(phase == step_phase::PHYSICS_UPDATE)
     {
+        // construct or update bodies
+        auto &reg = engine::instance().default_scene().registry();
+        auto &on_construct_upd = reg.storage<entt::reactive>(BODY2D_CONSTRUCT_UPDATE_STORAGE);
+        for(auto entity: on_construct_upd)
+        {
+            cbody2d &cbody = reg.get<cbody2d>(entity);
+            cspatial *spatial = reg.try_get<cspatial>(entity);
+
+            if(B2_IS_NON_NULL(cbody._body_id))
+            {
+                // destroy previous body
+                // TODO: maybe just update what can be updated if possible
+                b2DestroyBody(cbody._body_id);
+                cbody._body_id = b2_nullBodyId;
+            }
+
+            b2BodyDef bodyDef;
+            bool ok = cbody2d_to_body_def(bodyDef, cbody, spatial);
+            bodyDef.userData = reinterpret_cast<void*>(entity);
+            if(!ok)
+                log::warn("[physics2d] invalid body def: %x", entity);
+            else
+            {
+                b2BodyId id = b2CreateBody(_d->world_id, &bodyDef);
+                cbody._body_id = id;
+
+                int idx = 0;
+                for(auto &shape: cbody.shapes)
+                {
+                    ok = shape2d_create(id, shape);
+                    if(!ok)
+                        log::warn("[physics2d] could not create shape: %x: #%d", entity, idx);
+
+                    ++idx;
+                }
+                _d->body_entt.emplace(id, entity);
+                _d->body_comp.emplace(id, &cbody);
+                _d->body_spatial.emplace(id, spatial);
+            }
+        }
+        on_construct_upd.clear();
+
         // TODO do use fixed timestep, but maybe not every frame
         const int substeps = 4;
         const float time_step = 1.0f/60.0f/substeps;
@@ -91,7 +165,32 @@ bool physics2d::step(step_phase phase)
         if(B2_IS_NON_NULL(_d->world_id))
         {
             b2World_Step(_d->world_id, time_step, substeps);
+
+            b2BodyEvents events = b2World_GetBodyEvents(_d->world_id);
+            log::info("[p2d] %d moves", events.moveCount);
+            for (int i = 0; i < events.moveCount; ++i)
+            {
+                const b2BodyMoveEvent* event = events.moveEvents + i;
+                auto it = _d->body_spatial.find(event->bodyId);
+                if(it != _d->body_spatial.end())
+                {
+                    cspatial *spatial = it->second;
+                    if(spatial)
+                    {
+                        spatial->pos = {event->transform.p.x, event->transform.p.y, spatial->pos.z};
+                        spatial->rot.z = glm::degrees(b2Rot_GetAngle(event->transform.q));
+                        spatial->apply();
+                    }else 
+                    log::info("[p2d] no spatial", events.moveCount);
+                }
+            }
         }
+
+        // check all bodies - unneeded?
+        //auto view = reg.view<cbody2d>();
+        //for(auto [id, body]:view.each())
+        //{
+        //}
     }
     else if(phase == step_phase::PRE_RENDER)
     {
@@ -119,9 +218,9 @@ bool physics2d::step(step_phase phase)
                 if(!ground_added)
                 {
                     b2BodyDef groundBodyDef = b2DefaultBodyDef();
-                    groundBodyDef.position = (b2Vec2){0.0f, 10.0f};
+                    groundBodyDef.position = (b2Vec2){0.0f, 10.0f*_d->world_scale};
                     b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
-                    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
+                    b2Polygon groundBox = b2MakeBox(50.0f*_d->world_scale, 10.0f*_d->world_scale);
                     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
                     b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
                     ground_added = true;
@@ -129,9 +228,9 @@ bool physics2d::step(step_phase phase)
 
                 b2BodyDef bodyDef = b2DefaultBodyDef();
                 bodyDef.type = b2_dynamicBody;
-                bodyDef.position = (b2Vec2){0.0f, -20.0f};
+                bodyDef.position = (b2Vec2){0.0f, -10.0f*_d->world_scale};
                 b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
-                b2Polygon dynamicBox = b2MakeBox(1.0f, 1.0f);
+                b2Polygon dynamicBox = b2MakeBox(1.0f*_d->world_scale, 1.0f*_d->world_scale);
                 b2ShapeDef shapeDef = b2DefaultShapeDef();
                 shapeDef.density = 1.0f;
                 shapeDef.material.friction = 0.3f;
@@ -139,8 +238,22 @@ bool physics2d::step(step_phase phase)
             }
             ImGui::End();
 
-            physics2d_pre_debug_draw(0.0f, 0.0f, _d->world_scale, _d->world_scale);
-            b2World_Draw(_d->world_id, &_d->debug_draw);
+            viewport_geometry* vg = entt::locator<viewport_geometry*>::value();
+            if(vg)
+            {
+                viewport_geometry::extents_2d extents;
+                if(vg->get_2d_extents(extents))
+                {
+                    float span_x = extents.right - extents.left;
+                    float span_y = extents.bottom - extents.top;
+                    float scale_x = extents.width/span_x;
+                    float scale_y = extents.height/span_y;
+                    float cx = (extents.right+extents.left)/2.0f;
+                    float cy = (extents.top+extents.bottom)/2.0f;
+                    physics2d_pre_debug_draw(cx, cy, scale_x*0.5, scale_y*0.5);
+                    b2World_Draw(_d->world_id, &_d->debug_draw);
+                }
+            }
 
         }
     }

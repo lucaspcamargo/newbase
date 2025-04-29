@@ -2,14 +2,6 @@
   comps:
     script:
       lua: "res/asteroids/stage.lua"
-- name: background
-  comps:
-    spatial:
-      pos: [0, 0, 100]
-      rot: [0, 0, 0]
-      scale: [1, 1, 1]
-    sprite:
-      res: "res/asteroids/background.jpg"
 - name: ship
   comps:
     spatial:
@@ -21,7 +13,40 @@
     script:
       lua: "res/asteroids/ship.lua"
     body2d:
-      type: KINEMATIC
+      type: DYNAMIC
+      gravity_scale: 0.0f
       shapes:
        - type: POLY
-         data: [10, 10, 10, -10, -10, -10]
+         data: [-20, -20, 36, 0, -20, +20]
+- name: ship2
+  comps:
+    spatial:
+      pos: [100, 0, 0]
+      rot: [0, 0, 90]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/asteroids/spr/ship.png"
+    script:
+      lua: "res/asteroids/ship.lua"
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 0.1f
+      shapes:
+       - type: POLY
+         data: [-20, -20, 36, 0, -20, +20]
+- name: ship3
+  comps:
+    spatial:
+      pos: [-100, 100, 0]
+      rot: [0, 0, -90]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/asteroids/spr/ship.png"
+    script:
+      lua: "res/asteroids/ship.lua"
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 1.0f
+      shapes:
+       - type: POLY
+         data: [-20, -20, 36, 0, -20, +20]

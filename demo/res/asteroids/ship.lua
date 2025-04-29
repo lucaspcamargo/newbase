@@ -21,8 +21,8 @@ clock_update_add(function (delta)
     end
     sp.pos = sp.pos + delta*vel
 
-    local w = render_window_width()
-    local h = render_window_height()
+    local w = render_window_width() / render_cam_2d_scale()
+    local h = render_window_height() / render_cam_2d_scale()
 
     if sp.pos.x < (-w)/2 then
         sp.pos.x = sp.pos.x + w

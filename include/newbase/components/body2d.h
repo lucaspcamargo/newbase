@@ -39,9 +39,14 @@ namespace nb {
     };
 
     struct cbody2d {
+
+        // pointer stability (easy user_data)
+        static constexpr auto in_place_delete = true;
+        
         body2d_type type {body2d_type::STATIC};
         float linear_damping {-1.0f};
         float angular_damping {-1.0f};
+        float gravity_scale {1.0f};
         
         bool enabled {true};
         bool enable_sleep {true};

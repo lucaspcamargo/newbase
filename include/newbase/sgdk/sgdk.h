@@ -4,6 +4,8 @@
 
 namespace nb {
 
+struct sgdk_p;
+
 // this system provides a C API for compatibility with SGDK games
 // it needs to:
 // - implement an emulated VDP

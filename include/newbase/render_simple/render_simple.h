@@ -1,10 +1,12 @@
 #pragma once
 
 #include <newbase/system.h>
+#include <newbase/services/viewport_geometry.h>
 
 namespace nb {
 
-class render_simple : public system {
+class render_simple : public system, public viewport_geometry
+{
 public:
     render_simple();
     ~render_simple();
@@ -20,6 +22,12 @@ public:
 
     int window_width();
     int window_height();
+
+    void cam_2d_setup(float cx, float cy, float wmax, float hmax);
+    float cam_2d_scale();
+
+    // service: viewport_geometry
+    bool get_2d_extents(viewport_geometry::extents_2d &extents) override;
 
 private:
     void draw_perf();

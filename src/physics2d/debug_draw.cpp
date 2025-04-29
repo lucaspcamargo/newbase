@@ -58,10 +58,10 @@ static constexpr uint32_t ALPHA_ONE = 0xff000000;
 static constexpr uint32_t ALPHA_75 = 0xbf000000;
 static constexpr uint32_t ALPHA_25 = 0x40000000;
 
-static float dx {1.0f};
-static float dy {1.0f};
-static float sx {20.0f};
-static float sy {20.0f};
+static float dx {0.0f};
+static float dy {0.0f};
+static float sx {1.0f};
+static float sy {1.0f};
 static float line_thickness {1.0f};
 
 void nb::physics2d_pre_debug_draw(float dx_in, float dy_in, float sx_in, float sy_in)

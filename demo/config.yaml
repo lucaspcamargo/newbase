@@ -8,10 +8,11 @@ systems:
     sfx_gain: 1.0
  script_lua: {}
  editor: {}
- input: {}
+ input:
+   default_actions: true
  clock: {}
  physics2d:
-   world_scale: 10
+   world_scale: 50
 resources:
  scanners:
  - type: "fs_raw"

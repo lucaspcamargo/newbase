@@ -8,10 +8,10 @@
 #include <newbase/res/manager.h>
 #include <newbase/reflection/contexts.h>
 #include <newbase/reflection/data.h>
+#include <newbase/utility/imgui_style.h>
 #include <newbase/log.h>
 
 #include "imgui.h"
-#include "IconsForkAwesome.h"
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_sdlrenderer3.h"
 #include <entt/entt.hpp>
@@ -30,6 +30,11 @@ using entt::operator""_hs;
 
 static std::string _imguiCfgFile {};
 static SDL_Rect _safe {};
+float _cam2d_cx {0.0f};
+float _cam2d_cy {0.0f};
+float _cam2d_wmax {1024.0f};
+float _cam2d_hmax {1024.0f};
+float _cam2d_scale {1.0f};
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
 #endif
@@ -139,22 +144,13 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     _imguiCfgFile += "ImGui.cfg";
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = _imguiCfgFile.c_str();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    // Setup Dear ImGui style
-#include <newbase/utility/imgui_style.cpp.inc>
-    ImGui::GetStyle().WindowRounding = 8;
-    ImGui::GetStyle().FrameRounding = 3;
-    ImGui::GetStyle().GrabRounding = 3;
-    ImGui::GetStyle().PopupRounding = 3;
-    ImGui::GetStyle().ChildRounding = 3;
-    ImGui::GetStyle().GrabMinSize = 8;
-    ImGui::GetStyle().ScrollbarSize = 14;
-
-
+    imgui_style_setup();
+    
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
     ImGui_ImplSDLRenderer3_Init(_render);
@@ -164,67 +160,14 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     ImGui::GetIO().FontGlobalScale = _scale;
 #endif
 
-    std::string mainfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Regular.ttf";
-    std::vector<char> mainfont_data;
-    auto mainfont_hash = entt::hashed_string{mainfont_path.c_str()}.value();
-    log::info("[render_simple] system font: %x", mainfont_hash);
-    if(rman().read_all_sync(mainfont_hash, mainfont_data, false))
-    {
-        ImFontConfig config;
-        strncpy(config.Name, "regular", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = _scale;
-        void * copy = malloc(mainfont_data.size()); // need to copy, imgui takes ownership
-        memcpy(copy, mainfont_data.data(), mainfont_data.size());
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, mainfont_data.size(), 14, &config);
-    }
-    else
-    {
-        log::error("[render_simple] cannot read system font: %x", mainfont_hash);
-    }
-    
-    std::string iconfont_path = "_nb_core/ttf/forkawesome/forkawesome-webfont.ttf";
-    std::vector<char> iconfont_data;
-    auto iconfont_hash = entt::hashed_string{iconfont_path.c_str()}.value();
-    log::info("[render_simple] icon font: %x", iconfont_hash);
-    if(rman().read_all_sync(iconfont_hash, iconfont_data, false))
-    {
-        ImFontConfig config;
-        strncpy(config.Name, "icons", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = _scale;
-        config.MergeMode = true;
-        config.GlyphMinAdvanceX = 14.0f;
-        void * copy = malloc(iconfont_data.size()); // need to copy, imgui takes ownership
-        memcpy(copy, iconfont_data.data(), iconfont_data.size());
-        static const ImWchar icon_ranges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont_data.size(), 14, &config, icon_ranges);
-    }
-    else
-    {
-        log::error("[render_simple] cannot read icon font: %x", iconfont_hash);
-    }
-
-    std::string boldfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Bold.ttf";
-    std::vector<char> boldfont_data;
-    auto boldfont_hash = entt::hashed_string{boldfont_path.c_str()}.value();
-    log::info("[render_simple] bold font: %x", boldfont_hash);
-    if(rman().read_all_sync(boldfont_hash, boldfont_data, false))
-    {
-        ImFontConfig config;
-        strncpy(config.Name, "bold", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = _scale;
-        void * copy = malloc(boldfont_data.size()); // need to copy, imgui takes ownership
-        memcpy(copy, boldfont_data.data(), boldfont_data.size());
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, boldfont_data.size(), 14, &config);
-    }
-    else
-    {
-        log::error("[render_simple] cannot read system font: %x", boldfont_hash);
-    }
-
-    ImGui::GetIO().Fonts->Build();
+    imgui_style_fonts_setup(_scale);
 
     SDL_GetWindowSafeArea(_win, &_safe);
     log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
+
+    // register services
+    entt::locator<viewport_geometry*>::emplace(this);
+
     return true;
 }
 
@@ -241,6 +184,11 @@ bool render_simple::step(nb::step_phase phase)
         ImGui::GetMainViewport()->WorkSize.x = _safe.w;
         ImGui::GetMainViewport()->WorkSize.y = _safe.h;
     }
+    else if(phase == step_phase::POST_UPDATE)
+    {
+        // prepare viewport rendering data for ImGui
+        //ImGui::GetPlatformIO().
+    }
     else if(phase == step_phase::PRE_RENDER)
     {
 
@@ -248,7 +196,15 @@ bool render_simple::step(nb::step_phase phase)
     else if(phase == step_phase::RENDER)
     {
         // Rendering
-        glm::mat4x4 viewproj{glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f })};
+
+        // clear
+        SDL_SetRenderDrawColor(_render, 0,0,0,255);
+        SDL_RenderClear(_render);
+
+        // TODO cam translate
+        glm::mat4x4 viewproj {glm::scale(
+            glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f }), 
+            glm::vec3{_cam2d_scale, _cam2d_scale, 1.0f})};
 
         auto &reg = engine::instance().default_scene().registry(); // TODO change this
 
@@ -321,7 +277,7 @@ bool render_simple::step(nb::step_phase phase)
 
 #ifdef TRACY_ENABLED
         // TODO
-        // rebuild _tracyCopy to be able to hold current framebuffer
+        // rebuild _tracyCopy to be able to hold current framebuffer (if needed)
         // Call SDL_RenderReadPixels() to fill buffer
         // Send buffer to tracy profiler
 #endif
@@ -342,6 +298,7 @@ bool render_simple::event( SDL_Event * evt)
         {
             _wx = evt->window.data1;
             _wy = evt->window.data2;
+            cam_2d_setup(_cam2d_cx, _cam2d_cy, _cam2d_wmax, _cam2d_hmax);
             log::info("[render_simple] resized to %dx%d", _wx, _wy);
         }
     }
@@ -353,7 +310,6 @@ bool render_simple::event( SDL_Event * evt)
             log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
         }
     }
-
 
     if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
         SDL_SetWindowFullscreen(_win, !(SDL_GetWindowFlags(_win)&SDL_WINDOW_FULLSCREEN));
@@ -370,6 +326,63 @@ int render_simple::window_width()
 int render_simple::window_height()
 {
     return _wy;
+}
+
+void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
+{
+    _cam2d_cx = cx;
+    _cam2d_cy = cy;
+    _cam2d_wmax = wmax;
+    _cam2d_hmax = hmax;
+
+    bool shrink_x = wmax < _wx;
+    bool shrink_y = hmax < _wy;
+
+    if(shrink_x)
+    {
+        if(shrink_y)
+        {
+            // both
+            float scale_x = _wx / wmax;
+            float scale_y = _wy / hmax;
+            _cam2d_scale = std::min(scale_x, scale_y);
+        }
+        else
+        {
+            // just x
+            _cam2d_scale = _wx / wmax;
+        }
+    }
+    else
+    {
+        if(shrink_y)
+        {
+            // just y
+            _cam2d_scale = _wy / hmax;
+        }
+        else
+        {
+            // none
+            _cam2d_scale = 1.0f;
+        }
+    }
+}
+
+float render_simple::cam_2d_scale()
+{
+    return _cam2d_scale;
+}
+
+bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
+{
+    float span_x = _wx/_cam2d_scale;
+    float span_y = _wy/_cam2d_scale;
+    extents = {_wx, _wy,
+        _cam2d_cx - span_x/2,
+        _cam2d_cy - span_y/2,
+        _cam2d_cx + span_x/2,
+        _cam2d_cy + span_y/2};
+    return true;
 }
 
 void render_simple::draw_perf()

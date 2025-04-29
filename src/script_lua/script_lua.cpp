@@ -168,6 +168,9 @@ bool script_lua::step(step_phase phase)
                 {
                     log::info("[script_lua] setup: %x", id);
                     sol::state_view lua{_d->L};
+                    sol::protected_function f(_d->L, lua.stack_top());
+                    sol::environment env {lua, sol::create, lua.globals()};
+                    env.set_on(f);
                     
                     // check which components to make available
                     for(auto&& curr : reg.storage())
@@ -205,12 +208,11 @@ bool script_lua::step(step_phase phase)
                             auto mt = lua[userdata_id].get<sol::metatable>();
                             assert(mt.valid());
                             assert(storage.value(id));
-                            _d->bound_components[comp_id].second(_d->L, id, reg);
+                            _d->bound_components[comp_id].second(&env, id, reg);
                             // we have asked the binding to add the component to the current lua state
                         }
                     }
 
-                    sol::protected_function f(_d->L, lua.stack_top());
                     sol::protected_function_result result = f();
                     if (result.valid()) {
                         log::info("[script_lua] script ok: %x", id);

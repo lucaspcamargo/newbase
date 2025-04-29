@@ -141,6 +141,7 @@ namespace nb {
                     ImVec4 color;
                     bool has_color = false;
                     if (strstr(item, "[ERROR]")) { color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); has_color = true; }
+                    else if (strstr(item, "[WARN]")) { color = ImVec4(0.9f, 0.7f, 0.1f, 1.0f); has_color = true; }
                     else if (strncmp(item, "# ", 2) == 0) { color = ImVec4(1.0f, 0.8f, 0.6f, 1.0f); has_color = true; }
                     if (has_color)
                         ImGui::PushStyleColor(ImGuiCol_Text, color);

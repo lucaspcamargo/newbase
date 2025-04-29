@@ -102,6 +102,9 @@ add_library(newbase STATIC
     # rtti
     src/reflection/contexts.cpp
 
+    # utility
+    src/utility/imgui_style.cpp
+
     # optional subsystems
     ${SGDK_SUPPORT_SOURCES}
 
