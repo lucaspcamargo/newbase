@@ -47,7 +47,7 @@ struct nb::physics2d_p
     b2WorldId world_id {b2_nullWorldId};
     std::unordered_map<b2BodyId, entt::entity> body_entt {};
     std::unordered_map<b2BodyId, cbody2d*> body_comp {};
-    std::unordered_map<b2BodyId, cspatial*> body_spatial {};
+    std::unordered_map<b2BodyId, cspatial*> body_spatial {}; // TODO spatial has no pointer stability, this is wrong and dangerous
 
     bool debug_draw_enabled {false};
     b2DebugDraw debug_draw {};
@@ -167,7 +167,6 @@ bool physics2d::step(step_phase phase)
             b2World_Step(_d->world_id, time_step, substeps);
 
             b2BodyEvents events = b2World_GetBodyEvents(_d->world_id);
-            log::info("[p2d] %d moves", events.moveCount);
             for (int i = 0; i < events.moveCount; ++i)
             {
                 const b2BodyMoveEvent* event = events.moveEvents + i;
@@ -180,8 +179,9 @@ bool physics2d::step(step_phase phase)
                         spatial->pos = {event->transform.p.x, event->transform.p.y, spatial->pos.z};
                         spatial->rot.z = glm::degrees(b2Rot_GetAngle(event->transform.q));
                         spatial->apply();
-                    }else 
-                    log::info("[p2d] no spatial", events.moveCount);
+                    }
+                    else
+                        log::warn("[p2d] no spatial: body_id=%lx", b2StoreBodyId(event->bodyId));
                 }
             }
         }

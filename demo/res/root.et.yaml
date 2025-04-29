@@ -14,7 +14,7 @@
       lua: "res/asteroids/ship.lua"
     body2d:
       type: DYNAMIC
-      gravity_scale: 0.0f
+      gravity_scale: 0.0
       shapes:
        - type: POLY
          data: [-20, -20, 36, 0, -20, +20]
@@ -30,7 +30,7 @@
       lua: "res/asteroids/ship.lua"
     body2d:
       type: DYNAMIC
-      gravity_scale: 0.1f
+      gravity_scale: 0.0
       shapes:
        - type: POLY
          data: [-20, -20, 36, 0, -20, +20]
@@ -46,7 +46,7 @@
       lua: "res/asteroids/ship.lua"
     body2d:
       type: DYNAMIC
-      gravity_scale: 1.0f
+      gravity_scale: 0.0
       shapes:
        - type: POLY
          data: [-20, -20, 36, 0, -20, +20]
