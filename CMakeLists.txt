@@ -87,7 +87,9 @@ add_library(newbase STATIC
 
     # system: physics2d
     src/physics2d/physics2d.cpp
+    src/physics2d/lua_bindings.cpp
     src/physics2d/debug_draw.cpp
+
 
     # system: editor
     src/editor/editor.cpp
