@@ -4,6 +4,11 @@
 #include <cstring>
 #include <entt/entt.hpp>
 
+// Use "safer" string copy on MSVCPP, normal otherwise...
+#ifndef _MSC_VER
+#define strncpy_s strncpy
+#endif
+
 namespace nb {
 namespace rtti {
 
