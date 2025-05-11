@@ -38,7 +38,7 @@ struct cstrn {
     cstrn () { _val[0] = '\0'; }
 
     cstrn (const char * strptr) {
-        std::strncpy(_val, strptr, N);
+        strncpy_s(_val, strptr, N);
         _val[N-1] = 0;
     }
 

@@ -5,6 +5,10 @@ set(NEWBASE_ALL_SYSTEMS
     audio
     )
 
+if(WIN32)
+    set(PYTHON_INTERPRETER python.exe)
+endif()
+
 function(newbase_add_executable)
     set(options "")
     set(oneValueArgs TARGET)
@@ -66,7 +70,8 @@ function(newbase_prepare_executable)
             set(arg_SYSTEMS ${NEWBASE_ALL_SYSTEMS})
         elseif(arg_SYSTEMS STREQUAL "AUTO")
             execute_process(
-                COMMAND "${CMAKE_SOURCE_DIR}/scripts/config_get_systems.py" 
+                COMMAND ${PYTHON_INTERPRETER}
+                        "${CMAKE_SOURCE_DIR}/scripts/config_get_systems.py" 
                         "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml"
                 TIMEOUT 5
                 OUTPUT_VARIABLE arg_SYSTEMS
@@ -83,7 +88,8 @@ function(newbase_prepare_executable)
     message("[newbase_prepare_executable] RTTI entry points: from '${rtti_entry_file_template}'")
     message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
     add_custom_target( ${rtti_entry_target} ALL
-        COMMAND ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
+        COMMAND ${PYTHON_INTERPRETER}
+            ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
             "${rtti_entry_file_template}" 
             "${rtti_entry_file_output}" 
             "${arg_SYSTEMS}"
@@ -131,7 +137,13 @@ function(newbase_declare_resources)
             file(RELATIVE_PATH file_build_rel "${links_dest_dir}" "${file_real}")
             message("[newbase_declare_resources] \treal path: " ${file_real})
             message("[newbase_declare_resources] \tbuild-relative path: " ${file_build_rel})
-            file(CREATE_LINK "${file_build_rel}" "${links_dest_dir}/${file_basename}" SYMBOLIC)
+            if(WIN32)
+                # hack: copy instead
+                message("[newbase_declare_resources] \tWIN32: COPY" ${file_real} DESTINATION ${links_dest_dir})
+                file(COPY ${file_real} DESTINATION ${links_dest_dir})
+            else()
+                file(CREATE_LINK "${file_build_rel}" "${links_dest_dir}/${file_basename}" SYMBOLIC)
+            endif()
         endif()
     endforeach()
 
@@ -139,7 +151,8 @@ function(newbase_declare_resources)
     message("[newbase_declare_resources] creating target index")
         set(res_index_target ${arg_TARGET}_res_index)
         add_custom_target( ${res_index_target} ALL
-            COMMAND ${CMAKE_SOURCE_DIR}/scripts/res_indexer.py
+            COMMAND ${PYTHON_INTERPRETER}
+                ${CMAKE_SOURCE_DIR}/scripts/res_indexer.py
                 "${links_dest_dir}"
             # BYPRODUCTS index file, if needed (?)
             # DEPENDS if another target is processing or generating resources

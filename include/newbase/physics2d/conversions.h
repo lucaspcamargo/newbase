@@ -106,7 +106,7 @@ namespace nb
                 {
                     points.push_back(b2Vec2{shape.shape_data[i], shape.shape_data[i+1]});
                 }
-                b2Hull hull = b2ComputeHull(points.data(), points.size());
+                b2Hull hull = b2ComputeHull(points.data(), static_cast<int>(points.size()));
                 b2Polygon poly = b2MakePolygon(&hull, 0.0);
                 b2CreatePolygonShape(id, &def, &poly);
                 return true;

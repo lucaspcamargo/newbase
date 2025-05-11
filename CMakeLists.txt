@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.9.0)
 
 project(newbase)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
 set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
@@ -39,7 +42,9 @@ set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
 message("[newbase] adding box2d")
 add_subdirectory(vendored/box2d EXCLUDE_FROM_ALL)
-target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
+if(NOT WIN32)
+    target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
+endif()
 
 
 add_library(newbase STATIC

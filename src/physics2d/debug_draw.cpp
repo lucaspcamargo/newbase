@@ -85,7 +85,7 @@ static void DrawPolygon( const b2Vec2* vertices, int vertexCount, b2HexColor col
     {
         points.push_back(ImVec2{vertices[i].x*sx + dx, vertices[i].y*sy + dy});
     }
-    dl->AddPolyline(points.data(), points.size(), color|ALPHA_ONE, ImDrawFlags_Closed, line_thickness);
+    dl->AddPolyline(points.data(), static_cast<int>(points.size()), color|ALPHA_ONE, ImDrawFlags_Closed, line_thickness);
 }
 
 /// Draw a solid closed polygon provided in CCW order.
@@ -99,8 +99,8 @@ static void DrawSolidPolygon( b2Transform transform, const b2Vec2* vertices, int
         auto transformed = b2TransformPoint(transform, vertices[i]);
         points.push_back(ImVec2{transformed.x*sx + dx, transformed.y*sy + dy});
     }
-    dl->AddConvexPolyFilled(points.data(), points.size(), color|ALPHA_25);
-    dl->AddPolyline(points.data(), points.size(), color|ALPHA_ONE, ImDrawFlags_Closed, line_thickness);
+    dl->AddConvexPolyFilled(points.data(), static_cast<int>(points.size()), color|ALPHA_25);
+    dl->AddPolyline(points.data(), static_cast<int>(points.size()), color|ALPHA_ONE, ImDrawFlags_Closed, line_thickness);
 
 }
 

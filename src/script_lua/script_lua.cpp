@@ -63,7 +63,7 @@ void script_lua::bind_engine()
     auto registry_lua_t = lua.new_usertype<::entt::registry>("registry"
         "new", sol::no_constructor);
         registry_lua_t["orphan"] = &::entt::registry::orphan;
-        registry_lua_t["clear"] = &::entt::registry::clear;
+        //registry_lua_t["clear"] = &::entt::registry::clear; <-- hmmm not ok :(
 
     auto scene_lua_t = lua.new_usertype<::nb::scene>("scene",
         "new", sol::no_constructor,

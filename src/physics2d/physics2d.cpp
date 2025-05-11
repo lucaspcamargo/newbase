@@ -218,7 +218,8 @@ bool physics2d::step(step_phase phase)
                 if(!ground_added)
                 {
                     b2BodyDef groundBodyDef = b2DefaultBodyDef();
-                    groundBodyDef.position = (b2Vec2){0.0f, 10.0f*_d->world_scale};
+                    groundBodyDef.position.x = 0.0f;
+                    groundBodyDef.position.y = 10.0f*_d->world_scale;
                     b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
                     b2Polygon groundBox = b2MakeBox(50.0f*_d->world_scale, 10.0f*_d->world_scale);
                     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
@@ -228,7 +229,8 @@ bool physics2d::step(step_phase phase)
 
                 b2BodyDef bodyDef = b2DefaultBodyDef();
                 bodyDef.type = b2_dynamicBody;
-                bodyDef.position = (b2Vec2){0.0f, -10.0f*_d->world_scale};
+                bodyDef.position.x = 0.0f;
+                bodyDef.position.y = -10.0f*_d->world_scale;
                 b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
                 b2Polygon dynamicBox = b2MakeBox(1.0f*_d->world_scale, 1.0f*_d->world_scale);
                 b2ShapeDef shapeDef = b2DefaultShapeDef();
@@ -250,7 +252,7 @@ bool physics2d::step(step_phase phase)
                     float scale_y = extents.height/span_y;
                     float cx = (extents.right+extents.left)/2.0f;
                     float cy = (extents.top+extents.bottom)/2.0f;
-                    physics2d_pre_debug_draw(cx, cy, scale_x*0.5, scale_y*0.5);
+                    physics2d_pre_debug_draw(cx, cy, scale_x*0.5f, scale_y*0.5f);
                     b2World_Draw(_d->world_id, &_d->debug_draw);
                 }
             }

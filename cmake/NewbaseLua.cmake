@@ -80,7 +80,12 @@ function( newbase_lua_setup_fetch )
         ${lua_fetch_SOURCE_DIR}/src/linit.c
     )
     target_include_directories(lua PUBLIC ${lua_fetch_SOURCE_DIR}/src/)
-    target_compile_definitions(lua PUBLIC LUA_USE_POSIX)
+    if(WIN32)
+        set(LUA_DEFS "")
+    else()
+        set(LUA_DEFS LUA_USE_POSIX)
+    endif()
+    target_compile_definitions(lua PUBLIC ${LUA_DEFS})
     export(TARGETS lua NAMESPACE newbase FILE newbase-lua-export.cmake)
 endfunction()
 

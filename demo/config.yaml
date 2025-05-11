@@ -1,6 +1,6 @@
 systems:
  render_simple:
-    prefer: wayland
+    #prefer: wayland
     w: 1920
     h: 1080
  audio:

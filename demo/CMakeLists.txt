@@ -5,7 +5,10 @@ newbase_add_executable(
         src/main.c
 )
 newbase_prepare_executable(TARGET newbase_demo SYSTEMS AUTO)
-newbase_declare_resources(TARGET newbase_demo BUILD_SYMLINKS INDEX 
+#if(NOT WIN32)
+set(BUILD_SYMLINKS BUILD_SYMLINKS)
+#endif()
+newbase_declare_resources(TARGET newbase_demo ${BUILD_SYMLINKS} INDEX 
     FILES 
         ${CMAKE_SOURCE_DIR}/res/_nb_core
         res

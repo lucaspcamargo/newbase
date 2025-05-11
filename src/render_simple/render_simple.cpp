@@ -71,13 +71,13 @@ SDL_InitFlags render_simple::sdl_subsystems(ryml::ConstNodeRef cfg)
 {
     // TODO doesn't seem to work in runtime
     // No SDL hints have found for this either
-    if(!cfg["prefer"].invalid())
+    // also msvcpp does not like env manipulation on windows
+    if(cfg.has_child("prefer") && !cfg["prefer"].invalid())
     {
         log::info("[render_simple] current driver: %s", SDL_GetCurrentVideoDriver());
         bool already = getenv("SDL_VIDEODRIVER");
         std::string preferred;
         cfg["prefer"] >> preferred;
-        setenv("SDL_VIDEODRIVER", preferred.c_str(), 1);
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, preferred.c_str());
         log::info("[render_simple] preferring: %s%s", preferred.c_str(), already?" (overrides env)":"");
     }
@@ -179,10 +179,10 @@ bool render_simple::step(nb::step_phase phase)
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-        ImGui::GetMainViewport()->WorkPos.x = _safe.x;
-        ImGui::GetMainViewport()->WorkPos.y = _safe.y;
-        ImGui::GetMainViewport()->WorkSize.x = _safe.w;
-        ImGui::GetMainViewport()->WorkSize.y = _safe.h;
+        ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(_safe.x);
+        ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(_safe.y);
+        ImGui::GetMainViewport()->WorkSize.x = static_cast<float>(_safe.w);
+        ImGui::GetMainViewport()->WorkSize.y = static_cast<float>(_safe.h);
     }
     else if(phase == step_phase::POST_UPDATE)
     {
