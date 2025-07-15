@@ -202,7 +202,7 @@ bool render_simple::step(nb::step_phase phase)
         SDL_SetRenderDrawColor(_render, 0,0,0,255);
         SDL_RenderClear(_render);
 
-        // TODO cam translate
+        // cam transform
         glm::mat4x4 viewproj {glm::scale(
             glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f }), 
             glm::vec3{_cam2d_scale, _cam2d_scale, 1.0f})};
