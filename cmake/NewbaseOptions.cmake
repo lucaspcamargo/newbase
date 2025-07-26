@@ -22,11 +22,13 @@ endif()
 
 # resolve option configuration
 if(DEFINED EMSCRIPTEN)
+    set(NEWBASE_EMSCRIPTEN ON)
     if(NEWBASE_EMSCRIPTEN_HTML)
         set(CMAKE_EXECUTABLE_SUFFIX ".html")
     endif()
     set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_EMSCRIPTEN_RES_PREFIX}")
 else()
+    set(NEWBASE_EMSCRIPTEN OFF)
     set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_NATIVE_RES_PREFIX}")
 endif()
 

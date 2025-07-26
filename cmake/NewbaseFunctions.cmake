@@ -57,7 +57,7 @@ function(newbase_prepare_executable)
     endif()
 
     if(DEFINED EMSCRIPTEN)
-        set(target_opts "-sALLOW_MEMORY_GROWTH")
+        set(target_opts -sALLOW_MEMORY_GROWTH -sEXPORTED_FUNCTIONS=_main,_free -sENVIRONMENT=web)
         message("[newbase_prepare_executable] setting emscripten options for '${arg_TARGET}': ${target_opts}")
         target_link_options(${arg_TARGET} PRIVATE ${target_opts})
     endif()

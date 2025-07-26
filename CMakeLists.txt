@@ -42,7 +42,7 @@ set(ENTT_INSTALL ON) # needed for export
 add_subdirectory(vendored/entt EXCLUDE_FROM_ALL)
 message("[newbase] adding box2d")
 add_subdirectory(vendored/box2d EXCLUDE_FROM_ALL)
-if(NOT WIN32)
+if(NOT WIN32 AND NOT NEWBASE_EMSCRIPTEN)
     target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
 endif()
 
