@@ -6,6 +6,7 @@ namespace nb
 {
 
 // An audio producer that gets data from a buffer reference
+// It can loop the buffer forever, from start to end
 class audio_producer_buffer : public audio_producer
 {
 public:

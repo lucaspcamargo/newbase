@@ -8,8 +8,8 @@ local vel = vec3.new()
 local thrust = 200
 
 clock_update_add(function (delta)
-    local sp = spatial()
     local dir = input_action_direction(dir_hs)
+    local sp = spatial()
     sp.rot.z = sp.rot.z + delta*ROT_SPEED*dir.x
 
     vel.x = vel.x - dir.y*delta*math.cos(math.rad(sp.rot.z))*thrust

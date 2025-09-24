@@ -1,21 +1,22 @@
 systems:
- render_simple:
+  render_simple:
     #prefer: wayland
-    w: 1920
-    h: 1080
- audio:
+    w: 1280
+    h: 720
+  audio:
     bgm_gain: 0.8
     sfx_gain: 1.0
- script_lua: {}
- editor: {}
- input:
-   default_actions: true
- clock: {}
- physics2d:
-   world_scale: 50
+  script_lua: {}
+  editor: {}
+  input:
+    default_actions: true
+  clock: {}
+  physics2d:
+    world_scale: 50
+  steam: {}
 resources:
- scanners:
- - type: "fs_raw"
-   path: "./res/"
- - type: "title_storage"
-   path: "/"
+  scanners:
+    - type: "fs_raw"
+      path: "./res/"
+    - type: "title_storage"
+      path: "/"

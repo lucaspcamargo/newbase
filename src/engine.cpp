@@ -12,6 +12,7 @@
 #endif
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_thread.h>
 #include <SDL3/SDL_init.h>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
@@ -55,7 +56,7 @@ struct nb::engine_p {
 
 engine::engine()
 {
-    log::info("[engine] constructing");
+    log::info("[engine] constructing (thread id: %lu)", SDL_ThreadID());
 
     _d = new engine_p();
     _d->initflags = 0;

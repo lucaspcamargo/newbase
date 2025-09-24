@@ -17,10 +17,10 @@ function(newbase_add_executable)
         "${options}" "${oneValueArgs}" "${multiValueArgs}")
 
     if(NOT DEFINED arg_TARGET)
-        message(FATAL_ERROR "[newbase_prepare_executable] no target was given!")
+        message(FATAL_ERROR "[newbase_add_executable] no target was given!")
     endif()
     if(NOT DEFINED arg_SOURCES)
-        message(FATAL_ERROR "[newbase_prepare_executable] no sources were given!")
+        message(FATAL_ERROR "[newbase_add_executable] no sources were given!")
     endif()
 
     # TODO check if this target is the android main executable

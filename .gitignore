@@ -2,8 +2,11 @@ build
 build_ems
 build_distcc
 out
-CMake*.json
+
 emsdk
+vendored/steamworks-sdk
+
+CMake*.json
 **.kdev4
 .kdev4/
 **.kate-swp

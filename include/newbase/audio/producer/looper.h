@@ -8,6 +8,7 @@ namespace nb
 {
 
 // An audio producer that gets data from a stream
+// It can loop the stream from a specified loop point, by rewinding and seeking the stream
 class audio_producer_looper : public audio_producer
 {
 public:

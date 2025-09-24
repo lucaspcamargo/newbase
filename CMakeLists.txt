@@ -14,6 +14,7 @@ option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone 
 option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
 option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during runtime" OFF)
+option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
@@ -120,9 +121,25 @@ add_library(newbase STATIC
     ${IMGUI_SOURCES}
     ${TRACY_SOURCES}
 )
+
 if(NEWBASE_USE_XDG_DATA_DIRS)
     target_sources(newbase PRIVATE src/utility/xdg.cpp)
 endif()
+
+if(NEWBASE_STEAM)
+    message("[newbase] adding steamworks-sdk")
+    target_include_directories(newbase PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendored/steamworks-sdk/public>
+        $<INSTALL_INTERFACE:include/steamworks-sdk/public>
+    )
+    target_sources(newbase PRIVATE src/steam/steam.cpp)
+    target_compile_definitions(newbase PUBLIC -DNEWBASE_STEAM=1)
+    target_link_libraries(newbase PUBLIC steam_api)
+    target_link_directories(newbase PUBLIC vendored/steamworks-sdk/redistributable_bin/linux64)
+else()
+    target_compile_definitions(newbase PUBLIC -DNEWBASE_STEAM=0)
+endif()
+
 
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})

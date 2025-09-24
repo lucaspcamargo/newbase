@@ -2,6 +2,7 @@
 #include <newbase/audio/producer/buffer.h>
 #include <newbase/audio/producer/looper.h>
 #include <newbase/audio/producer/vorbis.h>
+#include <newbase/audio/graph/graph.h>
 #include <newbase/engine.h>
 #include <newbase/sdl/utils.h>
 #include <newbase/reflection/contexts.h>
@@ -24,6 +25,11 @@ static int _bufsize_out;
 
 bool _out_mute {false};
 float _out_gain {1.0f};
+SDL_AudioStream * _out_stream {nullptr};
+
+SDL_Mutex * _graph_mtx;
+audio_graph::graph _graph;
+
 
 SDL_AudioStream *_bgm {nullptr};
 audio_producer * _bgm_prod {nullptr};
@@ -32,14 +38,47 @@ float _sfx_gain {1.0f};
 
 static bool _show_debug_ui {false};
 
+
+
+// callbacks
+static void audio_out_cb(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
+{
+    // WARN: called from audio thread!
+
+    if(!additional_amount)
+    {
+        // stream already has all requested frames
+        return;
+    }
+
+    auto self = static_cast<audio*>(userdata);
+    assert(self);
+
+    // keep stream empty when muted
+    if(_out_mute)
+    {
+        SDL_ClearAudioStream(stream);
+        return;
+    }
+
+    uint8_t* buf = reinterpret_cast<uint8_t*>(alloca(sizeof(uint8_t) * additional_amount));
+
+    // keep critical section as short as possible 
+    SDL_LockMutex(_graph_mtx);
+    _graph.produce(buf, static_cast<size_t>(additional_amount));
+    SDL_UnlockMutex(_graph_mtx);
+
+    SDL_PutAudioStreamData(stream, buf, static_cast<size_t>(additional_amount));
+}
+
 audio::audio()
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] constructing");
+    nb::log::info("[audio] constructing");
 }
 
 audio::~audio()
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] destroying");
+    nb::log::info("[audio] destroying");
     if(_bgm)
     {
         SDL_DestroyAudioStream(_bgm);
@@ -49,7 +88,7 @@ audio::~audio()
         SDL_CloseAudioDevice(_dev_out);
         _dev_out = 0;
     }
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] destroyed");
+    nb::log::info("[audio] destroyed");
 }
 
 SDL_InitFlags audio::sdl_subsystems(ryml::ConstNodeRef)
@@ -59,24 +98,49 @@ SDL_InitFlags audio::sdl_subsystems(ryml::ConstNodeRef)
 
 bool audio::init(ryml::ConstNodeRef cfg)
 {
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] init");
+    nb::log::info("[audio] init");
+
+    _graph_mtx = SDL_CreateMutex();
+    assert(_graph_mtx);
 
     const auto drivers = get_all_strings(SDL_GetNumAudioDrivers, SDL_GetAudioDriver);
     const auto drivers_str = join_strings(drivers, ' ');
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] available drivers: %s", drivers_str.c_str());
+    nb::log::info("[audio] available drivers: %s", drivers_str.c_str());
     
     _dev_out = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
     if(!_dev_out)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "[audio] could not open default device!");
+        nb::log::error("[audio] could not open default device!");
         return false;
     }
     else
     {
         SDL_GetAudioDeviceFormat(_dev_out, &_spec_out, &_bufsize_out);
-        SDL_GetCurrentAudioDriver();
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[audio] using '%s', opened device '%s' (%d channels, %d Hz, %d frames)", SDL_GetCurrentAudioDriver(), SDL_GetAudioDeviceName(_dev_out), _spec_out.channels, _spec_out.freq, _bufsize_out);
-        SDL_ResumeAudioDevice(_dev_out);
+        nb::log::info("[audio] using '%s', opened device '%s' (%d channels, %d Hz, %d frames)", SDL_GetCurrentAudioDriver(), SDL_GetAudioDeviceName(_dev_out), _spec_out.channels, _spec_out.freq, _bufsize_out);
+        _out_stream = SDL_CreateAudioStream(&_spec_out, &_spec_out);
+        if(_out_stream)
+        {
+            if(SDL_BindAudioStream(_dev_out, _out_stream))
+            {
+                nb::log::info("[audio] output stream live");
+                if(SDL_SetAudioStreamGetCallback(_out_stream, audio_out_cb, this))
+                {
+                    nb::log::info("[audio] output stream callback set");
+                }
+                else
+                {
+                    nb::log::error("[audio] could not set output stream callback!");    
+                }
+            }
+            else
+            {
+                nb::log::error("[audio] could not bind output stream!");
+            }
+        }
+        else
+        {
+            nb::log::error("[audio] could not create output stream!");
+        }
     }
 
     if(cfg.has_child("bgm_gain"))
@@ -111,6 +175,7 @@ bool audio::step(step_phase phase)
         if(_show_debug_ui)
             show_debug_ui(&_show_debug_ui);
     }
+
     return true;
 }
 
@@ -134,12 +199,6 @@ void audio::out_gain(float gain)
 
 bool audio::bgm_play(entt::id_type res_id)
 {
-    if(_bgm)
-    {
-        SDL_DestroyAudioStream(_bgm);
-        _bgm = nullptr; 
-    }
-
     auto vorbis_res = rman().get_vorbis(res_id);
     if(!vorbis_res->valid)
     {
@@ -147,34 +206,8 @@ bool audio::bgm_play(entt::id_type res_id)
         return false;
     }
 
-    SDL_AudioSpec spec;
-    vorbis_res->spec.to_sdl(spec);
-    _bgm = SDL_CreateAudioStream(&spec, nullptr);
-    if(!_bgm)
-    {
-        log::error("[audio] bgm_play: cannot open stream: %s", SDL_GetError());
-        return false;
-    }
-    
-    if(!SDL_BindAudioStream(_dev_out, _bgm))
-    {
-        log::error("[audio] bgm_play: cannot bind stream: %s", SDL_GetError());
-        return false;
-    } 
- 
-    if(!SDL_PutAudioStreamData(_bgm, vorbis_res->frames.data(), vorbis_res->frames.size()))
-    {
-        log::error("[audio] bgm_play: cannot enqueue data: %s", SDL_GetError());
-        return false;
-    } 
-
-    if(!SDL_SetAudioStreamGain(_bgm, _bgm_gain))
-    {
-        log::error("[audio] bgm_play: cannot set stream gain: %s", SDL_GetError());
-    }
-
     log::info("[audio] bgm_play: %x", res_id);
-    return true;
+    return false;
 }
 
 bool audio::bgm_playing()

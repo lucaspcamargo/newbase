@@ -30,7 +30,6 @@ public:
             return;
 
         assert(m_spec == dst.buffer_ref().spec());
-        assert(m_gather.frames() >= dst.frames());
         
         for(const audio_buffer::span *src : srcs)
         {

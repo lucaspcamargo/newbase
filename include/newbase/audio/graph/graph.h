@@ -40,10 +40,10 @@ namespace nb::audio_graph
         std::shared_ptr<node> node_ptr; // Only used for add_node
 
         static op add_node_op(std::shared_ptr<node> n) {
-            return {type::add_node, n->id(), "", n};
+            return {type::add_node, n->id(), 0, n};
         }
         static op remove_node_op(const node_id& id) {
-            return {type::remove_node, id, "", nullptr};
+            return {type::remove_node, id, 0, nullptr};
         }
         static op connect_op(const node_id& src, const node_id& dst) {
             return {type::connect, src, dst, nullptr};
@@ -56,7 +56,19 @@ namespace nb::audio_graph
     class graph
     {
     public:
-        graph() = default;
+        graph() {
+            // Create a default output node with id 0
+            auto output = std::make_shared<node>(0);
+            nodes_[output->id()] = output;
+            edges_[output->id()] = {};
+        }
+
+        void produce(uint8_t* buffer, size_t n) const {
+            assert(buffer);
+            for (size_t i = 0; i < n; ++i) {
+                buffer[i] = 0x00;
+            }
+        }
 
         // Apply an operation to the graph
         void apply(const op& operation) {
@@ -162,25 +174,6 @@ namespace nb::audio_graph
                 return true;
             }
         }
-    };
-
-}
-namespace nb::audio_graph 
-{
-
-    class node 
-    {
-
-    };
-
-    class op 
-    {
-
-    };
-
-    class graph
-    {
-
     };
 
 }

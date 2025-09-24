@@ -7,7 +7,7 @@ namespace nb
 
 struct audio_producer_vorbis_p;
 
-// An audio producer that gets data from a stream
+// An audio producer that gets data from a vorbis stream in memory
 class audio_producer_vorbis : public audio_producer
 {
 public:

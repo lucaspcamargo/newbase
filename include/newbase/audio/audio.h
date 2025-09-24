@@ -7,7 +7,7 @@ namespace nb {
 class audio : public system {
 public:
     audio();
-    ~audio();
+    ~audio() override;
 
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef) override;
     entt::id_type metatype_id() override { return entt::hashed_string{"audio"}.value(); }
