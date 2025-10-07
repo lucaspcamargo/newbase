@@ -13,7 +13,8 @@ systems:
   clock: {}
   physics2d:
     world_scale: 50
-  steam: {}
+  steam:
+    app_id: 480
 resources:
   scanners:
     - type: "fs_raw"
