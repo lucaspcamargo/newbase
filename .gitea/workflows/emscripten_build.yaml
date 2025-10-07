@@ -4,8 +4,12 @@ on: [push]
 
 jobs:
   Main-Build:
-    runs-on: emscripten/emsdk:latest
+    runs-on: ubuntu-latest
     steps:
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Verify Emscripten installation
+        run: emcc -v
+      - run: env
       - name: Check out repository code
         uses: actions/checkout@v4
       - run: git submodule update --init --recursive
