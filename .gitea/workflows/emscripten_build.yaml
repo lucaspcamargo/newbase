@@ -8,7 +8,8 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-        submodules: recursive
+        with:
+          submodules: recursive
       - uses: mymindstorm/setup-emsdk@v14
       - name: Verify Emscripten installation
         run: emcc -v
