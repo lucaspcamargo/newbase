@@ -14,8 +14,9 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
+      - run: which pip && which python
       - name: Install Latest CMake
-        uses: ssrobins/install-cmake@v1
+        run: pip install cmake~=3.5
       - name: Verify CMake installation
         run: cmake --version
       - run: env
