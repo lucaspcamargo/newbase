@@ -9,6 +9,11 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
       - name: Verify Emscripten installation
         run: emcc -v
+      - name: "Setup and activate python venv"
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
       - name: Install Latest CMake
         uses: ssrobins/install-cmake@v1
       - name: Verify CMake installation
@@ -16,6 +21,8 @@ jobs:
       - run: env
       - name: Check out repository code
         uses: actions/checkout@v4
+      - name: Install script dependencies
+        run: pip install -r scripts/requirements.txt
       - run: git submodule update --init --recursive
       - run: cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
       - run: cmake --build embuild -j $(( $(nproc) - 1 ))
