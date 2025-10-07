@@ -35,10 +35,8 @@ jobs:
           env
           source venv/bin/activate
           cmake --build embuild -j $(( $(nproc) - 1 ))
-      - name: Package Release
-        run: tar cvzf newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}.tar.gz -C embuild .
-      - name: Upload package
+      - name: Upload build artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
-          name: newbase_emscripten
-          path: newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}.tar.gz
+          name: newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}
+          path: embuild
