@@ -9,8 +9,8 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
       - name: Verify Emscripten installation
         run: emcc -v
-      - name: actions-setup-cmake
-        uses: jwlawson/actions-setup-cmake@v2.0.2
+      - name: Install Latest CMake
+        uses: ssrobins/install-cmake@v1
       - name: Verify CMake installation
         run: cmake --version
       - run: env
