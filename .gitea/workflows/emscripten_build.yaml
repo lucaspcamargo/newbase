@@ -9,6 +9,10 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
       - name: Verify Emscripten installation
         run: emcc -v
+      - name: Install CMake
+        run: sudo apt install -y cmake extra-cmake-modules
+      - name: Verify CMake installation
+        run: cmake --version
       - run: env
       - name: Check out repository code
         uses: actions/checkout@v4
