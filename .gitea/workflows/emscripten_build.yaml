@@ -6,26 +6,31 @@ jobs:
   Main-Build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        submodules: recursive
       - uses: mymindstorm/setup-emsdk@v14
       - name: Verify Emscripten installation
         run: emcc -v
-      - name: "Setup and activate python venv"
+      - name: "Setup Python and CMake"
         run: |
           python3 -m venv venv
           source venv/bin/activate
+          which pip && which python
           pip install --upgrade pip
+          pip install cmake~=3.5
+          cmake --version
+          echo "Installing script deps..."
+          pip install -r scripts/requirements.txt
           env
           echo PATH=$PATH >> $GITHUB_ENV
-      - run: which pip && which python
-      - name: Install Latest CMake
-        run: pip install cmake~=3.5
-      - name: Verify CMake installation
-        run: cmake --version
-      - run: env
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Install script dependencies
-        run: pip install -r scripts/requirements.txt
-      - run: git submodule update --init --recursive
-      - run: cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
-      - run: cmake --build embuild -j $(( $(nproc) - 1 ))
+      - name: Configure 
+        run: |
+          env
+          source venv/bin/activate 
+          cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+      - name: Build
+        run: |
+          env
+          source venv/bin/activate
+          cmake --build embuild -j $(( $(nproc) - 1 ))
