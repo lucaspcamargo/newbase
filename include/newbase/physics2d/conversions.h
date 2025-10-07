@@ -35,7 +35,7 @@ namespace nb
         def.isEnabled = comp.enabled;
         def.enableSleep = comp.enable_sleep;
         def.isAwake = comp.awake;
-        def.fixedRotation = comp.fix_rotation;
+        def.motionLocks.angularZ = comp.fix_rotation;
         def.isBullet = comp.bullet;
 
         def.gravityScale = comp.gravity_scale;

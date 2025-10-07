@@ -198,7 +198,6 @@ bool physics2d::step(step_phase phase)
         {
             ImGui::Begin(ICON_FK_SQUARE " Physics 2D Debug Draw");
             ImGui::Text("World scale: %f", _d->world_scale);
-            ImGui::Checkbox("useDrawingBounds", &_d->debug_draw.useDrawingBounds);
             ImGui::Checkbox("drawShapes", &_d->debug_draw.drawShapes);
             ImGui::Checkbox("drawJoints", &_d->debug_draw.drawJoints);
             ImGui::Checkbox("drawJointExtras", &_d->debug_draw.drawJointExtras);
@@ -208,9 +207,9 @@ bool physics2d::step(step_phase phase)
             ImGui::Checkbox("drawContacts", &_d->debug_draw.drawContacts);
             ImGui::Checkbox("drawGraphColors", &_d->debug_draw.drawGraphColors);
             ImGui::Checkbox("drawContactNormals", &_d->debug_draw.drawContactNormals);
-            ImGui::Checkbox("drawContactImpulses", &_d->debug_draw.drawContactImpulses);
+            ImGui::Checkbox("drawContactForces", &_d->debug_draw.drawContactForces);
             ImGui::Checkbox("drawContactFeatures", &_d->debug_draw.drawContactFeatures);
-            ImGui::Checkbox("drawFrictionImpulses", &_d->debug_draw.drawFrictionImpulses);
+            ImGui::Checkbox("drawFrictionImpulses", &_d->debug_draw.drawFrictionForces);
             ImGui::Checkbox("drawIslands", &_d->debug_draw.drawIslands);
             if(ImGui::Button("Hello Box2D!"))
             {
