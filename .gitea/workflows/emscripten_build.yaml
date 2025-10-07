@@ -38,7 +38,7 @@ jobs:
       - name: Package Release
         run: tar cvzf newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}.tar.gz -C embuild .
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
           name: newbase_emscripten
           path: newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}.tar.gz
