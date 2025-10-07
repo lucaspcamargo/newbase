@@ -1,0 +1,46 @@
+@startuml "Audio Graph Example"
+
+object SFX_0_Data
+object SFX_1_Data
+
+SFX_0_Data : resource = 0x1234
+SFX_1_Data : resource = 0x5678
+
+object Player_0
+
+SFX_0_Data --> Player_0
+
+
+
+object Player_1
+
+SFX_1_Data --> Player_1
+
+
+object Mixer_0
+
+Player_0 --> Mixer_0
+Player_1 --> Mixer_0
+
+object Reverb
+
+Mixer_0 --> Reverb
+
+object BGM_0_Data
+
+BGM_0_Data : resource = 0x9abc
+
+object Player_2
+
+BGM_0_Data --> Player_2
+
+object Mixer_1
+
+Reverb --> Mixer_1
+Player_2 --> Mixer_1
+
+object Main_Output
+
+Mixer_1 --> Main_Output
+
+@enduml
