@@ -37,14 +37,18 @@ jobs:
         run: |
           env
           source venv/bin/activate 
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build  -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON -DNEWBASE_FDO_FILES=ON
       - name: Build
         run: |
           env
           source venv/bin/activate
           cmake --build build -j $(( $(nproc) - 1 ))
-      - name: Upload build artifact
+      - name: Install
+        run: |
+          source venv/bin/activate
+          cmake --install build --prefix build/install
+      - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
           name: newbase_linux_amd64_${{ github.head_ref }}_${{ github.sha }}
-          path: build
+          path: build/install
