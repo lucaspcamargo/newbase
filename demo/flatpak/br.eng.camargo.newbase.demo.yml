@@ -20,11 +20,11 @@ finish-args:
 modules:
   - name: newbase_demo
     buildsystem: cmake-ninja
-    config-opts: ["-DNEWBASE_LUA_ROOT=lua", "-DNEWBASE_FDO_FILES=ON", "-DNEWBASE_USE_XDG_DATA_DIRS=ON"]
+    config-opts: ["-DNEWBASE_LUA_ROOT=lua", "-DNEWBASE_FDO_FILES=ON", "-DNEWBASE_USE_XDG_DATA_DIRS=ON", "-DNEWBASE_LTO=ON"]
     sources:
       - type: git
         url: ../..
-        commit: 72a8f339419366c2445644b573309ae55c26fa52
+        branch: main
         dest: .
       - type: archive
         url: https://www.lua.org/ftp/lua-5.4.7.tar.gz
