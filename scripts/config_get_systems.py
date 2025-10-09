@@ -10,8 +10,6 @@ conf = yaml.load(open(sys.argv[1], 'r'), yaml.Loader)
 
 sysnames = []
 for sysname, sysconf in conf['systems'].items():
-    if sysname == "steam":
-        continue
     sysnames.append(sysname)
 
 print(";".join(sysnames), end=None)

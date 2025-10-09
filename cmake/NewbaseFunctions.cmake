@@ -97,6 +97,17 @@ function(newbase_prepare_executable)
     )
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
     target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+    # now, link the systems to the executable
+    foreach(system ${arg_SYSTEMS})
+        set(system_target newbase_sys_${system})
+        if(TARGET ${system_target})
+            message("[newbase_prepare_executable] linking system '${system}' to target '${arg_TARGET}'")
+            target_link_libraries(${arg_TARGET} PRIVATE ${system_target})
+        else()
+            message(WARNING "[newbase_prepare_executable] system '${system}' (target '${system_target}') is not available to link to executable target '${arg_TARGET}'. Is it built-in? (Not yet handled)")
+        endif()
+    endforeach()
 endfunction()
 
 function(newbase_add_system)

@@ -66,10 +66,6 @@ add_library(newbase STATIC
     src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
 
-    # system: render_simple
-    src/render_simple/render_simple.cpp
-    src/render_simple/lua_bindings.cpp
-
     # system: audio
     src/audio/audio.cpp
     src/audio/lua_bindings.cpp
@@ -126,6 +122,11 @@ if(NEWBASE_USE_XDG_DATA_DIRS)
     target_sources(newbase PRIVATE src/utility/xdg.cpp)
 endif()
 
+
+# CORE SYSTEMS
+add_subdirectory(src/render_simple)
+
+# OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)
     add_subdirectory(src/steam)
 endif()
