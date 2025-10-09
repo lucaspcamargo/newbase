@@ -2,7 +2,11 @@
 
 ![icon](res/_nb_core/icon.svg)
 
-A *new base* for making games and stuff.
+
+<!-- repo not yet public, may be in the future, then badge can be added : ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
+![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)-->
+
+A *new base* for making games and interactive stuff.
 
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom

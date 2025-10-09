@@ -66,36 +66,6 @@ add_library(newbase STATIC
     src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
 
-    # system: audio
-    src/audio/audio.cpp
-    src/audio/lua_bindings.cpp
-    src/audio/buffer.cpp
-    src/audio/converter.cpp
-    src/audio/producer/buffer.cpp
-    src/audio/producer/vorbis.cpp
-    src/audio/types.cpp
-
-    # system: input
-    src/input/input.cpp
-    src/input/lua_bindings.cpp
-
-    # system: clock
-    src/clock/clock.cpp
-    src/clock/lua_bindings.cpp
-
-    # system: script_lua
-    src/script_lua/script_lua.cpp
-    src/script_lua/bindings_glm.cpp
-
-    # system: physics2d
-    src/physics2d/physics2d.cpp
-    src/physics2d/lua_bindings.cpp
-    src/physics2d/debug_draw.cpp
-
-
-    # system: editor
-    src/editor/editor.cpp
-
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp
@@ -125,6 +95,12 @@ endif()
 
 # CORE SYSTEMS
 add_subdirectory(src/render_simple)
+add_subdirectory(src/audio)
+add_subdirectory(src/input)
+add_subdirectory(src/clock)
+add_subdirectory(src/script_lua)
+add_subdirectory(src/physics2d)
+add_subdirectory(src/editor)
 
 # OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)

@@ -80,6 +80,20 @@ function(newbase_prepare_executable)
         endif()
     endif()
 
+    # filter list of systems according to what is available
+    set(filtered_systems "")
+    foreach(system ${arg_SYSTEMS})
+        list(FIND NEWBASE_ALL_SYSTEMS ${system} system_index)
+        if(NOT system_index EQUAL -1)
+            list(APPEND filtered_systems ${system})
+            message("[newbase_prepare_executable] will generate rtti info for system ${system}...")
+            message("${filtered_systems}")
+        else()
+            message(WARNING "[newbase_prepare_executable] system '${system}' is not available for target '${arg_TARGET}'. Has the system been registered? Won't be linked, RTTI hooks skipped")
+            message("ALL SYSTEMS: ${NEWBASE_ALL_SYSTEMS}")
+        endif()
+    endforeach()
+
     set(rtti_entry_target ${arg_TARGET}_rtti_entry_gen)
     set(rtti_entry_file_template ${CMAKE_SOURCE_DIR}/include/newbase/reflection/initialization_template.h.in)
     set(rtti_entry_file_output ${CMAKE_CURRENT_BINARY_DIR}/include/newbase/reflection/init.h)
@@ -90,7 +104,7 @@ function(newbase_prepare_executable)
             ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
             "${rtti_entry_file_template}" 
             "${rtti_entry_file_output}" 
-            "${arg_SYSTEMS}"
+            "${filtered_systems}"
         BYPRODUCTS "${rtti_entry_file_output}"
         DEPENDS "${rtti_entry_file_template}" ${rtti_extra_depends}
         VERBATIM
@@ -99,13 +113,13 @@ function(newbase_prepare_executable)
     target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
     # now, link the systems to the executable
-    foreach(system ${arg_SYSTEMS})
+    foreach(system ${filtered_systems})
         set(system_target newbase_sys_${system})
         if(TARGET ${system_target})
             message("[newbase_prepare_executable] linking system '${system}' to target '${arg_TARGET}'")
             target_link_libraries(${arg_TARGET} PRIVATE ${system_target})
         else()
-            message(WARNING "[newbase_prepare_executable] system '${system}' (target '${system_target}') is not available to link to executable target '${arg_TARGET}'. Is it built-in? (Not yet handled)")
+            message(FATAL_ERROR "[newbase_prepare_executable] system '${system}' (target '${system_target}') is not available to link to executable target '${arg_TARGET}'. System is registered but its target was not found.")
         endif()
     endforeach()
 endfunction()
@@ -136,8 +150,13 @@ function(newbase_add_system)
     else()
         message(FATAL_ERROR "[newbase_add_system] system '${arg_NAME}' was already registered!")
     endif()
+    set(NEWBASE_ALL_SYSTEMS ${NEWBASE_ALL_SYSTEMS} PARENT_SCOPE) # update system list in calling scope 
 endfunction()
-    # TODO add to a global "all systems" target?
+
+# TODO: make the systems list a property of the "newbase" target, so we can eliminate this macro
+macro(newbase_commit_systems)
+    set(NEWBASE_ALL_SYSTEMS ${NEWBASE_ALL_SYSTEMS} PARENT_SCOPE) # update system list in calling scope 
+endmacro()
 
 function(newbase_declare_resources)
     set(options BUILD_SYMLINKS NO_INSTALL INDEX)

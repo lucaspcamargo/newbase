@@ -26,7 +26,7 @@ data = {
     'progname': PROGNAME,
     'datetime': dt.datetime.now().isoformat(),
     'outname': os.path.basename(ns.outfile),
-    'identifiers': ns.identifiers.split(';')
+    'identifiers': ns.identifiers.rstrip(';').split(';')
 }
 
 env = jinja2.Environment()
