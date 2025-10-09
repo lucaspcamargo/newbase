@@ -1,9 +1,7 @@
 # cmake functions used by newbase
-set(NEWBASE_ALL_SYSTEMS
-    script_lua
-    render_simple
-    audio
-    )
+
+# this variable should be set to a list of all systems as they are regsitered and enabled 
+set(NEWBASE_ALL_SYSTEMS "")
 
 if(WIN32)
     set(PYTHON_INTERPRETER python.exe)
@@ -36,7 +34,7 @@ function(newbase_add_executable)
     
 endfunction()
 
-# TODO fold into newbase_add_executable
+# TODO fold into newbase_add_executable, maybe?
 function(newbase_prepare_executable)
     set(options BUILD_SYMLINKS NO_INSTALL NO_CORE_RESOURCES)
     set(oneValueArgs TARGET)
@@ -100,6 +98,35 @@ function(newbase_prepare_executable)
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
     target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 endfunction()
+
+function(newbase_add_system)
+    set(options)
+    set(oneValueArgs NAME)
+    set(multiValueArgs SOURCES)
+    cmake_parse_arguments(PARSE_ARGV 0 arg 
+        "${options}" "${oneValueArgs}" "${multiValueArgs}")
+
+    if(NOT DEFINED arg_NAME)
+        message(FATAL_ERROR "[newbase_add_system] no system name was given!")
+    endif()
+    if(NOT DEFINED arg_SOURCES)
+        message(FATAL_ERROR "[newbase_add_system] no sources were given for system '${arg_NAME}'!")
+    endif()
+
+    set(system_target newbase_sys_${arg_NAME})
+    message("[newbase_add_system] adding system target '${system_target}' with sources: ${arg_SOURCES}")
+    add_library(${system_target} OBJECT ${arg_SOURCES})
+    target_link_libraries(${system_target} PRIVATE newbase)
+
+    list(FIND NEWBASE_ALL_SYSTEMS ${arg_NAME} system_index)
+    if(system_index EQUAL -1)
+        list(APPEND NEWBASE_ALL_SYSTEMS ${arg_NAME})
+        message("[newbase_add_system] registered system '${arg_NAME}' (all systems: ${NEWBASE_ALL_SYSTEMS})")
+    else()
+        message(FATAL_ERROR "[newbase_add_system] system '${arg_NAME}' was already registered!")
+    endif()
+endfunction()
+    # TODO add to a global "all systems" target?
 
 function(newbase_declare_resources)
     set(options BUILD_SYMLINKS NO_INSTALL INDEX)

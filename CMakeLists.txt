@@ -127,17 +127,7 @@ if(NEWBASE_USE_XDG_DATA_DIRS)
 endif()
 
 if(NEWBASE_STEAM)
-    message("[newbase] adding steamworks-sdk")
-    target_include_directories(newbase PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendored/steamworks-sdk/public>
-        $<INSTALL_INTERFACE:include/steamworks-sdk/public>
-    )
-    target_sources(newbase PRIVATE src/steam/steam.cpp)
-    target_compile_definitions(newbase PUBLIC -DNEWBASE_STEAM=1)
-    target_link_libraries(newbase PUBLIC steam_api)
-    target_link_directories(newbase PUBLIC vendored/steamworks-sdk/redistributable_bin/linux64)
-else()
-    target_compile_definitions(newbase PUBLIC -DNEWBASE_STEAM=0)
+    add_subdirectory(src/steam)
 endif()
 
 
