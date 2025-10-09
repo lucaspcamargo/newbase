@@ -1,12 +1,12 @@
 name: Flatpak Build
-run-name: ${{ gitea.actor }} is building newbase for Flatpack 🐧
+run-name: ${{ gitea.actor }} is building newbase for Flatpak 🐧
 on: [push]
 
 jobs:
   Main-Build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
       - name: Check out repository code
@@ -27,3 +27,10 @@ jobs:
           bundle: newbase_demo_${SHORT_SHA}.flatpak
           manifest-path: demo/flatpak/br.eng.camargo.newbase.demo.yml
           cache-key: flatpak-builder-${SHORT_SHA}
+          upload-artifact: false   # does not work right on gitea, so we do it manually below
+      - run: ls
+      - name: Upload Flatpak bundle
+        uses: https://gitea.com/actions/gitea-upload-artifact@v4
+        with:
+          name: newbase_flatpak_amd64_${{ github.head_ref }}_${{ github.sha }}
+          path: newbase_demo_${SHORT_SHA}.flatpak
