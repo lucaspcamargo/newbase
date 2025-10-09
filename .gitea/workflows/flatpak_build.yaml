@@ -33,4 +33,4 @@ jobs:
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
           name: newbase_flatpak_amd64_${{ github.head_ref }}_${{ github.sha }}
-          path: newbase_demo_${SHORT_SHA}.flatpak
+          path: .  # TODO packing all, find bundle later and update here
