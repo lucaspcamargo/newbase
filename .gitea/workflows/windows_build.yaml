@@ -28,16 +28,16 @@ jobs:
           echo PATH=$PATH >> $GITHUB_ENV
       - name: Configure 
         run: |
-          source venv/bin/activate
+          . venv/bin/activate
           export PATH="/opt/mxe/usr/bin:${PATH}"
           env
           ls /opt/mxe/usr/bin
           x86_64-w64-mingw32.static-cmake -S . -B build  -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON 
       - name: Build
         run: |
-          env
-          source venv/bin/activate
+          . venv/bin/activate
           export PATH="/opt/mxe/usr/bin:${PATH}"
+          env
           x86_64-w64-mingw32.static-cmake --build build -j $(( $(nproc) - 1 ))
       - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
