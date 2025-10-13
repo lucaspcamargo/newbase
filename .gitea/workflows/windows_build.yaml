@@ -19,7 +19,8 @@ jobs:
         run: |
           env
           python -m venv venv
-          source venv/bin/activate
+          ls venv/bin
+          . venv/bin/activate
           which pip && which python
           pip install --upgrade pip
           echo "Installing script deps..."
