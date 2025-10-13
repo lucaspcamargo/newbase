@@ -1,3 +1,6 @@
+# NOTE: This doesn't work, as the prebuilt packages are too old.
+# Just kept as future reference
+
 FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive

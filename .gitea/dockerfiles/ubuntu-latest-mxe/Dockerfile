@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM docker.gitea.com/runner-images:ubuntu-latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 
