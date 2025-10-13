@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: gt.camargo.eng.br/camargo/ubuntu-22-04-mxe:v1
+      credentials:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GT_API_TOKEN }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
