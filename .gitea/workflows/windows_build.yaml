@@ -17,7 +17,8 @@ jobs:
           submodules: recursive
       - name: "Setup Python"
         run: |
-          python3 -m venv venv
+          env
+          python -m venv venv
           source venv/bin/activate
           which pip && which python
           pip install --upgrade pip
