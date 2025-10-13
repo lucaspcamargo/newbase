@@ -3,7 +3,7 @@
 # this variable should be set to a list of all systems as they are regsitered and enabled 
 set(NEWBASE_ALL_SYSTEMS "")
 
-if(WIN32)
+if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
     set(PYTHON_INTERPRETER python.exe)
 endif()
 
@@ -99,7 +99,7 @@ function(newbase_prepare_executable)
     set(rtti_entry_file_output ${CMAKE_CURRENT_BINARY_DIR}/include/newbase/reflection/init.h)
     message("[newbase_prepare_executable] RTTI entry points: from '${rtti_entry_file_template}'")
     message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
-    add_custom_target( ${rtti_entry_target} ALL
+    add_custom_target( ${rtti_entry_target}
         COMMAND ${PYTHON_INTERPRETER}
             ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
             "${rtti_entry_file_template}" 
@@ -117,7 +117,7 @@ function(newbase_prepare_executable)
         set(system_target newbase_sys_${system})
         if(TARGET ${system_target})
             message("[newbase_prepare_executable] linking system '${system}' to target '${arg_TARGET}'")
-            target_link_libraries(${arg_TARGET} PRIVATE ${system_target})
+            target_link_libraries(${arg_TARGET} PUBLIC ${system_target})
         else()
             message(FATAL_ERROR "[newbase_prepare_executable] system '${system}' (target '${system_target}') is not available to link to executable target '${arg_TARGET}'. System is registered but its target was not found.")
         endif()

@@ -28,7 +28,6 @@ jobs:
           manifest-path: demo/flatpak/br.eng.camargo.newbase.demo.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false   # does not work right on gitea, so we do it manually below
-      - run: ls
       - name: Upload Flatpak bundle
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:

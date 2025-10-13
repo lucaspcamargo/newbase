@@ -1,0 +1,38 @@
+name: Windows Build
+run-name: ${{ gitea.actor }} is cross-building newbase for Windows 🪟
+on: [push]
+
+jobs:
+  Main-Build:
+    runs-on: ubuntu-22-04-mxe:v1
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: "Setup Python"
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          which pip && which python
+          pip install --upgrade pip
+          echo "Installing script deps..."
+          pip install -r scripts/requirements.txt
+          echo PATH=$PATH >> $GITHUB_ENV
+      - name: Configure 
+        run: |
+          env
+          source venv/bin/activate
+          export PATH="/opt/mxe/usr/bin:${PATH}"
+          x86_64-w64-mingw32.static-cmake -S . -B build  -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON 
+      - name: Build
+        run: |
+          env
+          source venv/bin/activate
+          export PATH="/opt/mxe/usr/bin:${PATH}"
+          x86_64-w64-mingw32.static-cmake --build build -j $(( $(nproc) - 1 ))
+      - name: Upload install artifact
+        uses: https://gitea.com/actions/gitea-upload-artifact@v4
+        with:
+          name: newbase_linux_amd64_${{ github.head_ref }}_${{ github.sha }}
+          path: build

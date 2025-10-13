@@ -48,15 +48,16 @@ RUN apt update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a user for building (optional, for better security)
-RUN useradd -ms /bin/bash mxe
-USER mxe
-WORKDIR /home/mxe
+RUN mkdir -p /opt
+
+WORKDIR /opt
 
 # Clone MXE
 RUN git clone https://github.com/mxe/mxe.git
 
+WORKDIR /opt/mxe
 
-WORKDIR /home/mxe/mxe
+COPY ./pkg/* /opt/mxe/pkg/
 
 # setup wanted target (64-bin win)
 RUN echo "MXE_TARGETS := x86_64-w64-mingw32.static" >> settings.mk
@@ -65,10 +66,11 @@ RUN echo "MXE_TARGETS := x86_64-w64-mingw32.static" >> settings.mk
 RUN make cc
 
 # Build CMake
-# RUN make cmake <-- TODO check if needed !!!!!
+RUN make cmake
 
 # Set default workdir
-WORKDIR /home/mxe
+RUN mkdir -p /work
+WORKDIR /work
 
 # Default command
 CMD ["/bin/bash"]
