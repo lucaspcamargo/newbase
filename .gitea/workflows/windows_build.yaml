@@ -32,7 +32,7 @@ jobs:
           export PATH="/opt/mxe/usr/bin:${PATH}"
           env
           ls /opt/mxe/usr/bin
-          x86_64-w64-mingw32.static-cmake -S . -B build  -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON 
+          x86_64-w64-mingw32.static-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON 
       - name: Build
         run: |
           . venv/bin/activate
