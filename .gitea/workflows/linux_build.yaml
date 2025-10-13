@@ -23,7 +23,11 @@ jobs:
             libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev
       - name: "Setup Python and CMake"
         run: |
+          which python
+          which python3
           python3 -m venv venv
+          ls || echo hmmm
+          ls venv || echo ooo
           source venv/bin/activate
           which pip && which python
           pip install --upgrade pip
