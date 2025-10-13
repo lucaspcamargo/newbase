@@ -4,7 +4,9 @@ on: [push]
 
 jobs:
   Main-Build:
-    runs-on: ubuntu-22-04-mxe:v1
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
