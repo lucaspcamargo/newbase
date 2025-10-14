@@ -154,7 +154,7 @@ I have vague plans to release the source, but not sure when or how. The way the 
 
 CMake is the main build tool for this project. Python 3 is also a build-time dependency, as described above.
 
-The engine is set up to be statically linked with the final executable, and has toggles for enabling LTO, aiming for best possible performance. This is one of the reasons only MIT and BSD licensed dependencies are used.
+The engine is set up to be statically linked with the final executable, and has toggles for enabling LTO, aiming for best possible performance. This is one of the reasons only MIT, BSD and zlib-licensed dependencies are used.
 
 ### Linux
 
@@ -168,9 +168,12 @@ This project is mostly built and tested on Linux. It boils down to the following
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r scripts/requirements.txt
-    cmake -B build -S . -DNEWBASE_FDO
     ```
-
+- Then, configure and build the project using CMake:
+    ```
+    cmake -B ./build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEWBASE_LTO=ON
+    cmake --build ./build
+    ```
 
 ### Android
 
@@ -192,5 +195,20 @@ This project also targets
 
 ### Important CMake Configuration Options
 
-// TODO
+- `NEWBASE_LTO`: enable link-time optimization. Defaults to OFF.
+- `NEWBASE_SDL_STATIC`: whether to build and use SDL statically. Defaults to ON.
+- `NEWBASE_BUILD_TESTS`: build unit and integration tests. Defaults to OFF.
+- `NEWBASE_TRACING`: enable Tracy profiler integration. Defaults to OFF.
+- `NEWBASE_FDO_FILES`: generate and install the XDG .desktop files, required for Flatpak builds. Defaults to OFF.
+- `NEWBASE_NATIVE_RES_PREFIX`: specify the relative path where resources will be installed and searched for. Defaults to "nb".
+
+You can set these options when running `cmake` by passing `-DOPTION=VALUE`.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+For questions, suggestions, or bug reports, please open an issue or contact the maintainer.
 

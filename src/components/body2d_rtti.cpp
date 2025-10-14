@@ -1,4 +1,4 @@
-    #include <newbase/components/body2d.h>
+#include <newbase/components/body2d.h>
 #include <newbase/reflection/data.h>
 #include <newbase/log.h>
 #include <entt/meta/factory.hpp>
