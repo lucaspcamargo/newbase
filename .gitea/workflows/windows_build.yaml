@@ -42,5 +42,5 @@ jobs:
       - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
-          name: newbase_linux_amd64_${{ github.head_ref }}_${{ github.sha }}
+          name: newbase_windows_amd64_${{ github.head_ref }}_${{ github.sha }}
           path: build
