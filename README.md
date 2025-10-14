@@ -229,9 +229,9 @@ You can set these options when running `cmake` by passing `-DOPTION=VALUE`.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the BSD 3-Clause license, for now. Future development may change this. See [LICENSE](LICENSE) for details.
 
----
+## Get in Touch
 
 For questions, suggestions, or bug reports, please open an issue or contact the maintainer.
 
