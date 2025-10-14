@@ -191,7 +191,30 @@ For the CMake configuration process, it is important to have Python 3.10+ availa
 
 ### Emscripten (Web)
 
-This project also targets
+This project also targets the web via Emscripten. The process is similar to the Linux build, but requires the Emscripten SDK to be installed and activated.
+- Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) and activate it:
+    ```
+    git clone ...
+    cd emsdk
+    ./emsdk install latest
+    ./emsdk activate latest
+    source ./emsdk_env.sh 
+    ```
+- Prepare a Python virtual environment with the dependencies and enable it:
+    ```
+    python -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r scripts/requirements.txt
+    ```
+- Then, configure and build the project using CMake:
+    ```
+    cmake -B ./build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DNEWBASE_LTO=ON -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN/cmake/Modules/Platform/Emscripten.cmake
+    cmake --build ./build
+    ```
+
+Integrating the web build into a page or web app, and distributing, is outside of the scope of this document.
+Look into the Emscripten documentation for more details.
 
 ### Important CMake Configuration Options
 
