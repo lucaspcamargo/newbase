@@ -177,15 +177,15 @@ This project is mostly built and tested on Linux. It boils down to the following
 
 ### Android
 
-// TODO
+The Android build mostly follows from the SDL Android build process. The project is set up to use the Android NDK, and CMake to build the native code. [This](https://wiki.libsdl.org/SDL3/README/android) was the main reference used in setting up the build.
+
+For an example of an Android project using the engine (the demo), see the project files under `demo/android-project`.
 
 ### Windows
 
-**TODO:** detailed build instructions for Windows.
-
 The project is occasionally built natively on Windows with Visual Studio. After checking out submodules, it should be built like any other CMake project on Windows that targets the MSVC toolchain.
 
-Additionally, the project is built on the CI/CD pipeline using the [MXE](https://mxe.cc/) cross-compilation toolchain.
+Additionally, the project is built on the CI/CD pipeline using the [MXE](https://mxe.cc/) cross-compilation toolchain. See [the workflow file](.gitea/workflows/windows_build.yaml) for details.
 
 For the CMake configuration process, it is important to have Python 3.10+ available, and a virtual environment setup with the packages from `scripts/requirements.txt` installed.
 

@@ -12,7 +12,7 @@ if(NEWBASE_SGDK)
         vendored/ymfm/src/ymfm_ssg.cpp
     )
     target_link_directories(ymfm PUBLIC vendored/ymfm/src )
-    export(TARGETS ymfm NAMESPACE newbase FILE newbase-ymfm-export.cmake)
+    export(TARGETS ymfm NAMESPACE nb:: FILE newbase-ymfm-export.cmake)
 
     set(SGDK_SUPPORT_LIBS ymfm)
     set(SGDK_SUPPORT_SOURCES 

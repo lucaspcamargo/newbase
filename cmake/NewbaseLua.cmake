@@ -86,7 +86,7 @@ function( newbase_lua_setup_fetch )
         set(LUA_DEFS LUA_USE_POSIX)
     endif()
     target_compile_definitions(lua PUBLIC ${LUA_DEFS})
-    export(TARGETS lua NAMESPACE newbase FILE newbase-lua-export.cmake)
+    export(TARGETS lua NAMESPACE nb:: FILE newbase-lua-export.cmake)
 endfunction()
 
 newbase_lua_setup_fetch()

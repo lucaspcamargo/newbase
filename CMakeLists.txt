@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.9.0)
+cmake_minimum_required(VERSION 3.10.0)
 
 project(newbase)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
+# core vars and options
 set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
 set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
 option(NEWBASE_LTO "Enable LTO if available" OFF)
@@ -20,14 +20,19 @@ set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
 set(NEWBASE_NATIVE_RES_PREFIX "nb" CACHE STRING "Path prefix for installing and searching for resources")
 
+# options and logging
 include(cmake/NewbaseOptions.cmake)
-include(cmake/NewbaseFunctions.cmake)
 include(cmake/NewbaseLogging.cmake)
+
+# dependencies
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
 include(cmake/NewbaseTracy.cmake)
 include(cmake/NewbaseSGDK.cmake)
 
+# core cmake functions (for adding executables, systems, resources, etc)
+# should work both when newbase is imported or built directly
+include(cmake/NewbaseFunctions.cmake)
 
 message("[newbase] adding SDL")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
@@ -92,6 +97,10 @@ if(NEWBASE_USE_XDG_DATA_DIRS)
     target_sources(newbase PRIVATE src/utility/xdg.cpp)
 endif()
 
+# let engine dependents know where to find core resources
+set_target_properties(newbase PROPERTIES
+    CORE_RES_DIR $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/res/_nb_core>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/share/newbase/res/_nb_core>>
+)
 
 # CORE SYSTEMS
 add_subdirectory(src/render_simple)
@@ -115,7 +124,7 @@ target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT l
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
-target_include_directories(newbase PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+target_include_directories(newbase PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
 
 # BINARIES
@@ -128,6 +137,6 @@ target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 
 # EXPORTS
 # let games use newbase and dependencies straight from the build folder
-export(EXPORT glm NAMESPACE newbase FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
-export(EXPORT box2dConfig NAMESPACE newbase FILE newbase-box2d-export.cmake) # same for box2d
-export(TARGETS newbase NAMESPACE newbase FILE newbase-export.cmake )
+export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
+export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
+export(TARGETS newbase NAMESPACE nb:: FILE newbase-export.cmake )

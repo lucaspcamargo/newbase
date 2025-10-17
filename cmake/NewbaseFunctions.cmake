@@ -3,6 +3,28 @@
 # this variable should be set to a list of all systems as they are regsitered and enabled 
 set(NEWBASE_ALL_SYSTEMS "")
 
+# check whether newbase is being imported
+# set root dir accordingly
+set(NEWBASE_IMPORTED FALSE) # not considered imported by default
+set(NEWBASE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+set(NEWBASE_TARGET "newbase")
+if(TARGET nb::newbase)
+    set(NEWBASE_TARGET "nb::newbase")
+    get_target_property(NEWBASE_IMPORTED nb::newbase IMPORTED)
+    message("[newbase_functions] nb::newbase IMPORTED is ${NEWBASE_IMPORTED}")
+    if(NEWBASE_IMPORTED)
+        set(NEWBASE_ROOT "../newbase") # HACK: there must be a better way to get this path
+        message("[newbase_functions] newbase imported from: ${NEWBASE_IMPORT_ROOT}")
+    else()
+        message("[newbase_functions] newbase already exists, and not imported...")
+    endif()
+else()
+    message("[newbase_functions] nb::newbase target not found, assuming not imported...")
+endif()
+message("[newbase_functions] newbase root dir is: ${NEWBASE_ROOT}")
+
+
+
 if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
     set(PYTHON_INTERPRETER python.exe)
 endif()
@@ -30,7 +52,7 @@ function(newbase_add_executable)
         add_executable(${arg_TARGET} WIN32 ${arg_SOURCES})
     endif()
 
-    target_link_libraries(${arg_TARGET} PRIVATE newbase)
+    target_link_libraries(${arg_TARGET} PRIVATE ${NEWBASE_TARGET})
     
 endfunction()
 
@@ -62,7 +84,6 @@ function(newbase_prepare_executable)
 
     # implement dynamic system lists
     list(LENGTH arg_SYSTEMS arg_SYSTEMS_LEN)
-    message(${arg_SYSTEMS_LEN})
     if(arg_SYSTEMS_LEN EQUAL 1)
         if(arg_SYSTEMS STREQUAL "ALL")
             set(arg_SYSTEMS ${NEWBASE_ALL_SYSTEMS})
@@ -141,7 +162,7 @@ function(newbase_add_system)
     set(system_target newbase_sys_${arg_NAME})
     message("[newbase_add_system] adding system target '${system_target}' with sources: ${arg_SOURCES}")
     add_library(${system_target} OBJECT ${arg_SOURCES})
-    target_link_libraries(${system_target} PRIVATE newbase)
+    target_link_libraries(${system_target} PRIVATE ${NEWBASE_TARGET})
 
     list(FIND NEWBASE_ALL_SYSTEMS ${arg_NAME} system_index)
     if(system_index EQUAL -1)
@@ -159,7 +180,7 @@ macro(newbase_commit_systems)
 endmacro()
 
 function(newbase_declare_resources)
-    set(options BUILD_SYMLINKS NO_INSTALL INDEX)
+    set(options BUILD_SYMLINKS NO_INSTALL INDEX NO_CORE_RESOURCES)
     set(oneValueArgs TARGET)
     set(multiValueArgs FILES)
     cmake_parse_arguments(PARSE_ARGV 0 arg 
@@ -177,6 +198,11 @@ function(newbase_declare_resources)
         set(links_dest_dir "${CMAKE_CURRENT_BINARY_DIR}/${NEWBASE_DEFAULT_RES_PREFIX}")
         message("[newbase_declare_resources] ensuring symlink dest dir: ${links_dest_dir}")
         file(MAKE_DIRECTORY "${links_dest_dir}")
+    endif()
+
+    # add core files to file list, unless NO_CORE_RESOURCES is set
+    if(NOT arg_NO_CORE_RESOURCES)
+        list(APPEND arg_FILES "${CMAKE_CURRENT_LIST_DIR}/../res/_nb_core")
     endif()
 
     foreach(file ${arg_FILES})
@@ -205,7 +231,7 @@ function(newbase_declare_resources)
     endforeach()
 
     if(arg_INDEX)
-    message("[newbase_declare_resources] creating target index")
+    message("[newbase_declare_resources] creating target index. Resources are at: ${links_dest_dir}")
         set(res_index_target ${arg_TARGET}_res_index)
         add_custom_target( ${res_index_target} ALL
             COMMAND ${PYTHON_INTERPRETER}
