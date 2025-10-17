@@ -1,7 +1,4 @@
 #include <newbase/system.h>
-#include <newbase/render_simple/render_simple.h>
-#include <newbase/audio/audio.h>
-#include <newbase/script_lua/script_lua.h>
 #include <newbase/reflection/contexts.h>
 #include <newbase/reflection/data.h>
 #include <newbase/log.h>

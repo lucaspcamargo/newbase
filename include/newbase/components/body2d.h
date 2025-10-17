@@ -49,7 +49,7 @@ namespace nb {
         float gravity_scale {1.0f};
         
         bool enabled {true};
-        bool enable_sleep {true};
+        bool enable_sleep {false};
         bool awake {true};
         bool fix_rotation {false};
         bool bullet {false};

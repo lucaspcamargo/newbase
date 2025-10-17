@@ -1,39 +1,45 @@
 local accel_hs = hs("btn_south")
 local shoot_hs = hs("btn_west")
 local dir_hs = hs("dir")
-local DRAG = 0.98
-local ROT_SPEED = 100.0
 
-local vel = vec3.new()
-local thrust = 200
+local DRAG = 0.98
+local ROT_TORQUE = 30000000.0
+local THRUST = 6000000
+local THRUST_ANGLE_DELTA = 180
+
+local thruster_spr = hs("res/asteroids/sprites/ship-t.png")
 
 clock_update_add(function (delta)
     local dir = input_action_direction(dir_hs)
     local sp = spatial()
-    sp.rot.z = sp.rot.z + delta*ROT_SPEED*dir.x
 
-    vel.x = vel.x - dir.y*delta*math.cos(math.rad(sp.rot.z))*thrust
-    vel.y = vel.y - dir.y*delta*math.sin(math.rad(sp.rot.z))*thrust
-    if dir.y == 0.0 then
-        -- apply drag 👠 (yes, in space 🌌)
-        local drag_factor = DRAG ^ (delta/(1.0/60.0))
-        vel = vel * drag_factor
-    end
-    sp.pos = sp.pos + delta*vel
+    local thrust_dir = math.rad(sp.rot.z + THRUST_ANGLE_DELTA)
+    local thrust_x = math.cos(thrust_dir)*THRUST*dir.y
+    local thrust_y = math.sin(thrust_dir)*THRUST*dir.y
+
+    physics2d_body_force_center(eid, vec2.new(thrust_x, thrust_y)) -- reset forces
+    physics2d_body_torque(eid, dir.x * ROT_TORQUE)
 
     local w = render_window_width() / render_cam_2d_scale()
     local h = render_window_height() / render_cam_2d_scale()
 
+    local new_x = sp.pos.x 
+    local new_y = sp.pos.y
+
     if sp.pos.x < (-w)/2 then
-        sp.pos.x = sp.pos.x + w
+        new_x = sp.pos.x + w
     elseif sp.pos.x > w/2 then
-        sp.pos.x = sp.pos.x - w
+        new_x = sp.pos.x - w
     end
 
     if sp.pos.y < (-h)/2 then
-        sp.pos.y = sp.pos.y + h
+        new_y = sp.pos.y + h
     elseif sp.pos.y > h/2 then
-        sp.pos.y = sp.pos.y - h
+        new_y = sp.pos.y - h
+    end
+
+    if new_x ~= sp.pos.x or new_y ~= sp.pos.y then
+        physics2d_body_warp(eid, vec2.new(new_x, new_y))
     end
 
     sp:apply()

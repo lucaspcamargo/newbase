@@ -245,13 +245,11 @@ bool physics2d::step(step_phase phase)
                 viewport_geometry::extents_2d extents;
                 if(vg->get_2d_extents(extents))
                 {
-                    float span_x = extents.right - extents.left;
-                    float span_y = extents.bottom - extents.top;
-                    float scale_x = extents.width/span_x;
-                    float scale_y = extents.height/span_y;
                     float cx = (extents.right+extents.left)/2.0f;
                     float cy = (extents.top+extents.bottom)/2.0f;
-                    physics2d_pre_debug_draw(cx, cy, scale_x*0.5f, scale_y*0.5f);
+                    float sx = extents.width/extents.xspan;
+                    float sy = extents.height/extents.yspan;
+                    physics2d_pre_debug_draw(_d->debug_draw, cx, cy, sx, sy, _d->world_scale, extents.ui_scale);
                     b2World_Draw(_d->world_id, &_d->debug_draw);
                 }
             }
@@ -266,6 +264,112 @@ bool physics2d::event(SDL_Event*)
     return true;
 }
 
+void physics2d::set_gravity(glm::vec2 grav)
+{
+    if(B2_IS_NON_NULL(_d->world_id))
+    {
+        b2Vec2 gravity;
+        gravity.x = grav.x;
+        gravity.y = grav.y;
+        b2World_SetGravity(_d->world_id, gravity);
+    }
+}
+
+bool physics2d::body_force(entt::entity ent, glm::vec2 force, glm::vec2 world_point, bool awake)
+{
+    // apply force to body at point
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_force: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        log::warn("[physics2d] body_force: body has no physics body: %x", ent);
+        return false;
+    }
+    b2Vec2 f;
+    f.x = force.x;
+    f.y = force.y;
+    b2Vec2 p;
+    p.x = world_point.x;
+    p.y = world_point.y;
+    log::info("[physics2d] applying force (%f, %f) at point (%f, %f) to entity body %x", f.x, f.y, p.x, p.y, ent);
+    b2Body_ApplyForce(cbody->_body_id, f, p, awake);
+    return true;
+}
+
+bool physics2d::body_force_center(entt::entity ent, glm::vec2 force, bool awake)
+{
+    // apply force to body center
+
+    // find entity's body id
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_force_center: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        log::warn("[physics2d] body_force_center: body has no physics body: %x", ent);
+        return false;
+    }
+    b2Vec2 f;
+    f.x = force.x;
+    f.y = force.y;
+    log::info("[physics2d] applying center force (%f, %f) to entity body %x", f.x, f.y, ent);
+    b2Body_ApplyForceToCenter(cbody->_body_id, f, true);
+    return true;
+}
+
+bool physics2d::body_torque(entt::entity ent, float torque, bool awake)
+{
+    // apply torque to body
+
+    // find entity's body id
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_torque: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        log::warn("[physics2d] body_torque: body has no physics body: %x", ent);
+        return false;
+    }
+    log::info("[physics2d] applying torque %f to entity body %x", torque, ent);
+    b2Body_ApplyTorque(cbody->_body_id, torque, true);
+    return true;
+}
+
+bool physics2d::body_warp(entt::entity ent, glm::vec2 pos)
+{
+    // instantly set body position, keep current angle
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_warp: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        log::warn("[physics2d] body_warp: body has no physics body: %x", ent);
+        return false;
+    }
+    b2Transform xf = b2Body_GetTransform(cbody->_body_id);
+    xf.p.x = pos.x;
+    xf.p.y = pos.y;
+    b2Body_SetTransform(cbody->_body_id, xf.p, xf.q);
+    log::info("[physics2d] warped body %x to (%f, %f)", ent, pos.x, pos.y);
+    return true;
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_physics2d()

@@ -12,13 +12,18 @@ class viewport_geometry
 public:
     struct extents_2d
     {
-        int width;
-        int height;
+        int width;      // viewport size in pixels
+        int height;     // viewport size in pixels
+
+        float xspan;    // how wide the viewport is in world units
+        float yspan;    // how tall the viewport is in world units
         
-        float left;
-        float top;
-        float right;
-        float bottom;
+        float left;     // left border x, in world coordinates
+        float top;      // top border y, in world coordinates
+        float right;    // right border x, in world coordinates
+        float bottom;   // bottom border y, in world coordinates
+
+        float ui_scale; // how much UI drawing will be scaled by, when using ImGui to draw
     };
 
     virtual bool get_2d_extents(extents_2d &) = 0;

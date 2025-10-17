@@ -27,6 +27,7 @@ for relpath in paths:
     if relpath == "index.yaml":
         continue
     path = os.path.join(resdir, relpath)
+    #print("stat:", path)
     st:os.stat_result = os.stat(path)
     if not st:
         continue

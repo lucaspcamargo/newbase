@@ -378,10 +378,13 @@ bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
     float span_x = _wx/_cam2d_scale;
     float span_y = _wy/_cam2d_scale;
     extents = {_wx, _wy,
+        span_x,
+        span_y,
         _cam2d_cx - span_x/2,
         _cam2d_cy - span_y/2,
         _cam2d_cx + span_x/2,
-        _cam2d_cy + span_y/2};
+        _cam2d_cy + span_y/2,
+        _scale};
     return true;
 }
 

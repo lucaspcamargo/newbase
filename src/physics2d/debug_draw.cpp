@@ -1,4 +1,5 @@
 #include <newbase/physics2d/debug_draw.h>
+#include <newbase/log.h>
 #include <imgui.h>
 #include <vector>
 
@@ -64,15 +65,21 @@ static float sx {1.0f};
 static float sy {1.0f};
 static float line_thickness {1.0f};
 
-void nb::physics2d_pre_debug_draw(float dx_in, float dy_in, float sx_in, float sy_in)
+void nb::physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float scale_x, float scale_y, float world_scale, float ui_scale)
 {
     ImGui::GetBackgroundDrawList();
     auto center = ImGui::GetMainViewport()->GetCenter();
-    dx = center.x + dx_in;
-    dy = center.y + dy_in;
 
-    sx = sx_in;
-    sy = sy_in;
+    dx = center.x + cx;
+    dy = center.y + cy;
+
+    sx = scale_x / ui_scale;
+    sy = scale_y / ui_scale;
+
+    //log::info("PRE DEBUG DRAW dx=%f, dy=%f, sx=%f, sy=%f", dx, dy, sx, sy);
+
+    // HACK, fix later
+    draw.drawingBounds = b2AABB{b2Vec2{-100000000.0f, -100000000.0f}, b2Vec2{100000000.0f, 100000000.0f}};
 }
 
 /// Draw a closed polygon provided in CCW order.

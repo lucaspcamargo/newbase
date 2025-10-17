@@ -65,6 +65,9 @@ void script_lua::bind_engine()
         registry_lua_t["orphan"] = &::entt::registry::orphan;
         //registry_lua_t["clear"] = &::entt::registry::clear; <-- hmmm not ok :(
 
+    auto entity_lua_t = lua.new_usertype<::entt::entity>("entity",
+        "new", sol::no_constructor);
+
     auto scene_lua_t = lua.new_usertype<::nb::scene>("scene",
         "new", sol::no_constructor,
         "registry", &scene::registry);
@@ -171,6 +174,8 @@ bool script_lua::step(step_phase phase)
                     sol::protected_function f(_d->L, lua.stack_top());
                     sol::environment env {lua, sol::create, lua.globals()};
                     env.set_on(f);
+
+                    env.set("eid", id);
                     
                     // check which components to make available
                     for(auto&& curr : reg.storage())

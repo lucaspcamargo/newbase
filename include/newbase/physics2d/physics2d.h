@@ -24,9 +24,15 @@ public:
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
 
+    void set_gravity(glm::vec2 grav);
+
+    // apply forces and torques
     bool body_force(entt::entity ent, glm::vec2 force, glm::vec2 world_point, bool awake = true);
     bool body_force_center(entt::entity ent, glm::vec2 force, bool awake = true);
     bool body_torque(entt::entity ent, float torque, bool awake = true);
+
+    // warp body to a given position, keeping other dynamics unchanged
+    bool body_warp(entt::entity ent, glm::vec2 position);
 
 private:
     physics2d_p *_d;

@@ -12,7 +12,7 @@ systems:
     default_actions: true
   clock: {}
   physics2d:
-    world_scale: 50
+    world_scale: 100
   steam:
     app_id: 480
 resources:
