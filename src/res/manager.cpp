@@ -27,6 +27,7 @@ static entt::resource_cache<rsprite, rloader_sprite> _cache_sprite{};
 static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
 static entt::resource_cache<rscript, rloader_script> _cache_script{};
 static entt::resource_cache<rvorbis, rloader_vorbis> _cache_vorbis{};
+static entt::resource_cache<ryaml, rloader_yaml> _cache_yaml{};
 
 SDL_Storage *_store_title{ nullptr };
 
@@ -247,6 +248,12 @@ entt::resource<rvorbis> rmanager::get_vorbis(entt::id_type id, bool forceload)
 {
     return (C4_UNLIKELY(forceload)? _cache_vorbis.force_load(id, id)
                                  : _cache_vorbis.load(id, id)).first->second;
+}
+
+entt::resource<ryaml> rmanager::get_yaml(entt::id_type id, bool forceload)
+{
+    return (C4_UNLIKELY(forceload)? _cache_yaml.force_load(id, id)
+                                 : _cache_yaml.load(id, id)).first->second;
 }
 
 }

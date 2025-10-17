@@ -36,4 +36,9 @@ struct rloader_wav {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_yaml {
+    using result_type = std::shared_ptr<ryaml>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

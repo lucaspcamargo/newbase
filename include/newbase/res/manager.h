@@ -31,6 +31,7 @@ public:
     entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
     entt::resource<rscript> get_script(entt::id_type id, bool forceload = false);
     entt::resource<rvorbis> get_vorbis(entt::id_type id, bool forceload = false);
+    entt::resource<ryaml> get_yaml(entt::id_type id, bool forceload = false);
 
 
 private:

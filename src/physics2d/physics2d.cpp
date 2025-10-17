@@ -296,7 +296,7 @@ bool physics2d::body_force(entt::entity ent, glm::vec2 force, glm::vec2 world_po
     b2Vec2 p;
     p.x = world_point.x;
     p.y = world_point.y;
-    log::info("[physics2d] applying force (%f, %f) at point (%f, %f) to entity body %x", f.x, f.y, p.x, p.y, ent);
+    log::verb("[physics2d] applying force (%f, %f) at point (%f, %f) to entity body %x", f.x, f.y, p.x, p.y, ent);
     b2Body_ApplyForce(cbody->_body_id, f, p, awake);
     return true;
 }
@@ -321,7 +321,7 @@ bool physics2d::body_force_center(entt::entity ent, glm::vec2 force, bool awake)
     b2Vec2 f;
     f.x = force.x;
     f.y = force.y;
-    log::info("[physics2d] applying center force (%f, %f) to entity body %x", f.x, f.y, ent);
+    log::verb("[physics2d] applying center force (%f, %f) to entity body %x", f.x, f.y, ent);
     b2Body_ApplyForceToCenter(cbody->_body_id, f, true);
     return true;
 }
@@ -343,7 +343,7 @@ bool physics2d::body_torque(entt::entity ent, float torque, bool awake)
         log::warn("[physics2d] body_torque: body has no physics body: %x", ent);
         return false;
     }
-    log::info("[physics2d] applying torque %f to entity body %x", torque, ent);
+    log::verb("[physics2d] applying torque %f to entity body %x", torque, ent);
     b2Body_ApplyTorque(cbody->_body_id, torque, true);
     return true;
 }
@@ -367,7 +367,7 @@ bool physics2d::body_warp(entt::entity ent, glm::vec2 pos)
     xf.p.x = pos.x;
     xf.p.y = pos.y;
     b2Body_SetTransform(cbody->_body_id, xf.p, xf.q);
-    log::info("[physics2d] warped body %x to (%f, %f)", ent, pos.x, pos.y);
+    log::verb("[physics2d] warped body %x to (%f, %f)", ent, pos.x, pos.y);
     return true;
 }
 

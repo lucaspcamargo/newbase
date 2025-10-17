@@ -1,14 +1,13 @@
 #pragma once
 
-#include <ryml.hpp>
+#include <newbase/res/yaml.h>
 #include <vector>
 
 namespace nb {
 
-    struct retree {
-        bool valid {false};
-        std::vector<char> data;
-        ryml::Tree tree;
+    struct retree : public ryaml
+    {
+        bool etree_valid {false};
     };
 
-};
+}

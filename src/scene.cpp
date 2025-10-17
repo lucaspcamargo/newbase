@@ -46,7 +46,7 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
         return entt::tombstone;
     }
 
-    if(!res->valid)
+    if(!res->etree_valid)
     {
         log::warn("[scene] build_etree: invalid etree: %x", static_cast<uint32_t>(retree_id));
         return entt::tombstone;

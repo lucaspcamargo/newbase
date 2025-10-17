@@ -7,4 +7,5 @@ namespace nb {
     struct rscript;
     struct rvorbis;
     struct rwav;
+    struct ryaml;
 }

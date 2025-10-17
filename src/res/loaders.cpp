@@ -6,6 +6,7 @@
 #include <newbase/res/script.h>
 #include <newbase/res/vorbis.h>
 #include <newbase/res/wav.h>
+#include <newbase/res/yaml.h>
 #include <newbase/log.h>
 
 #include <SDL3/SDL.h>
@@ -28,7 +29,8 @@ namespace nb {
         if(read_success)
         {
             ret->tree = ryml::parse_in_place(c4::to_substr(ret->data.data()));
-            ret->valid = ret->tree.rootref().is_seq();
+            ret->yaml_valid = ret->tree.rootref().is_seq();
+            ret->etree_valid = ret->yaml_valid; // TODO parse to specific etree data
         }
         else
         {
@@ -108,6 +110,7 @@ namespace nb {
         return script;
     }
 
+    // vorbis loader
     rloader_vorbis::result_type rloader_vorbis::operator()(entt::id_type id) const
     {
         log::info("[rloader_vorbis] loading: %x", id);
@@ -144,8 +147,6 @@ namespace nb {
 
         return vorbis;
     }
-
-
 
     rloader_wav::result_type rloader_wav::operator()(entt::id_type id) const
     {
@@ -188,5 +189,24 @@ namespace nb {
         {
             SDL_free(buf);
         }
+    }
+
+    // generic yaml resource loader
+    rloader_yaml::result_type rloader_yaml::operator()(entt::id_type id) const
+    {
+        log::info("[rloader_yaml] loading: %x", id);
+        auto ret = std::make_shared<ryaml>();
+        auto read_success = rman().read_all_sync(id, ret->data, true);
+        if(read_success)
+        {
+            ret->tree = ryml::parse_in_place(c4::to_substr(ret->data.data()));
+            ret->yaml_valid = true; 
+        }
+        else
+        {
+            log::error("[rloader_yaml] cannot read: %x", id);
+            return nullptr; // let go of allocated resource, fail to load
+        }
+        return ret;
     }
 }
