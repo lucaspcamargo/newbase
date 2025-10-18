@@ -4,9 +4,6 @@
 [submodule "vendored/stb"]
 	path = vendored/stb
 	url = https://github.com/nothings/stb.git
-[submodule "vendored/imgui"]
-	path = vendored/imgui
-	url = https://github.com/ocornut/imgui.git
 [submodule "vendored/rapidyaml"]
 	path = vendored/rapidyaml
 	url = https://github.com/biojppm/rapidyaml.git
