@@ -2,6 +2,7 @@ build
 build_ems
 build_distcc
 out
+wbuild
 
 emsdk
 vendored/steamworks-sdk

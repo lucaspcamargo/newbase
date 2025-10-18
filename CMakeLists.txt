@@ -74,6 +74,7 @@ add_library(newbase STATIC
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp
+    src/res/resource.cpp
 
     # yaml conversions
     src/yaml/glm.cpp
