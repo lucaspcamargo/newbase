@@ -50,7 +50,7 @@ void nb::imgui_style_setup()
     colors[ImGuiCol_TabSelected]            = ImVec4(0.00f, 0.53f, 0.67f, 1.00f);
     colors[ImGuiCol_TabSelectedOverline]    = ImVec4(0.00f, 0.27f, 0.33f, 1.00f);
     colors[ImGuiCol_TabDimmed]              = ImVec4(0.00f, 0.18f, 0.22f, 1.00f);
-    colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.14f, 0.26f, 0.42f, 1.00f);
+    colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.00f, 0.27f, 0.33f, 1.00f);
     colors[ImGuiCol_TabDimmedSelectedOverline]  = ImVec4(0.50f, 0.50f, 0.50f, 0.00f);
     colors[ImGuiCol_PlotLines]              = ImVec4(0.79f, 0.91f, 0.25f, 1.00f);
     colors[ImGuiCol_PlotLinesHovered]       = ImVec4(0.92f, 0.29f, 0.08f, 1.00f);
@@ -69,11 +69,12 @@ void nb::imgui_style_setup()
     colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
     colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 
-    ImGui::GetStyle().WindowRounding = 8;
+    ImGui::GetStyle().WindowRounding = 6;
     ImGui::GetStyle().FrameRounding = 3;
     ImGui::GetStyle().GrabRounding = 3;
     ImGui::GetStyle().PopupRounding = 3;
     ImGui::GetStyle().ChildRounding = 3;
+    ImGui::GetStyle().TabRounding = 4;
     ImGui::GetStyle().GrabMinSize = 8;
     ImGui::GetStyle().ScrollbarSize = 14;
 }

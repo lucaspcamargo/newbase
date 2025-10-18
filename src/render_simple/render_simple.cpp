@@ -12,6 +12,7 @@
 #include <newbase/log.hpp>
 
 #include "imgui.h"
+#include "imgui_internal.h" // for ImGuiViewport
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_sdlrenderer3.h"
 #include <entt/entt.hpp>
@@ -154,6 +155,8 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
     ImGui_ImplSDLRenderer3_Init(_render);
 
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
 #ifdef ANDROID
     ImGui::GetStyle().ScaleAllSizes(_scale);
     ImGui::GetIO().FontGlobalScale = _scale;
@@ -179,6 +182,7 @@ bool render_simple::step(nb::step_phase phase)
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+        ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(_safe.x);
         ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(_safe.y);
         ImGui::GetMainViewport()->WorkSize.x = static_cast<float>(_safe.w);
