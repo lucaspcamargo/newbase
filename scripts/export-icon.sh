@@ -8,6 +8,7 @@ icon_names=(
     icon
     icon_exec
     icon_exec_alt
+    icon_package
 )
 
 resolutions=(
