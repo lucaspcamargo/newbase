@@ -1,15 +1,15 @@
-#include <newbase/render_simple/render_simple.h>
-#include <newbase/engine.h>
-#include <newbase/scene.h>
-#include <newbase/components/sprite.h>
-#include <newbase/components/spatial.h>
-#include <newbase/res/sprite.h>
-#include <newbase/res/texture.h>
-#include <newbase/res/manager.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
-#include <newbase/utility/imgui_style.h>
-#include <newbase/log.h>
+#include <newbase/render_simple/render_simple.hpp>
+#include <newbase/engine.hpp>
+#include <newbase/scene.hpp>
+#include <newbase/components/sprite.hpp>
+#include <newbase/components/spatial.hpp>
+#include <newbase/res/sprite.hpp>
+#include <newbase/res/texture.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
+#include <newbase/utility/imgui_style.hpp>
+#include <newbase/log.hpp>
 
 #include "imgui.h"
 #include "backends/imgui_impl_sdl3.h"
@@ -366,6 +366,9 @@ void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
             _cam2d_scale = 1.0f;
         }
     }
+
+    log::info("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f wx=%d wy=%d => scale=%f", 
+        _cam2d_cx, _cam2d_cy, _cam2d_wmax, _cam2d_hmax, _wx, _wy, _cam2d_scale);
 }
 
 float render_simple::cam_2d_scale()

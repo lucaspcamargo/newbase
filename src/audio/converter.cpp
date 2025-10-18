@@ -1,4 +1,4 @@
-#include <newbase/audio/converter.h>
+#include <newbase/audio/converter.hpp>
 #include <SDL3/SDL_audio.h>
 
 using namespace nb;

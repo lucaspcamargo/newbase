@@ -1,0 +1,1 @@
+#include "newbase/res/resource.hpp"

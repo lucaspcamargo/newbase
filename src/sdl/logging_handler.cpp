@@ -1,4 +1,4 @@
-#include <newbase/sdl/logging_handler.h>
+#include <newbase/sdl/logging_handler.hpp>
 #include <SDL3/SDL_log.h>
 #include <unordered_set>
 

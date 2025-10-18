@@ -1,4 +1,4 @@
-#include <newbase/input/input.h>
+#include <newbase/input/input.hpp>
 #include <sol/sol.hpp>
 #include <glm/glm.hpp>
 

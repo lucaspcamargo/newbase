@@ -1,5 +1,5 @@
-#include <newbase/audio/producer/vorbis.h>
-#include <newbase/log.h>
+#include <newbase/audio/producer/vorbis.hpp>
+#include <newbase/log.hpp>
 #include <cassert>
 
 #define STB_VORBIS_HEADER_ONLY

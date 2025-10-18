@@ -1,7 +1,7 @@
-#include <newbase/system.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
-#include <newbase/log.h>
+#include <newbase/system.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
+#include <newbase/log.hpp>
 #include <entt/entt.hpp>
 
 using entt::operator""_hs;

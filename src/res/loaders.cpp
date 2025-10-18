@@ -1,13 +1,13 @@
-#include <newbase/res/loaders.h>
-#include <newbase/res/manager.h>
-#include <newbase/res/etree.h>
-#include <newbase/res/texture.h>
-#include <newbase/res/sprite.h>
-#include <newbase/res/script.h>
-#include <newbase/res/vorbis.h>
-#include <newbase/res/wav.h>
-#include <newbase/res/yaml.h>
-#include <newbase/log.h>
+#include <newbase/res/loaders.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/res/etree.hpp>
+#include <newbase/res/texture.hpp>
+#include <newbase/res/sprite.hpp>
+#include <newbase/res/script.hpp>
+#include <newbase/res/vorbis.hpp>
+#include <newbase/res/wav.hpp>
+#include <newbase/res/yaml.hpp>
+#include <newbase/log.hpp>
 
 #include <SDL3/SDL.h>
 #include <stb_image.h>

@@ -1,14 +1,14 @@
-#include <newbase/physics2d/physics2d.h>
-#include <newbase/physics2d/debug_draw.h>
-#include <newbase/physics2d/conversions.h>
-#include <newbase/components/body2d.h>
-#include <newbase/components/spatial.h>
-#include <newbase/engine.h>
-#include <newbase/scene.h>
-#include <newbase/log.h>
-#include <newbase/services/viewport_geometry.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
+#include <newbase/physics2d/physics2d.hpp>
+#include <newbase/physics2d/debug_draw.hpp>
+#include <newbase/physics2d/conversions.hpp>
+#include <newbase/components/body2d.hpp>
+#include <newbase/components/spatial.hpp>
+#include <newbase/engine.hpp>
+#include <newbase/scene.hpp>
+#include <newbase/log.hpp>
+#include <newbase/services/viewport_geometry.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
 #include <entt/entt.hpp>
 #include <box2d/box2d.h>
 #include <imgui.h>
@@ -218,9 +218,9 @@ bool physics2d::step(step_phase phase)
                 {
                     b2BodyDef groundBodyDef = b2DefaultBodyDef();
                     groundBodyDef.position.x = 0.0f;
-                    groundBodyDef.position.y = 10.0f*_d->world_scale;
+                    groundBodyDef.position.y = 10.0f;
                     b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
-                    b2Polygon groundBox = b2MakeBox(50.0f*_d->world_scale, 10.0f*_d->world_scale);
+                    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
                     b2ShapeDef groundShapeDef = b2DefaultShapeDef();
                     b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
                     ground_added = true;
@@ -229,9 +229,9 @@ bool physics2d::step(step_phase phase)
                 b2BodyDef bodyDef = b2DefaultBodyDef();
                 bodyDef.type = b2_dynamicBody;
                 bodyDef.position.x = 0.0f;
-                bodyDef.position.y = -10.0f*_d->world_scale;
+                bodyDef.position.y = -75.0f;
                 b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
-                b2Polygon dynamicBox = b2MakeBox(1.0f*_d->world_scale, 1.0f*_d->world_scale);
+                b2Polygon dynamicBox = b2MakeBox(10.0f, 10.0f);
                 b2ShapeDef shapeDef = b2DefaultShapeDef();
                 shapeDef.density = 1.0f;
                 shapeDef.material.friction = 0.3f;

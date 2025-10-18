@@ -1,7 +1,7 @@
-#include <newbase/input/input.h>
-#include <newbase/log.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
+#include <newbase/input/input.hpp>
+#include <newbase/log.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
 #include <SDL3/SDL_gamepad.h>
 #include <entt/entt.hpp>
 #include <unordered_map>

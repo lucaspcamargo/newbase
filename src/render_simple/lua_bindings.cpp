@@ -1,4 +1,4 @@
-#include <newbase/render_simple/render_simple.h>
+#include <newbase/render_simple/render_simple.hpp>
 #include <sol/sol.hpp>
 #include <glm/glm.hpp>
 

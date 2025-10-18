@@ -1,10 +1,10 @@
-#include <newbase/res/manager.h>
-#include <newbase/res/loaders.h>
+#include <newbase/res/manager.hpp>
+#include <newbase/res/loaders.hpp>
 #include <newbase/nb_config.h>
-#include <newbase/log.h>
-#include <newbase/utility/strings.h>
+#include <newbase/log.hpp>
+#include <newbase/utility/strings.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
-#include <newbase/utility/xdg.h>
+#include <newbase/utility/xdg.hpp>
 #endif
 
 #include <entt/entt.hpp>

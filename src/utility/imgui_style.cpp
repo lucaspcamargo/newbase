@@ -1,6 +1,6 @@
-#include <newbase/utility/imgui_style.h>
-#include <newbase/res/manager.h>
-#include <newbase/log.h>
+#include <newbase/utility/imgui_style.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/log.hpp>
 #include "imgui.h"
 #include "IconsForkAwesome.h"
 #include <entt/entt.hpp>

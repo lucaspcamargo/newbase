@@ -1,4 +1,4 @@
-#include <newbase/audio/producer/buffer.h>
+#include <newbase/audio/producer/buffer.hpp>
 #include <algorithm>
 #include <cassert>
 

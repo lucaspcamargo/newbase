@@ -1,6 +1,6 @@
-#include <newbase/components/spatial.h>
-#include <newbase/reflection/data.h>
-#include <newbase/log.h>
+#include <newbase/components/spatial.hpp>
+#include <newbase/reflection/data.hpp>
+#include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include <sol/sol.hpp>
 #include <IconsForkAwesome.h>

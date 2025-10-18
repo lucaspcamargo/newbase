@@ -1,6 +1,6 @@
-#include <newbase/utility/xdg.h>
-#include <newbase/utility/strings.h>
-#include <newbase/log.h>
+#include <newbase/utility/xdg.hpp>
+#include <newbase/utility/strings.hpp>
+#include <newbase/log.hpp>
 #include <string>
 #include <SDL3/SDL.h>
 

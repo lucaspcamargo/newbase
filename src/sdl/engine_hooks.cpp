@@ -1,5 +1,5 @@
 #include <newbase/sdl/engine_hooks.h>
-#include <newbase/engine.h>
+#include <newbase/engine.hpp>
 
 #include <cassert>
 

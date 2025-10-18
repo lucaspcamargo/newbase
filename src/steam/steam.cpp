@@ -1,7 +1,7 @@
-#include <newbase/steam/steam.h>
-#include <newbase/log.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
+#include <newbase/steam/steam.hpp>
+#include <newbase/log.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
 

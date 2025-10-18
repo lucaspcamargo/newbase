@@ -1,4 +1,4 @@
-#include <newbase/audio/audio.h>
+#include <newbase/audio/audio.hpp>
 #include <sol/sol.hpp>
 
 using namespace nb;

@@ -1,14 +1,14 @@
-#include <newbase/engine.h>
-#include <newbase/system.h>
-#include <newbase/res/manager.h>
-#include <newbase/scene.h>
-#include <newbase/sdl/logging_handler.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
+#include <newbase/engine.hpp>
+#include <newbase/system.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/scene.hpp>
+#include <newbase/sdl/logging_handler.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
 #include <newbase/nb_config.h>
-#include <newbase/log.h>
+#include <newbase/log.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
-#include <newbase/utility/xdg.h>
+#include <newbase/utility/xdg.hpp>
 #endif
 
 #include <SDL3/SDL.h>

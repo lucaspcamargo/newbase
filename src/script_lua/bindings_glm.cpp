@@ -1,4 +1,4 @@
-#include <newbase/script_lua/bindings_glm.h>
+#include <newbase/script_lua/bindings_glm.hpp>
 #include <glm/glm.hpp>
 
 void nb::_lua_bind_glm(sol::state_view sv)

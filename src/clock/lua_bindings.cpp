@@ -1,4 +1,4 @@
-#include <newbase/clock/clock.h>
+#include <newbase/clock/clock.hpp>
 #include <sol/sol.hpp>
 
 using namespace nb;

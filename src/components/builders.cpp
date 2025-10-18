@@ -1,11 +1,11 @@
-#include <newbase/components/builders.h>
-#include <newbase/components/spatial.h>
-#include <newbase/components/sprite.h>
-#include <newbase/components/script.h>
-#include <newbase/components/body2d.h>
-#include <newbase/res/manager.h>
-#include <newbase/yaml/glm.h>
-#include <newbase/log.h>
+#include <newbase/components/builders.hpp>
+#include <newbase/components/spatial.hpp>
+#include <newbase/components/sprite.hpp>
+#include <newbase/components/script.hpp>
+#include <newbase/components/body2d.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/yaml/glm.hpp>
+#include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
 #include <glm/ext/matrix_transform.hpp>

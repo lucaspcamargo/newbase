@@ -1,5 +1,5 @@
-#include <newbase/physics2d/debug_draw.h>
-#include <newbase/log.h>
+#include <newbase/physics2d/debug_draw.hpp>
+#include <newbase/log.hpp>
 #include <imgui.h>
 #include <vector>
 

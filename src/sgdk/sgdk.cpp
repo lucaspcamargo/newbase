@@ -1,3 +1,3 @@
-#include <newbase/sgdk/sgdk.h>
+#include <newbase/sgdk/sgdk.hpp>
 
 using namespace nb;

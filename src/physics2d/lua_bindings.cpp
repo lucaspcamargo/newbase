@@ -1,4 +1,4 @@
-#include <newbase/physics2d/physics2d.h>
+#include <newbase/physics2d/physics2d.hpp>
 #include <sol/sol.hpp>
 #include <glm/glm.hpp>
 

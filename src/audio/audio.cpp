@@ -1,15 +1,15 @@
-#include <newbase/audio/audio.h>
-#include <newbase/audio/producer/buffer.h>
-#include <newbase/audio/producer/looper.h>
-#include <newbase/audio/producer/vorbis.h>
-#include <newbase/audio/graph/graph.h>
-#include <newbase/engine.h>
-#include <newbase/sdl/utils.h>
-#include <newbase/reflection/contexts.h>
-#include <newbase/reflection/data.h>
-#include <newbase/res/manager.h>
-#include <newbase/res/vorbis.h>
-#include <newbase/log.h>
+#include <newbase/audio/audio.hpp>
+#include <newbase/audio/producer/buffer.hpp>
+#include <newbase/audio/producer/looper.hpp>
+#include <newbase/audio/producer/vorbis.hpp>
+#include <newbase/audio/graph/graph.hpp>
+#include <newbase/engine.hpp>
+#include <newbase/sdl/utils.hpp>
+#include <newbase/reflection/contexts.hpp>
+#include <newbase/reflection/data.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/res/vorbis.hpp>
+#include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 
 // for debug ui

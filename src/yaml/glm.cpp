@@ -1,4 +1,4 @@
-#include <newbase/yaml/glm.h>
+#include <newbase/yaml/glm.hpp>
 
 namespace nb {
     

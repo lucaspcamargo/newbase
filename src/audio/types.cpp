@@ -1,4 +1,4 @@
-#include <newbase/audio/types.h>
+#include <newbase/audio/types.hpp>
 #include <SDL3/SDL_audio.h>
 
 using namespace nb;
