@@ -95,7 +95,9 @@ namespace nb {
             ImGui::Separator();
     
             // Reserve enough left-over height for 1 separator + 1 input text
-            const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+            /* DISABLED INPUT FIELD
+            const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();*/
+            const float footer_height_to_reserve = 0.0f;
             if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_HorizontalScrollbar))
             {
                 if (ImGui::BeginPopupContextWindow())
@@ -161,6 +163,8 @@ namespace nb {
                 ImGui::PopStyleVar();
             }
             ImGui::EndChild();
+
+            /* INPUT FIELD (disabled)
             ImGui::Separator();
     
             // Command-line
@@ -179,7 +183,7 @@ namespace nb {
             // Auto-focus on window apparition
             ImGui::SetItemDefaultFocus();
             if (reclaim_focus)
-                ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+                ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget*/
     
             ImGui::End();
         }

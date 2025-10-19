@@ -17,8 +17,8 @@ void nb::imgui_style_setup()
     colors[ImGuiCol_WindowBg]               = ImVec4(0.00f, 0.13f, 0.17f, 0.94f);
     colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     colors[ImGuiCol_PopupBg]                = ImVec4(0.00f, 0.08f, 0.10f, 0.94f);
-    colors[ImGuiCol_Border]                 = ImVec4(0.43f, 0.43f, 0.50f, 0.50f);
-    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.03f, 0.04f, 1.00f);
+    colors[ImGuiCol_Border]                 = ImVec4(0.871f, 0.910f, 0.690f, 0.118f);
+    colors[ImGuiCol_BorderShadow]           = ImVec4(0.000f, 0.102f, 0.129f, 1.000f);
     colors[ImGuiCol_FrameBg]                = ImVec4(0.87f, 0.91f, 0.69f, 0.04f);
     colors[ImGuiCol_FrameBgHovered]         = ImVec4(0.87f, 0.91f, 0.69f, 0.14f);
     colors[ImGuiCol_FrameBgActive]          = ImVec4(0.87f, 0.91f, 0.69f, 0.28f);
@@ -77,6 +77,7 @@ void nb::imgui_style_setup()
     ImGui::GetStyle().TabRounding = 4;
     ImGui::GetStyle().GrabMinSize = 8;
     ImGui::GetStyle().ScrollbarSize = 14;
+    ImGui::GetStyle().FrameBorderSize = 1;
 }
 
 void nb::imgui_style_fonts_setup(float scale)

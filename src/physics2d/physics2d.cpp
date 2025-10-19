@@ -24,6 +24,8 @@ constexpr auto BODY2D_DESTROY_STORAGE = "body2d_on_destroy"_hs;
 // TODO: right now there's only physics for the default scene
 // we need per-scene physics worlds
 
+// For scaling forces and torques etc according to by world scale, this guy knows what's up: https://stackoverflow.com/a/46898740
+
 template<> 
 struct std::hash<b2BodyId>
 {
