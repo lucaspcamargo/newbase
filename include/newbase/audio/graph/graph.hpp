@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/audio/types.hpp>
+#include <newbase/log.hpp>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -9,7 +10,7 @@
 #include <algorithm>
 #include <queue>
 #include <string>
-
+#include <cassert>
 namespace nb::audio_graph 
 {
 
@@ -89,16 +90,14 @@ namespace nb::audio_graph
         }
 
         void add_node(std::shared_ptr<node> n) {
-            if (!n) throw std::invalid_argument("Null node");
-            if (nodes_.count(n->id()))
-                throw std::runtime_error("Node already exists: " + n->id());
+            assert(n);
+            assert((nodes_.count(n->id()) == 0) && "Node already exists");
             nodes_[n->id()] = std::move(n);
             edges_[n->id()] = {};
         }
 
         void remove_node(const node_id& id) {
-            if (!nodes_.count(id))
-                throw std::runtime_error("Node does not exist: " + id);
+            assert(nodes_.count(id));
             nodes_.erase(id);
             edges_.erase(id);
             // Remove all incoming edges
@@ -107,33 +106,31 @@ namespace nb::audio_graph
             }
         }
 
-        void connect(const node_id& src, const node_id& dst) {
-            if (!nodes_.count(src) || !nodes_.count(dst))
-                throw std::runtime_error("Invalid node id(s) for connect");
-            if (src == dst)
-                throw std::runtime_error("Cannot connect node to itself");
-            if (std::find(edges_[src].begin(), edges_[src].end(), dst) != edges_[src].end())
-                throw std::runtime_error("Connection already exists");
+        bool connect(const node_id& src, const node_id& dst) {
+
+            assert(nodes_.count(src) && nodes_.count(dst) && "Invalid node id(s) for connect");
+            assert(src != dst && "Cannot connect node to itself");
+            assert(std::find(edges_[src].begin(), edges_[src].end(), dst) == edges_[src].end() && "Connection already exists");
             edges_[src].push_back(dst);
             if (has_cycle())
             {
                 edges_[src].pop_back();
-                throw std::runtime_error("Connection would create a cycle");
+                log::error("Connection from node {} to node {} would create a cycle", src, dst);
+                return false;
             }
+            return true;
         }
 
         void disconnect(const node_id& src, const node_id& dst) {
-            if (!nodes_.count(src) || !nodes_.count(dst))
-                throw std::runtime_error("Invalid node id(s) for disconnect");
+            assert(nodes_.count(src) && nodes_.count(dst));
             auto& dsts = edges_[src];
             auto it = std::remove(dsts.begin(), dsts.end(), dst);
-            if (it == dsts.end())
-                throw std::runtime_error("Connection does not exist");
+            assert(it != dsts.end());
             dsts.erase(it, dsts.end());
         }
 
         // Topological sort for processing order
-        std::vector<node_id> topological_sort() const {
+        std::vector<node_id> topological_sort(bool * has_cycle) const {
             std::unordered_map<node_id, int> in_degree;
             for (const auto& [id, _] : nodes_) in_degree[id] = 0;
             for (const auto& [src, dsts] : edges_)
@@ -153,8 +150,8 @@ namespace nb::audio_graph
                         q.push(dst);
                 }
             }
-            if (order.size() != nodes_.size())
-                throw std::runtime_error("Graph has a cycle");
+            if(has_cycle != nullptr)
+                (*has_cycle) = order.size() != nodes_.size();
             return order;
         }
 
@@ -167,12 +164,9 @@ namespace nb::audio_graph
         std::unordered_map<node_id, std::vector<node_id>> edges_;
 
         bool has_cycle() const {
-            try {
-                topological_sort();
-                return false;
-            } catch (...) {
-                return true;
-            }
+            bool ret;
+            topological_sort(&ret);
+            return ret;
         }
     };
 

@@ -6,6 +6,13 @@ if(DEFINED ANDROID_NDK)
     )
 endif()
 
+# some options for glm
+set(GLM_ENABLE_CXX_17 ON)
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("[newbase_options] enabling C++17 and fast math for glm")
+    set(GLM_ENABLE_FAST_MATH ON)
+endif()
+
 if(NEWBASE_LTO)
     message("[newbase] LTO requested, checking support...")
     include(CheckIPOSupported)

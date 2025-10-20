@@ -162,6 +162,7 @@ function(newbase_add_system)
     set(system_target newbase_sys_${arg_NAME})
     message("[newbase_add_system] adding system target '${system_target}' with sources: ${arg_SOURCES}")
     add_library(${system_target} OBJECT ${arg_SOURCES})
+    target_compile_options(${system_target} PUBLIC -fno-exceptions)
     target_link_libraries(${system_target} PRIVATE ${NEWBASE_TARGET})
 
     list(FIND NEWBASE_ALL_SYSTEMS ${arg_NAME} system_index)

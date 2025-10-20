@@ -1,8 +1,8 @@
 #include <newbase/utility/imgui_style.hpp>
+#include <newbase/utility/imgui_icons.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/log.hpp>
 #include "imgui.h"
-#include "IconsForkAwesome.h"
 #include <entt/entt.hpp>
 #include <string>
 #include <vector>
@@ -115,6 +115,28 @@ void nb::imgui_style_fonts_setup(float scale)
         memcpy(copy, iconfont_data.data(), iconfont_data.size());
         static const ImWchar icon_ranges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
         ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont_data.size(), 14, &config, icon_ranges);
+    }
+    else
+    {
+        log::error("[imgui_style] cannot read icon font: %x", iconfont_hash);
+    }
+
+    std::string iconfont2_path = "_nb_core/ttf/kenney-icon-font/kenney-icon-font.ttf";
+    std::vector<char> iconfont2_data;
+    auto iconfont2_hash = entt::hashed_string{iconfont2_path.c_str()}.value();
+    log::info("[imgui_style] icon font 2: %x", iconfont2_hash);
+    if(rman().read_all_sync(iconfont2_hash, iconfont2_data, false))
+    {
+        ImFontConfig config;
+        strncpy(config.Name, "icons_kenney", sizeof(ImFontConfig::Name));
+        config.RasterizerDensity = scale;
+        config.MergeMode = true;
+        config.GlyphMinAdvanceX = 14.0f;
+        config.GlyphOffset.y = 1.0f; // adjust vertical position
+        void * copy = malloc(iconfont2_data.size()); // need to copy, imgui takes ownership
+        memcpy(copy, iconfont2_data.data(), iconfont2_data.size());
+        static const ImWchar icon_ranges2[] = { ICON_MIN_KI, ICON_MAX_KI, 0 };
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont2_data.size(), 13, &config, icon_ranges2);
     }
     else
     {

@@ -14,7 +14,7 @@
 
 // for debug ui
 #include "imgui.h"
-#include "IconsForkAwesome.h"
+#include <newbase/utility/imgui_icons.hpp>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -238,8 +238,8 @@ bool audio::sfx_play(entt::id_type res_id, float gain)
 // debug
 void audio::show_debug_ui(bool *close)
 {
-    ImGui::Begin(ICON_FK_VOLUME_UP " Audio", close);
-    if(ImGui::Checkbox("Out Mute", &_out_mute))
+    ImGui::Begin(ICON_KI_SOUND_ON " Audio", close);
+    if(ImGui::Checkbox(ICON_KI_SOUND_OFF " Out Mute", &_out_mute))
         out_mute(_out_mute);
     if(ImGui::SliderFloat("Out Gain", &_out_gain, 0.f, 1.f))
         out_gain(_out_gain);
