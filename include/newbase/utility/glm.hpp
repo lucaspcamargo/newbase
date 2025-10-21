@@ -13,11 +13,12 @@
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>  // remember, construct with wxyz argument order
 #include <type_traits>
 
 // std type_traits specializations
-
+// this was not resolving the sol2 issues on clang (Android NDK 46)
+/*
 namespace std {
     template<>
     struct is_nothrow_copy_constructible<glm::vec2> : std::true_type {};
@@ -41,3 +42,4 @@ namespace std {
     template<>
     struct is_nothrow_copy_assignable<glm::quat> : std::true_type {};
 }
+    */

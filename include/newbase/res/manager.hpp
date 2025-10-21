@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/res/fwd.hpp>
-#include <newbase/res/storage/descriptor.hpp>
+#include <newbase/res/storage/handle.hpp>
 #include <entt/resource/cache.hpp>
 #include <entt/resource/resource.hpp>
 #include <ryml.hpp>
@@ -14,7 +14,7 @@ namespace nb {
 
 class rmanager final {
 public:
-    using descriptor = res_storage::descriptor;
+    using asset_handle = res_storage::asset_handle;
 
     rmanager();
     ~rmanager();
@@ -24,7 +24,7 @@ public:
     bool known(entt::id_type id); // whether this resource hash is known
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_term = false) const; // read all data into byte vector
 
-    const std::unordered_map<entt::id_type, rmanager::descriptor>& descriptors() const;
+    const std::unordered_map<entt::id_type, rmanager::asset_handle>& handles() const;
 
     entt::resource<retree> get_etree(entt::id_type id, bool forceload = false);
     entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
@@ -35,7 +35,6 @@ public:
 
 
 private:
-    void register_file(SDL_Storage *storage, const char *path, size_t sz);
 };
 
 rmanager& rman();

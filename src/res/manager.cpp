@@ -1,5 +1,8 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/res/loaders.hpp>
+#include <newbase/res/storage/interface.hpp>
+#include <newbase/res/storage/sdl_file.hpp>
+#include <newbase/res/storage/sdl_storage.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
 #include <newbase/utility/strings.hpp>
@@ -29,9 +32,9 @@ static entt::resource_cache<rscript, rloader_script> _cache_script{};
 static entt::resource_cache<rvorbis, rloader_vorbis> _cache_vorbis{};
 static entt::resource_cache<ryaml, rloader_yaml> _cache_yaml{};
 
-SDL_Storage *_store_title{ nullptr };
-
-static std::unordered_map<entt::id_type, rmanager::descriptor> _pathmap;
+// NEW asset infrastructure
+static std::vector<std::unique_ptr<res_storage::storage_interface>> _storage_interfaces;
+static std::unordered_map<entt::id_type, res_storage::asset_handle> _asset_handles;
 
 rmanager::rmanager()
 {
@@ -40,17 +43,23 @@ rmanager::rmanager()
 
 rmanager::~rmanager()
 {
-    if(_store_title)
-    {
-        SDL_CloseStorage(_store_title);
-        _store_title = nullptr;
-    }
+    // release asset handles
+    _asset_handles.clear();
+
+    // release storage interfaces
+    _storage_interfaces.clear();
 }
 
 bool rmanager::configure(const ryml::NodeRef &config)
 {
-    // TODO rework with "source" plugins and use yaml config
-#ifndef ANDROID
+    // WIP new asset infrastructure
+    // for now we don't use config, just open appropriate storage according to platform :)
+    (void) config;
+    bool use_sdl_file = false;
+#ifdef ANDROID
+    log::info("[rmanager] using SDL FileStorage on Android");
+    use_sdl_file = true;
+#endif
     std::string base_location {NEWBASE_DEFAULT_RES_PREFIX};
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
     if(_nb_xdg_data_dir_found())
@@ -58,111 +67,58 @@ bool rmanager::configure(const ryml::NodeRef &config)
         base_location = _nb_xdg_data_dirname_get() + std::string{"/"} + base_location;
     }
 #endif
-    _store_title = SDL_OpenTitleStorage(base_location.c_str(), SDL_CreateProperties());
-    if(!_store_title)
-    {
-        log::warn("[rmanager] cannot open title storage. Falling back to raw fs...");
-        _store_title = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
-    }
-#else
-    // Always use FileStorage on Android, as asset reading is tied to RWOps
-    _store_title = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
-    if(!_store_title) {
-        log::critical("[rmanager] [android] cannot open file storage...");
-        return false;
-    }
-#endif
 
-    if(_store_title)
+    if(use_sdl_file)
     {
-        char ** vfiles = SDL_GlobStorageDirectory(_store_title, nullptr, nullptr, 0, nullptr);
-        if(vfiles)
-        {
-            for(char **curr = vfiles; *curr; curr++)
-            {
-                Uint64 sz;
-                if(SDL_GetStorageFileSize(_store_title, *curr, &sz))
-                    register_file(_store_title, *curr, static_cast<size_t>(sz));
-            }
-            SDL_free(vfiles);
-        }
-        else
-        {
-            log::warn("[rmanager] cannot enumerate title storage: %s", SDL_GetError());
-            log::warn("[rmanager] searching index file");
-            std::string idx_path {"index.yaml"};
-            Uint64 idx_len;
-            std::vector<char> buf;
-#ifndef ANDROID
-            if (SDL_GetStorageFileSize(_store_title, idx_path.c_str(), &idx_len) && idx_len > 0)
-            {
-                buf.resize(static_cast<size_t>(idx_len));
-                if (SDL_ReadStorageFile(_store_title, idx_path.c_str(), buf.data(), idx_len))
-                {
-#else
-            void *data = SDL_LoadFile(NEWBASE_DEFAULT_RES_PREFIX"/index.yaml", &idx_len);
-            if(data)
-            {
-                buf.resize(static_cast<size_t>(idx_len));
-                memcpy(buf.data(), data, static_cast<size_t>(idx_len));
-                {
-#endif
-                    auto tree = ryml::parse_in_place(buf.data());
-                    assert(tree.rootref().has_children());
-                    for(ryml::ConstNodeRef n : tree.rootref().cchildren())
-                    {
-                        std::string path;
-                        size_t sz;
-                        n[0] >> path;
-                        n[1] >> sz;
-                        register_file(_store_title, path.c_str(), sz);
-                    }
-                    return true;
-                }
-#ifndef ANDROID
-                else 
-                {
-                    log::error("[rmanager] cannot open index.yaml!");
-                    return false;
-                }
-#else
-                SDL_free(data);
-#endif
-            }
-            else
-            {
-                log::error("[rmanager] cannot stat index.yaml!");
-                return false;
-            }
-        }
+        auto sfile = std::make_unique<res_storage::sdl_file>(ryml::ConstNodeRef{}, base_location);
+        _storage_interfaces.push_back(std::move(sfile));
     }
-    else 
+    else
     {
-        log::critical("[rmanager] cannot open any title storage!");
-        return false;
+        auto sstorage = std::make_unique<res_storage::sdl_storage>(ryml::ConstNodeRef{}, base_location);
+        _storage_interfaces.push_back(std::move(sstorage));
+    }
+
+    // Now, we manage our storage interfaces
+    int sintf_idx = 0;
+    for(auto &sintf : _storage_interfaces)
+    {
+        bool has_index = sintf->has_index();
+        bool scannable = sintf->scannable();
+        log::info("[rmanager] storage interface #%d: scannable=%s, has_index=%s",
+                  sintf_idx,
+                  scannable? "yes" : "no",
+                  has_index? "yes" : "no");
+
+        // ask for asset handles
+        // if we have an index, use it
+        // otherwise, try scanning if possible
+        auto handles = sintf->get_handles(scannable, has_index);
+
+        for(auto &handle : handles)
+        {
+            log::info("[rmanager] registered asset: %s (size: %zu)", handle.path.c_str(), handle.size);
+            handle.storage_interface_idx = sintf_idx;
+            _asset_handles.insert(std::make_pair(handle.id, handle));
+        }
+
+        sintf_idx++;
     }
 
     return true;
 }
 
-void rmanager::register_file(SDL_Storage *storage, const char *path, size_t sz)
-{
-    if(!path || !path[0])
-        return;
-    bool absolute = path[0] == '/';
-    path += absolute? 1 : 0;
-    auto hash = entt::hashed_string(path);
-    log::info("[rmanager] storage file: %s (%x)", path, hash.value());
-    _pathmap.insert(std::make_pair(hash.value(), rmanager::descriptor{path, sz, nullptr}));
-}
-
 bool rmanager::known(entt::id_type id)
 {
-    return _pathmap.find(id) != _pathmap.end();
+    return _asset_handles.find(id) != _asset_handles.end();
 }
 
 bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate) const // read all data into byte vector
 {
+    return false;
+    // WIP new asset infrastructure
+
+    /*
     auto it = _pathmap.find(id);
     if(it == _pathmap.end())
     {
@@ -202,13 +158,13 @@ bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero
             dst[loc.size] = '\0';
         return true;
     }  
+    */
 }
 
-const std::unordered_map<entt::id_type, rmanager::descriptor>& rmanager::descriptors() const
+const std::unordered_map<entt::id_type, rmanager::asset_handle>& rmanager::handles() const
 {
-    return _pathmap;
+    return _asset_handles;
 }
-
 
 template <typename Cache>
 static inline std::pair<typename Cache::iterator, bool> load_maybe_force(Cache &cache, entt::id_type id, bool forceload)

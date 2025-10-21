@@ -2,7 +2,6 @@
 
 #include <newbase/res/sprite.hpp>
 #include <entt/resource/resource.hpp>
-#include <glm/glm.hpp>
 
 namespace nb {
     struct csprite {

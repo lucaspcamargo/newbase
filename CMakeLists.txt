@@ -39,6 +39,7 @@ add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 message("[newbase] adding rapidyaml")
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
 message("[newbase] adding sol2")
+set(SOL_NO_EXCEPTIONS ON CACHE BOOL "sol2 without exceptions") # match our no-exceptions build
 add_subdirectory(vendored/sol2 EXCLUDE_FROM_ALL)
 message("[newbase] adding glm")
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
@@ -75,6 +76,8 @@ add_library(newbase STATIC
     src/res/manager.cpp
     src/res/loaders.cpp
     src/res/resource.cpp
+    src/res/storage/sdl_file.cpp
+    src/res/storage/sdl_storage.cpp
 
     # yaml conversions
     src/yaml/glm.cpp

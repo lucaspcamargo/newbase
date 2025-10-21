@@ -16,7 +16,7 @@
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_sdlrenderer3.h"
 #include <entt/entt.hpp>
-#include <glm/gtx/string_cast.hpp>
+#include <newbase/utility/glm.hpp>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 #include <tracy/Tracy.hpp>

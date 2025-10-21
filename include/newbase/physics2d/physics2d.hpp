@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/system.hpp>
-#include <glm/vec2.hpp>
+#include <newbase/utility/glm.hpp>
 
 namespace nb
 {

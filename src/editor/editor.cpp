@@ -103,7 +103,7 @@ bool editor::step(step_phase phase)
                 ImGui::TableSetupColumn("path", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("size", ImGuiTableColumnFlags_WidthFixed, fnt_size_unit*6);
                 ImGui::TableHeadersRow();
-                for(const auto &pair: rman().descriptors())
+                for(const auto &pair: rman().handles())
                 {
                     ImGui::TableNextColumn();
                     ImGui::Text("%x", pair.first);
