@@ -23,6 +23,9 @@ public:
     /** @brief Invoked by the resource manager after initialization */
     std::vector<asset_handle> get_handles(bool try_scan, bool use_index) override;
 
+    /** @brief Read all bytes of a resource into a buffer. May change in the future. */
+    bool read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate = false) override;
+    
 private:
     bool _search_index();
     bool _index_add(std::string path, size_t sz);

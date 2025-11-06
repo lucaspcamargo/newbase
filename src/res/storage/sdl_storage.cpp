@@ -152,5 +152,34 @@ bool sdl_storage::_index_add(std::string path, size_t sz)
 }
 
 
+bool sdl_storage::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
+{
+    if(!_storage)
+    {
+        return false;
+    }
+
+    Uint64 sz;
+    if(!SDL_GetStorageFileSize(_storage, hnd.path.c_str(), &sz))
+    {
+        log::error("[sdl_storage] cannot stat file: %s", hnd.path.c_str());
+        return false;
+    }
+
+    dst.resize(static_cast<size_t>(sz) + (zero_terminate ? 1 : 0));
+    if(!SDL_ReadStorageFile(_storage, hnd.path.c_str(), dst.data(), sz))
+    {
+        log::error("[sdl_storage] cannot read file: %s", hnd.path.c_str());
+        dst.clear();
+        return false;
+    }
+
+    if(zero_terminate)
+    {
+        dst[static_cast<size_t>(sz)] = '\0';
+    }
+
+    return true;
+}
 
 } // namespace nb::res_storage

@@ -137,4 +137,28 @@ bool sdl_file::_index_add(std::string path, size_t sz)
     return true;
 }
 
+
+bool sdl_file::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
+{
+    std::string full_path = _base_path + "/" + hnd.path;
+    Uint64 file_len;
+    void *data = SDL_LoadFile(full_path.c_str(), &file_len);
+    if(data)
+    {
+        dst.resize(static_cast<size_t>(file_len) + (zero_terminate ? 1 : 0));
+        memcpy(dst.data(), data, static_cast<size_t>(file_len));
+        if(zero_terminate)
+        {
+            dst[static_cast<size_t>(file_len)] = '\0';
+        }
+        SDL_free(data);
+        return true;
+    }
+    else
+    {
+        log::error("[sdl_file] cannot read file: %s", full_path.c_str());
+        return false;
+    }
+}
+
 }

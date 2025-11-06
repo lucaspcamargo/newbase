@@ -2,7 +2,7 @@
 
 #include <newbase/res/storage/interface.hpp>
 #include <entt/entity/handle.hpp>
-#inlude <ryml.h>
+#include <ryml.h>
 
 namespace nb::res_storage::factory {
 

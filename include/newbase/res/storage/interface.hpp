@@ -23,6 +23,9 @@ virtual bool has_index() const = 0;
 /** @brief Invoked by the resource manager after initialization. Returns the list of known resources as handles. */
 virtual std::vector<asset_handle> get_handles(bool try_scan, bool use_index) = 0;
 
+/** @brief Read all bytes of a resource into a buffer. May change in the future. */
+virtual bool read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate = false) = 0;
+
 };
 
 }

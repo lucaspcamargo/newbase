@@ -115,50 +115,21 @@ bool rmanager::known(entt::id_type id)
 
 bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate) const // read all data into byte vector
 {
-    return false;
-    // WIP new asset infrastructure
-
-    /*
-    auto it = _pathmap.find(id);
-    if(it == _pathmap.end())
+    auto it = _asset_handles.find(id);
+    if(it == _asset_handles.end())
     {
-        log::info("[rmanager] unregistered id: (%x)", id);
+        log::error("[rmanager] unknown asset id: %x", id);
         return false;
     }
-
-    const auto &loc = it->second;
-
-    const std::string &path = loc.path;
-    dst.resize(static_cast<size_t>(loc.size)+(zero_terminate? 1 : 0));
-#ifndef ANDROID
-    if(!SDL_ReadStorageFile(_store_title, path.c_str(), dst.data(), loc.size))
-#else
-    std::string fpath {NEWBASE_DEFAULT_RES_PREFIX};
-    fpath += "/";
-    fpath += path;
-    Uint64 sz;
-    void *data = SDL_LoadFile(fpath.c_str(), &sz);
-    bool ok = data && (sz == loc.size);
-    if(data)
+    const auto &handle = it->second;
+    int sintf_idx = handle.storage_interface_idx;
+    if(sintf_idx < 0 || sintf_idx >= static_cast<int>(_storage_interfaces.size()))
     {
-        if(ok)
-            memcpy(dst.data(), data, sz);
-        SDL_free(data);
-    }
-    if(!ok)
-#endif
-    {
-        log::info("[rmanager] cannot read: %s (%x)", path.c_str(), id);
-        dst.resize(0);
+        log::error("[rmanager] invalid storage interface index %d for asset id: %x", sintf_idx, id);
         return false;
     }
-    else
-    {
-        if(zero_terminate)
-            dst[loc.size] = '\0';
-        return true;
-    }  
-    */
+    auto &sintf = _storage_interfaces[sintf_idx];
+    return sintf->read_all_sync(handle, dst, zero_terminate);
 }
 
 const std::unordered_map<entt::id_type, rmanager::asset_handle>& rmanager::handles() const

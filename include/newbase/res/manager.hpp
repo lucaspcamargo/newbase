@@ -22,7 +22,7 @@ public:
     bool configure(const ryml::NodeRef &config);
     
     bool known(entt::id_type id); // whether this resource hash is known
-    bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_term = false) const; // read all data into byte vector
+    bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const; // read all data into byte vector
 
     const std::unordered_map<entt::id_type, rmanager::asset_handle>& handles() const;
 
