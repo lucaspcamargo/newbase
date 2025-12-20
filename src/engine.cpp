@@ -167,6 +167,7 @@ bool engine::teardown()
     // destroy all system shared_ptrs
     _d->_systems.clear();
     _d->_systems_meta.clear();
+    ::nb::rman().clear();
     return true;
 }
 

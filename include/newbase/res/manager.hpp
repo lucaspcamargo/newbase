@@ -20,6 +20,7 @@ public:
     ~rmanager();
 
     bool configure(const ryml::NodeRef &config);
+    void clear();
     
     bool known(entt::id_type id); // whether this resource hash is known
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const; // read all data into byte vector

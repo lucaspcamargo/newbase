@@ -33,16 +33,23 @@ static entt::resource_cache<rvorbis, rloader_vorbis> _cache_vorbis{};
 static entt::resource_cache<ryaml, rloader_yaml> _cache_yaml{};
 
 // NEW asset infrastructure
-static std::vector<std::unique_ptr<res_storage::storage_interface>> _storage_interfaces;
-static std::unordered_map<entt::id_type, res_storage::asset_handle> _asset_handles;
+static std::vector<std::unique_ptr<res_storage::storage_interface>> _storage_interfaces {};
+static std::unordered_map<entt::id_type, res_storage::asset_handle> _asset_handles {};
 
 rmanager::rmanager()
 {
-    
+    // static initialization
 }
 
 rmanager::~rmanager()
 {
+    // called in exit handlers!
+}
+
+void rmanager::clear()
+{
+    log::info("[rmanager] clearing resource pools and storage interfaces");
+
     // release asset handles
     _asset_handles.clear();
 
@@ -52,6 +59,7 @@ rmanager::~rmanager()
 
 bool rmanager::configure(const ryml::NodeRef &config)
 {
+    log::info("[rmanager] configuring...");
     // WIP new asset infrastructure
     // for now we don't use config, just open appropriate storage according to platform :)
     (void) config;
@@ -71,12 +79,12 @@ bool rmanager::configure(const ryml::NodeRef &config)
     if(use_sdl_file)
     {
         auto sfile = std::make_unique<res_storage::sdl_file>(ryml::ConstNodeRef{}, base_location);
-        _storage_interfaces.push_back(std::move(sfile));
+        _storage_interfaces.emplace_back(std::move(sfile));
     }
     else
     {
         auto sstorage = std::make_unique<res_storage::sdl_storage>(ryml::ConstNodeRef{}, base_location);
-        _storage_interfaces.push_back(std::move(sstorage));
+        _storage_interfaces.emplace_back(std::move(sstorage));
     }
 
     // Now, we manage our storage interfaces
