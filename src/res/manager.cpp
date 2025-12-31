@@ -105,7 +105,7 @@ bool rmanager::configure(const ryml::NodeRef &config)
 
         for(auto &handle : handles)
         {
-            log::info("[rmanager] registered asset: %s (size: %zu)", handle.path.c_str(), handle.size);
+            log::info("[rmanager] registered asset: %s (%zub)", handle.path.c_str(), handle.size);
             handle.storage_interface_idx = sintf_idx;
             _asset_handles.insert(std::make_pair(handle.id, handle));
         }
