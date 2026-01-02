@@ -7,7 +7,6 @@
 #include <newbase/script_lua/lua.hpp>
 #include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/log.hpp>
-#include <sol/sol.hpp>
 #include <entt/entt.hpp>
 #include <vector>
 
@@ -17,7 +16,7 @@ using entt::operator""_hs;
 typedef std::pair<size_t, std::vector<char>*> reader_state_t;
 
 const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* size);
-void _lua_panic(sol::optional<std::string> maybe_msg);
+//void _lua_panic(sol::optional<std::string> maybe_msg);
 
 
 struct nb::script_lua_p {
@@ -40,10 +39,10 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
 {
     log::info("[script_lua] init");
     _d->L = lua_newstate(&l_alloc, this);
-    lua_atpanic( _d->L, sol::c_call<decltype(&_lua_panic), &_lua_panic> );
+    //lua_atpanic( _d->L, sol::c_call<decltype(&_lua_panic), &_lua_panic> );
     luaL_openlibs(_d->L);
 
-    _lua_bind_glm(sol::state_view{_d->L});
+    //_lua_bind_glm(sol::state_view{_d->L});
     bind_engine();
     bind_systems();
     
@@ -54,7 +53,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
 
 void script_lua::bind_engine()
 {
-    sol::state_view lua{_d->L};
+    /*sol::state_view lua{_d->L};
 
     lua.set_function("hs", [](const char * str) -> int {
         return entt::hashed_string{str}.value();
@@ -77,6 +76,7 @@ void script_lua::bind_engine()
         "ref", &engine::instance,
         "default_scene", &engine::default_scene,
         "request_exit", &engine::request_exit);
+    */
 }
 
 void script_lua::bind_systems()
@@ -99,6 +99,8 @@ void script_lua::bind_systems()
                 log::warn("[script_lua] skipping system with no instance: %s (%x)", (const char*)info->identifier, type.id());
                 continue;
             }
+            log::warn("[script_lua] UNIMPLEMENTEND binding system: %s (%x)", (const char*)info->identifier, type.id());
+            /*
             if(sys->can_bind())
             {
                 log::info("[script_lua] requesting bind: %s (%x)", (const char*)info->identifier, type.id());
@@ -108,6 +110,7 @@ void script_lua::bind_systems()
             {
                 log::warn("[script_lua] system cannot bind: %s (%x)", (const char*)info->identifier, type.id());
             }
+            */
         }
     }
 
@@ -170,7 +173,7 @@ bool script_lua::step(step_phase phase)
                 if(valid_chunk)
                 {
                     log::info("[script_lua] setup: %x", id);
-                    sol::state_view lua{_d->L};
+                    /*sol::state_view lua{_d->L};
                     sol::protected_function f(_d->L, lua.stack_top());
                     sol::environment env {lua, sol::create, lua.globals()};
                     env.set_on(f);
@@ -226,6 +229,7 @@ bool script_lua::step(step_phase phase)
                         sol::error err = result;
                         log::error("[script_lua] script failed: %x: %s", id, err.what());
                     }
+                        */
                     script.ready = true;
                 }
             }
@@ -274,14 +278,14 @@ const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* 
 }
 
 
-inline void _lua_panic(sol::optional<std::string> maybe_msg) {
+/*inline void _lua_panic(sol::optional<std::string> maybe_msg) {
     if (maybe_msg) {
         const std::string& msg = maybe_msg.value();
         log::critical("[script_lua] panic: %s", msg.c_str());
 	}
     else
         log::critical("[script_lua] panic");
-}
+}*/
 
 
 

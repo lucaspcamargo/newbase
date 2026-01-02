@@ -13,8 +13,6 @@ public:
 
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override {return 0;}
     entt::id_type metatype_id() override { return entt::hashed_string{"clock"}.value(); }
-    bool can_bind() override { return true; }
-    void bind(void *state) override;
 
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase) override;

@@ -2,13 +2,12 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
-#include <sol/sol.hpp>
 #include <IconsForkAwesome.h>
 
 using namespace nb;
 using entt::operator""_hs;
 
-static rtti::component_type_info::bind_result _cbody2d_bind(void *state)
+/*static rtti::component_type_info::bind_result _cbody2d_bind(void *state)
 {
     sol::state_view lua{reinterpret_cast<lua_State*>(state)};
 
@@ -45,7 +44,7 @@ static rtti::component_type_info::bind_result _cbody2d_bind(void *state)
             return &(reg.get<cbody2d>(id));
         });
     }};
-}
+}*/
 
 void cbody2d::_ensure_rtti()
 {
@@ -57,7 +56,7 @@ void cbody2d::_ensure_rtti()
         .custom<rtti::component_type_info>(rtti::component_type_info{
             "body2d",
             true,
-            &_cbody2d_bind,
+            nullptr,
             ICON_FK_SQUARE_O
         })
         .ctor<>();

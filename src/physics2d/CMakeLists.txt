@@ -3,6 +3,5 @@
 newbase_add_system(NAME physics2d SOURCES 
     ./physics2d.cpp
     ./debug_draw.cpp
-    ./lua_bindings.cpp
 )
 newbase_commit_systems()

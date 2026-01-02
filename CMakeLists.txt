@@ -38,9 +38,6 @@ message("[newbase] adding SDL")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 message("[newbase] adding rapidyaml")
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
-message("[newbase] adding sol2")
-set(SOL_NO_EXCEPTIONS ON CACHE BOOL "sol2 without exceptions") # match our no-exceptions build
-add_subdirectory(vendored/sol2 EXCLUDE_FROM_ALL)
 message("[newbase] adding glm")
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
 add_subdirectory(vendored/glm EXCLUDE_FROM_ALL)
@@ -125,7 +122,7 @@ set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_compile_options(newbase PUBLIC -fno-exceptions )
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua sol2::sol2 box2d::box2d ymfm -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d ymfm -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)

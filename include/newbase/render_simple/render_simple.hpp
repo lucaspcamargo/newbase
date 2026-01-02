@@ -17,8 +17,6 @@ public:
 
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
     entt::id_type metatype_id() override { return entt::hashed_string{"render_simple"}.value(); }
-    bool can_bind() override { return true; }
-    void bind(void *lua) override;
 
     int window_width();
     int window_height();

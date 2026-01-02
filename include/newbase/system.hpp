@@ -28,8 +28,6 @@ public:
 
     virtual SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) = 0;
     virtual entt::id_type metatype_id() = 0;
-    virtual bool can_bind() { return false; }
-    virtual void bind(void *state) {}
 
     virtual bool init(ryml::ConstNodeRef cfg) = 0;
     virtual bool step(step_phase) = 0;

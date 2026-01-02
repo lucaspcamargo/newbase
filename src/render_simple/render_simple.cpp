@@ -23,7 +23,6 @@
 
 #include <string>
 #include <vector>
-#include <iostream> // TODO remove
 
 using namespace nb;
 using entt::operator""_hs;

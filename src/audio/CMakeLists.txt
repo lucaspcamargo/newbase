@@ -2,7 +2,6 @@
 
 newbase_add_system(NAME audio SOURCES 
     ./audio.cpp
-    ./lua_bindings.cpp
     ./buffer.cpp
     ./converter.cpp
     ./producer/buffer.cpp
