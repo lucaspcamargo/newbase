@@ -87,7 +87,7 @@ bool sdl_file::_search_index()
     bool ret = false;
     
     std::string idx_path {"index.yaml"};
-    Uint64 idx_len;
+    std::size_t idx_len;
     std::vector<char> buf;
 
     void *data = SDL_LoadFile((_base_path + "/index.yaml").c_str(), &idx_len);
@@ -140,7 +140,7 @@ bool sdl_file::_index_add(std::string path, size_t sz)
 bool sdl_file::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
 {
     std::string full_path = _base_path + "/" + hnd.path;
-    Uint64 file_len;
+    std::size_t file_len;
     void *data = SDL_LoadFile(full_path.c_str(), &file_len);
     if(data)
     {
