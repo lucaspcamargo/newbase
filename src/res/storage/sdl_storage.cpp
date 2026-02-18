@@ -2,13 +2,12 @@
 #include <newbase/utility/strings.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
+#include <ryml_std.hpp>
 
 namespace nb::res_storage {
 
 sdl_storage::sdl_storage(ryml::ConstNodeRef cfg, std::string base_location)
 {
-    (void) cfg;
-
     _storage = SDL_OpenTitleStorage(base_location.c_str(), SDL_CreateProperties());
     if(!_storage)
     {

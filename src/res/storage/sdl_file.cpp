@@ -8,7 +8,7 @@
 namespace nb::res_storage {
 
 sdl_file::sdl_file(ryml::ConstNodeRef cfg, std::string base_path)
-    : _base_path(std::move(base_path))
+    : _base_path(std::move(base_path)), _index_found( false )
 {
     _search_index();
 }
@@ -30,7 +30,6 @@ bool sdl_file::scannable() const
 
 bool sdl_file::has_index() const
 {
-    // not for now
     return _index_found;
 }
 

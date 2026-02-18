@@ -32,6 +32,8 @@ namespace log {
         _COUNT
     };
 
+// TODO: respect static log level in all logging function templates
+
     template<typename... Params>
     inline void verb(const char *msg, Params... params)
     {
