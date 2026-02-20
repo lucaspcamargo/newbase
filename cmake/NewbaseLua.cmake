@@ -1,10 +1,10 @@
 function( newbase_lua_setup_ext )
     include( ExternalProject )
-    # TODO remove submodule and just fetch the tarball: lua-5.4.7.tar.gz 	2024-06-13 	374097 	9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
-    # URL is https://www.lua.org/ftp/lua-5.4.7.tar.gz
+
+    # URL is https://www.lua.org/ftp/lua-5.5.0.tar.gz
     ExternalProject_Add( lua_ext
-        URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
-        URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+        URL https://www.lua.org/ftp/lua-5.5.0.tar.gz
+        URL_HASH SHA256=57ccc32bbbd005cab75bcc52444052535af691789dba2b9016d5c50640d68b3d
     #    DOWNLOAD_EXTRACT_TIMESTAMP true <-- too new for android cmake
         CONFIGURE_COMMAND ""
         BUILD_COMMAND make
@@ -37,8 +37,8 @@ function( newbase_lua_setup_fetch )
     if(NEWBASE_LUA_ROOT STREQUAL "")
         include( FetchContent )
         FetchContent_Declare( lua_fetch
-            URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
-            URL_HASH SHA256=9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30
+            URL https://www.lua.org/ftp/lua-5.5.0.tar.gz
+            URL_HASH SHA256=57ccc32bbbd005cab75bcc52444052535af691789dba2b9016d5c50640d68b3d
         )
         FetchContent_MakeAvailable(lua_fetch)
     else()

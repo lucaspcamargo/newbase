@@ -1,11 +1,11 @@
 #include <newbase/script_lua/script_lua.hpp>
+#include <newbase/script_lua/lua.hpp>
+#include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/components/script.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
-#include <newbase/script_lua/lua.hpp>
-#include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/log.hpp>
 #include <entt/entt.hpp>
 #include <vector>
@@ -16,12 +16,13 @@ using entt::operator""_hs;
 typedef std::pair<size_t, std::vector<char>*> reader_state_t;
 
 const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* size);
-//void _lua_panic(sol::optional<std::string> maybe_msg);
+int _lua_panic(lua_State * L);
 
 
 struct nb::script_lua_p {
     lua_State * L {nullptr};
-    std::unordered_map<entt::id_type, rtti::component_type_info::bind_result> bound_components; // map entt component types to sol usertypes
+    unsigned int seed {0};
+    std::unordered_map<entt::id_type, rtti::component_type_info::bind_result> bound_components; // map entt component types
 };
 
 
@@ -38,8 +39,8 @@ script_lua::~script_lua()
 bool script_lua::init(ryml::ConstNodeRef cfg)
 {
     log::info("[script_lua] init");
-    _d->L = lua_newstate(&l_alloc, this);
-    //lua_atpanic( _d->L, sol::c_call<decltype(&_lua_panic), &_lua_panic> );
+    _d->L = lua_newstate(&l_alloc, this, ++(_d->seed));
+    lua_atpanic( _d->L, &_lua_panic );
     luaL_openlibs(_d->L);
 
     //_lua_bind_glm(sol::state_view{_d->L});
@@ -101,6 +102,7 @@ void script_lua::bind_systems()
             }
             log::warn("[script_lua] UNIMPLEMENTEND binding system: %s (%x)", (const char*)info->identifier, type.id());
             /*
+
             if(sys->can_bind())
             {
                 log::info("[script_lua] requesting bind: %s (%x)", (const char*)info->identifier, type.id());
@@ -118,7 +120,7 @@ void script_lua::bind_systems()
 
 bool script_lua::step(step_phase phase)
 {
-    // TODO maybe not scan everything every frame (use reactive storage)
+    // TODO do not scan everything every frame (use reactive storage)
     if(phase == step_phase::PREPARE)
     {
         auto &reg = engine::instance().default_scene().registry();
@@ -278,16 +280,14 @@ const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* 
 }
 
 
-/*inline void _lua_panic(sol::optional<std::string> maybe_msg) {
-    if (maybe_msg) {
-        const std::string& msg = maybe_msg.value();
-        log::critical("[script_lua] panic: %s", msg.c_str());
-	}
-    else
-        log::critical("[script_lua] panic");
-}*/
-
-
+// custom panic function
+int _lua_panic(lua_State * L)
+{
+    const char* error_message = lua_tostring(L, -1);
+    log::critical("[script_lua] PANIC: '%s'", error_message);
+    abort();
+    return 0;
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_script_lua()
