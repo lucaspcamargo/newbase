@@ -4,6 +4,12 @@
 #include <cstring>
 #include <entt/entt.hpp>
 
+// These structures are used to augment the entt::meta reflection facility with some extra data 
+// that is useful for our editor and scripting systems, such as type identifiers and editor icons for components,
+// or writability flags for resource storage types. 
+// We use entt::meta's custom() function to associate these with the reflected types, 
+// and we can then query them at runtime when we need to display editor icons or bind types to lua.
+
 // Use "safer" string copy on MSVCPP, normal otherwise...
 #ifndef _MSC_VER
 #define strncpy_s strncpy
@@ -62,62 +68,47 @@ struct cstrn {
     }
 };
 
-
-struct system_info
-{
-    cstrn<32> identifier;
+enum type_class_t {
+    TYPE_CLASS_NONE = 0,
+    TYPE_CLASS_COMPONENT = 1,
+    TYPE_CLASS_RESOURCE = 2,
+    TYPE_CLASS_SYSTEM = 3,
+    TYPE_CLASS_SINGLETON = 4,
+    TYPE_CLASS_RES_STORAGE = 5,
 };
 
-struct singleton_info
+struct type_info
 {
-    cstrn<32> identifier;
-};
+    cstrn<32> identifier {};
 
-struct component_type_info
-{
-    // making a lua binding of a component returns the identifier to use for the local getter,
-    // and a function that can be used to resolve the reference in a state, given the id and registry
-    // we cannot just pass the component pointer to the function. That is faster but components do not
-    // necessarily have pointer stability
-    // maybe we can do something better in the future (e.g. update references when calling into lua again)
-    // for sure components that /do have/ pointer stability can bind more simply
-    using bind_result = std::pair<const char *, std::function<void(void*, entt::entity, entt::registry&)>>; 
+    type_class_t type_class {TYPE_CLASS_NONE};
 
-    cstrn<32> identifier;
-    bool can_add;
-    std::function<bind_result(void*)> _bind_func;
-    const char *editor_icon;
-    bool can_edit {false};
-    std::function<void(void*)> _edit_func;
-};
+    union {
+        struct {
+            const char *editor_icon;
+        } component;
 
-struct resource_type_info
-{
-    cstrn<32> identifier;
-};
+        struct {
+            bool sure_writable;
+            bool maybe_writable;
 
-struct res_storage_type_info
-{
-    cstrn<32> identifier;
+            // whether the storage type surely supports, or may possibly support, scanning it for files and sizes
+            bool sure_scaneable;
+            bool maybe_scaneable;
+        } res_storage;
+    } data;
 
-    bool sure_writable;
-    bool maybe_writable;
-
-    // whether the storage type surely supports, or may possibly support, scanning it for files and sizes
-    bool sure_scaneable;
-    bool maybe_scaneable;
+    void *uptr {nullptr};
 };
 
 struct func_info
 {
-    cstrn<32> identifier;
-    // incredibly, entt::meta provides all the rest for us
+    cstrn<32> identifier {};
 };
 
 struct data_info
 {
-    cstrn<32> identifier;
-    // incredibly, entt::meta provides all the rest for us
+    cstrn<32> identifier {};
 };
 
 // this is used to define builder functions for non-copyable and/or non-movable types,

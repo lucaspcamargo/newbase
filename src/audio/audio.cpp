@@ -256,7 +256,7 @@ extern "C" void _rtti_init_audio()
     // main interface
     entt::meta_factory<nb::audio>{}
         .type("audio"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"audio"})
+        .custom<rtti::type_info>(rtti::type_info{"audio", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
         .func<&audio::bgm_play>("bgm_play"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_play"})

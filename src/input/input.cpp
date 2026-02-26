@@ -602,7 +602,7 @@ extern "C" void _rtti_init_input()
 {
     entt::meta_factory<nb::input>{}
         .type("input"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"input"})
+        .custom<rtti::type_info>(rtti::type_info{"input", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
     entt::meta_factory<std::shared_ptr<nb::input>>{rtti::ctx_systems()}
         .type("input_shared"_hs)

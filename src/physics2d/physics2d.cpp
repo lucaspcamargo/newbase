@@ -378,7 +378,7 @@ extern "C" void _rtti_init_physics2d()
 {
     entt::meta_factory<nb::physics2d>{}
         .type("physics2d"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"physics2d"})
+        .custom<rtti::type_info>(rtti::type_info{"physics2d", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)

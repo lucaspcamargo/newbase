@@ -53,11 +53,15 @@ void cbody2d::_ensure_rtti()
         return;
 
     entt::meta_factory<cbody2d>{}
-        .custom<rtti::component_type_info>(rtti::component_type_info{
-            "body2d",
-            true,
-            nullptr,
-            ICON_FK_SQUARE_O
+        
+        .custom<rtti::type_info>(rtti::type_info{
+            .identifier = "body2d", 
+            .type_class = rtti::TYPE_CLASS_COMPONENT,
+            .data {
+                .component = {
+                    .editor_icon = ICON_FK_SQUARE_O
+                }
+            }
         })
         .ctor<>();
     log::info("[cbody2d] registered: id=%x");

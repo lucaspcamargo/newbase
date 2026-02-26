@@ -1,6 +1,7 @@
 #include <newbase/script_lua/script_lua.hpp>
 #include <newbase/script_lua/lua.hpp>
 #include <newbase/script_lua/bindings_glm.hpp>
+#include <newbase/script_lua/utility.hpp>
 #include <newbase/components/script.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/engine.hpp>
@@ -22,7 +23,6 @@ int _lua_panic(lua_State * L);
 struct nb::script_lua_p {
     lua_State * L {nullptr};
     unsigned int seed {0};
-    std::unordered_map<entt::id_type, rtti::component_type_info::bind_result> bound_components; // map entt component types
 };
 
 
@@ -43,8 +43,10 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     lua_atpanic( _d->L, &_lua_panic );
     luaL_openlibs(_d->L);
 
-    //_lua_bind_glm(sol::state_view{_d->L});
-    bind_engine();
+    lua_newtable(_d->L);
+    lua_setglobal(_d->L, "_meta");
+
+    bind_meta_types();
     bind_systems();
     
     log::info("[script_lua] initialized");
@@ -52,32 +54,84 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
 
 }
 
-void script_lua::bind_engine()
+void script_lua::bind_meta_types()
 {
-    /*sol::state_view lua{_d->L};
+    lua::stack_guard _guard {_d->L};
 
-    lua.set_function("hs", [](const char * str) -> int {
-        return entt::hashed_string{str}.value();
-    });
+    using rtti::type_info;
 
-    auto registry_lua_t = lua.new_usertype<::entt::registry>("registry"
-        "new", sol::no_constructor);
-        registry_lua_t["orphan"] = &::entt::registry::orphan;
-        //registry_lua_t["clear"] = &::entt::registry::clear; <-- hmmm not ok :(
+    log::info("[script_lua] binding types");
 
-    auto entity_lua_t = lua.new_usertype<::entt::entity>("entity",
-        "new", sol::no_constructor);
+    // push global meta table onto stack
+    lua_getglobal(_d->L, "_meta");
 
-    auto scene_lua_t = lua.new_usertype<::nb::scene>("scene",
-        "new", sol::no_constructor,
-        "registry", &scene::registry);
+    // iterate over registered entt::meta types
+    for (const auto&& [id, type] : entt::resolve())
+    {
+        lua::stack_guard _guard {_d->L};
+        
+        auto name_sv = type.info().name();
+        log::info("[script_lua] found meta type: %.*s (%x)", name_sv.size(), name_sv.data(), type.id());
 
-    auto engine_lua_t = lua.new_usertype<::nb::engine>("engine", 
-        "new", sol::no_constructor,
-        "ref", &engine::instance,
-        "default_scene", &engine::default_scene,
-        "request_exit", &engine::request_exit);
-    */
+        // create lua table for this typeinfo and store it in the registry, indexed by type id
+        lua_newtable(_d->L);
+        lua_pushvalue(_d->L, -1);
+        lua_setfield(_d->L, LUA_REGISTRYINDEX, std::to_string(type.id()).c_str());
+
+        // set type name in typeinfo table
+        lua_pushlstring(_d->L, name_sv.data(), name_sv.size());
+        lua_setfield(_d->L, -2, "typename");
+
+        // set type id in typeinfo table
+        lua_pushinteger(_d->L, type.id());
+        lua_setfield(_d->L, -2, "id");
+
+        // check if metatype has custom identifier set
+        const rtti::type_info * t_info = type.custom();
+        if(t_info)
+        {
+            log::info("[script_lua] found type info: %s", (const char*)t_info->identifier);
+
+            // set type identifier in typeinfo table
+            lua_pushstring(_d->L, t_info->identifier);
+            lua_setfield(_d->L, -2, "identifier");
+        }
+        else
+        {
+            // auto-determine type identifier
+            std::string identifier = _util_auto_identifier(name_sv);
+            log::info("[script_lua] no type info, auto identifier: %s", identifier.c_str());
+    
+            // set type identifier in typeinfo table
+            lua_pushlstring(_d->L, identifier.c_str(), identifier.size());
+            lua_setfield(_d->L, -2, "identifier");
+        }
+
+        // iterate over functions in type
+        int func_idx = 0;
+        for(const auto &&func : type.func())
+        {   
+            // TODO need to check all overloads
+            rtti::func_info *func_info = func.custom();
+            if(!func_info)
+            {
+                log::warn("[script_lua] skipping function with no info: %d args, const: %d, static: %d", func.arity(), func.is_const(), func.is_static());
+                ++func_idx;
+                continue;
+            }
+            log::info("[script_lua] found function with index: %d, name: %s", func_idx, func_info->identifier);
+            ++func_idx;
+        }
+
+        // iterate over data members in type
+        // --
+
+        // save table ref to metatype table and pop from stack
+        lua_seti(_d->L, -2, type.id());
+    }
+
+    // pop global meta table from stack
+    lua_pop(_d->L, 1);
 }
 
 void script_lua::bind_systems()
@@ -88,10 +142,15 @@ void script_lua::bind_systems()
         if (type.can_cast(system_t))
         {
             // this is a system
-            const rtti::system_info *info = type.custom();
+            const rtti::type_info *info = type.custom();
             if(!info)
             {
                 log::warn("[script_lua] skipping system with no info: %x", type.id());
+                continue;
+            }
+            if(info->type_class != rtti::TYPE_CLASS_SYSTEM)
+            {
+                log::warn("[script_lua] skipping system with wrong type class: %s (%x)", (const char*)info->identifier, type.id());
                 continue;
             }
             auto sys = engine::instance().system_from_id(type.id());
@@ -175,6 +234,10 @@ bool script_lua::step(step_phase phase)
                 if(valid_chunk)
                 {
                     log::info("[script_lua] setup: %x", id);
+
+                    // prepate the meta
+                    // prepare_env();
+
                     /*sol::state_view lua{_d->L};
                     sol::protected_function f(_d->L, lua.stack_top());
                     sol::environment env {lua, sol::create, lua.globals()};
@@ -262,6 +325,52 @@ void* script_lua::l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
         return realloc(ptr, nsize);
 }
 
+// this abomination attempts to convert a C++ type name into a more lua-friendly identifier, by removing namespaces and replacing :: with _
+// it should also include first-template-parameter digits into the names, for glm::vec2, glm::vec3, etc
+std::string script_lua::_util_auto_identifier(const std::string_view &identifier)
+{
+    // remove first namespace if exists, and convert :: to _ (for nested types)
+    size_t start = 0;
+    size_t end = identifier.size();
+    for(size_t i = 0; i < identifier.size(); ++i)
+    {
+        if(identifier[i] == ':' && i + 1 < identifier.size() && identifier[i+1] == ':')
+        {
+            start = i + 2;
+            break;
+        }
+    }
+    std::string result;
+    for(size_t i = start; i < end; ++i)
+    {
+        if(identifier[i] == ':' && i + 1 < identifier.size() && identifier[i+1] == ':')
+        {
+            result += '_';
+            ++i;
+        }
+        else
+            result += identifier[i];
+    }
+
+    // remove everything after and including first < if exists (for template types)
+    // if first character after < is a digit, it must be appended to the identifier (for template types with non-type parameters)
+    size_t template_start = result.find('<');
+    char digit_to_add = '\0';
+    if(template_start != std::string::npos)
+    {
+        if(template_start + 1 < result.size() && std::isdigit(result[template_start + 1]))
+        {
+            digit_to_add = result[template_start + 1];
+        }
+        result = result.substr(0, template_start);
+    }
+
+    if(digit_to_add != '\0')
+        result += digit_to_add;
+
+    return result;
+}
+
 const char* _lua_batch_reader(lua_State* lua_state, void* reader_state, size_t* size)
 {
     (void) lua_state;
@@ -289,12 +398,13 @@ int _lua_panic(lua_State * L)
     return 0;
 }
 
+
 // RTTI metadata
 extern "C" void _rtti_init_script_lua()
 {
     entt::meta_factory<script_lua>{}
         .type("script_lua"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"script_lua"})
+        .custom<rtti::type_info>(rtti::type_info{"script_lua", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
     entt::meta_factory<std::shared_ptr<nb::script_lua>>{rtti::ctx_systems()}
         .type("script_lua_shared"_hs)

@@ -10,11 +10,14 @@ using entt::operator""_hs;
 void cscript::_ensure_rtti()
 {
     entt::meta_factory<cscript>{}
-        .custom<rtti::component_type_info>(rtti::component_type_info{
-            "script", 
-            true,
-            nullptr,
-            ICON_FK_FILE_CODE_O
+        .custom<rtti::type_info>(rtti::type_info{
+            .identifier = "script", 
+            .type_class = rtti::TYPE_CLASS_COMPONENT,
+            .data {
+                .component = {
+                    .editor_icon = ICON_FK_FILE_CODE_O
+                }
+            }
         })
         .ctor<>();
     log::info("[cscript] registered: id=%x");

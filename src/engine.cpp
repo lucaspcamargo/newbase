@@ -5,6 +5,7 @@
 #include <newbase/sdl/logging_handler.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/reflection/lib_glm.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
@@ -17,6 +18,8 @@
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 #include <entt/entt.hpp>
+#include <entt/meta/utility.hpp>
+#include <entt/meta/pointer.hpp>
 
 #include <functional>
 #include <string>
@@ -301,14 +304,15 @@ engine& engine::instance()
 
 extern "C" void _rtti_init_engine()
 {
-    /*  does not work like this because type needs to be movable
-        for now bindings are done by hand :(
-        same for scene
+    ::nb::rtti::register_lib_glm();
+
+    /* unsure non how to register singletons, asked on discord
+       can possibly can be solved via some sort of proxy type that forwards to the singleton instance?
+    */
 
     entt::meta_factory<nb::engine>{}
-        .type("engine"_hs)
-        .custom<rtti::singleton_info>("engine")
-        .func<&nb::engine::request_exit>("request_exit"_hs)
-        .custom<rtti::func_info>("request_exit");
-    */
+    .type("engine"_hs)
+    .custom<rtti::type_info>(rtti::type_info{.identifier="engine", .type_class=rtti::TYPE_CLASS_SINGLETON})
+    .func<&nb::engine::request_exit>("request_exit"_hs)
+    .custom<rtti::func_info>(rtti::func_info{"request_exit"});
 }

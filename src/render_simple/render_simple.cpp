@@ -466,7 +466,7 @@ extern "C" void _rtti_init_render_simple()
 {
     entt::meta_factory<nb::render_simple>{}
         .type("render_simple"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"render_simple"})
+        .custom<rtti::type_info>(rtti::type_info{"render_simple", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
     entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
         .type("render_simple_shared"_hs)

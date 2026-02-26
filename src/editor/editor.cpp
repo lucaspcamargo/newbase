@@ -80,13 +80,13 @@ bool editor::step(step_phase phase)
                             {
                                 continue;
                             }
-                            rtti::component_type_info *info = comp_type.custom();
-                            if(!info)
+                            rtti::type_info *info = comp_type.custom();
+                            if((!info) || (info->type_class != rtti::TYPE_CLASS_COMPONENT))
                             {
                                 continue;
                             }
                             ImGui::SameLine();
-                            ImGui::Button(info->editor_icon);
+                            ImGui::Button(info->data.component.editor_icon? info->data.component.editor_icon: "??");
                         }
                     }
                     ImGui::PopID();
@@ -132,8 +132,9 @@ extern "C" void _rtti_init_editor()
 {
     entt::meta_factory<editor>{}
         .type("editor"_hs)
-        .custom<rtti::cstr>("editor")
+        .custom<rtti::type_info>(rtti::type_info{"editor", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
+
     entt::meta_factory<std::shared_ptr<nb::editor>>{rtti::ctx_systems()}
         .type("editor_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::editor>>()

@@ -10,11 +10,15 @@ using entt::operator""_hs;
 void csprite::_ensure_rtti()
 {
     entt::meta_factory<csprite>{}
-        .custom<rtti::component_type_info>(rtti::component_type_info{
-            "sprite",
-            true,
-            nullptr,
-            ICON_FK_PICTURE_O
+        
+        .custom<rtti::type_info>(rtti::type_info{
+            .identifier = "sprite", 
+            .type_class = rtti::TYPE_CLASS_COMPONENT,
+            .data {
+                .component = {
+                    .editor_icon = ICON_FK_PICTURE_O
+                }
+            }
         })
         .ctor<>();
     log::info("[csprite] registered: id=%x");

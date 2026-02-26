@@ -19,6 +19,11 @@ struct engine_p;
 
 class engine final : public nocopy {
 public:
+    engine(const engine &) = delete;
+    engine(engine &&) = delete;
+    engine& operator=(const engine &) = delete;
+    engine& operator=(engine &&) = delete;
+
 
     // entry points
     bool init(int argc, char **argv);
@@ -49,8 +54,9 @@ public:
 
 private:
     engine();
+public:  // HACK -- entt::meta does not like private destructors
     ~engine();
-
+private:  // HACK -- entt::meta does not like private destructors
     engine_p *_d;
 };
 

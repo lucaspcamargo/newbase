@@ -20,11 +20,13 @@ public:
     bool event(SDL_Event*) override;
 
 private:
-    void bind_engine();
+    void bind_meta_types();
     void bind_systems();
 
     // our own allocator provided to lua
     static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize);
+
+    static std::string _util_auto_identifier(const std::string_view &identifier);
 
     script_lua_p *_d {nullptr};
 };
