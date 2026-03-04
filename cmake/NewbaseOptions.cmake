@@ -1,3 +1,7 @@
+
+set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
+set(NEWBASE_NATIVE_RES_PREFIX "nb" CACHE STRING "Path prefix for installing and searching for resources")
+
 if(DEFINED ANDROID_NDK)
     # clang is very annoying
     add_compile_options(

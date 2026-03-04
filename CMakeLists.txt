@@ -17,10 +17,8 @@ option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during 
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
-set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
-set(NEWBASE_NATIVE_RES_PREFIX "nb" CACHE STRING "Path prefix for installing and searching for resources")
 
-# options and logging
+# further options and logging
 include(cmake/NewbaseOptions.cmake)
 include(cmake/NewbaseLogging.cmake)
 
@@ -142,4 +140,15 @@ target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 # let games use newbase and dependencies straight from the build folder
 export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
-export(TARGETS newbase NAMESPACE nb:: FILE newbase-export.cmake )
+# iterate over all systems in NEWBASE_ALL_SYSTEMS list and export them
+foreach(system IN LISTS NEWBASE_ALL_SYSTEMS)
+    set(system_target newbase_sys_${system})
+    if(TARGET ${system_target})
+        list(APPEND export_targets ${system_target})
+    else()
+        message(WARNING "System ${system} does not have a target, skipping export")
+    endif()
+endforeach()
+set_target_properties(newbase PROPERTIES ALL_SYSTEMS "${NEWBASE_ALL_SYSTEMS}")
+export(TARGETS newbase ${export_targets} NAMESPACE nb:: FILE newbase-export.cmake )
+

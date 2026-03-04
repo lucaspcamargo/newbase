@@ -1,4 +1,4 @@
-# Functions and variables for SGDK APi support
+# Functions and variables for SGDK API support
 
 if(NEWBASE_SGDK)
 

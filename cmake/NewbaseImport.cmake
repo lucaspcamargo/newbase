@@ -1,6 +1,6 @@
-# This file is to be included by projects that want to use Newbase as a dependency.
-# It import the necessary targets and sets up variables.
-# It assumes Newbase has been built and exported to a known location.
+# This file is to be included by projects that want to use newbase as a dependency.
+# It imports the necessary targets and sets up variables.
+# It assumes newbase has been built and exported to a known location.
 # It also brings in the newbase_* family of CMake functions
 
 if(NOT DEFINED NEWBASE_ROOT OR "${NEWBASE_ROOT}" STREQUAL "")
@@ -23,4 +23,5 @@ include(${NEWBASE_BUILD_ROOT}/vendored/rapidyaml/rymlTargets.cmake)
 include(${NEWBASE_BUILD_ROOT}/vendored/entt/EnTTTargets.cmake)
 include(${NEWBASE_BUILD_ROOT}/vendored/sol2/cmake/sol2-targets.cmake)
 include(${NEWBASE_BUILD_ROOT}/newbase-export.cmake)
+include(${NEWBASE_ROOT}/cmake/NewbaseOptions.cmake)
 include(${NEWBASE_ROOT}/cmake/NewbaseFunctions.cmake)

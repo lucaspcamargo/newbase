@@ -109,10 +109,11 @@ void script_lua::bind_meta_types()
 
         // iterate over functions in type
         int func_idx = 0;
-        for(const auto &&func : type.func())
+        for(const auto &&func_pair : type.func())
         {   
             // TODO need to check all overloads
-            rtti::func_info *func_info = func.custom();
+            const entt::meta_func &func = func_pair.second;
+            const rtti::func_info *func_info = func.custom();
             if(!func_info)
             {
                 log::warn("[script_lua] skipping function with no info: %d args, const: %d, static: %d", func.arity(), func.is_const(), func.is_static());

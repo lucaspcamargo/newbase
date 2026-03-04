@@ -1,20 +1,30 @@
 # cmake functions used by newbase
 
+define_property(TARGET PROPERTY ALL_SYSTEMS BRIEF_DOCS 
+    "An auxiliary property to be used with the newbase target. It should contain a list of all available systems for that build.")
+
 # this variable should be set to a list of all systems as they are regsitered and enabled 
 set(NEWBASE_ALL_SYSTEMS "")
 
 # check whether newbase is being imported
 # set root dir accordingly
-set(NEWBASE_IMPORTED FALSE) # not considered imported by default
-set(NEWBASE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+if(NOT DEFINED NEWBASE_IMPORTED)
+    set(NEWBASE_IMPORTED FALSE)
+endif()
+if(NOT DEFINED NEWBASE_ROOT)
+    set(NEWBASE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
 set(NEWBASE_TARGET "newbase")
+set(NEWBASE_TARGET_NS "")
 if(TARGET nb::newbase)
     set(NEWBASE_TARGET "nb::newbase")
+    set(NEWBASE_TARGET_NS "nb::")
     get_target_property(NEWBASE_IMPORTED nb::newbase IMPORTED)
     message("[newbase_functions] nb::newbase IMPORTED is ${NEWBASE_IMPORTED}")
     if(NEWBASE_IMPORTED)
-        set(NEWBASE_ROOT "../newbase") # HACK: there must be a better way to get this path
-        message("[newbase_functions] newbase imported from: ${NEWBASE_IMPORT_ROOT}")
+        message("[newbase_functions] newbase is being imported")
+        get_target_property(NEWBASE_ALL_SYSTEMS nb::newbase ALL_SYSTEMS)
+        message("[newbase_functions] imported newbase has systems: ${NEWBASE_ALL_SYSTEMS}")
     else()
         message("[newbase_functions] newbase already exists, and not imported...")
     endif()
@@ -23,7 +33,8 @@ else()
 endif()
 message("[newbase_functions] newbase root dir is: ${NEWBASE_ROOT}")
 
-
+# ensure NEWBASE_ROOT is absolute
+get_filename_component(NEWBASE_ROOT "${NEWBASE_ROOT}" ABSOLUTE)
 
 if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
     set(PYTHON_INTERPRETER python.exe)
@@ -90,7 +101,7 @@ function(newbase_prepare_executable)
         elseif(arg_SYSTEMS STREQUAL "AUTO")
             execute_process(
                 COMMAND ${PYTHON_INTERPRETER}
-                        "${CMAKE_SOURCE_DIR}/scripts/config_get_systems.py" 
+                        "${NEWBASE_ROOT}/scripts/config_get_systems.py" 
                         "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml"
                 TIMEOUT 5
                 OUTPUT_VARIABLE arg_SYSTEMS
@@ -104,25 +115,22 @@ function(newbase_prepare_executable)
     # filter list of systems according to what is available
     set(filtered_systems "")
     foreach(system ${arg_SYSTEMS})
-        list(FIND NEWBASE_ALL_SYSTEMS ${system} system_index)
-        if(NOT system_index EQUAL -1)
+        if(TARGET ${NEWBASE_TARGET_NS}newbase_sys_${system})
             list(APPEND filtered_systems ${system})
-            message("[newbase_prepare_executable] will generate rtti info for system ${system}...")
-            message("${filtered_systems}")
+            message("[newbase_prepare_executable] will hook rtti info and link system '${system}'...")
         else()
-            message(WARNING "[newbase_prepare_executable] system '${system}' is not available for target '${arg_TARGET}'. Has the system been registered? Won't be linked, RTTI hooks skipped")
-            message("ALL SYSTEMS: ${NEWBASE_ALL_SYSTEMS}")
+            message(WARNING "[newbase_prepare_executable] no target found for system '${system}'. Cannot link to '${arg_TARGET}'. Has the system been registered? Won't be linked, RTTI hooks skipped")
         endif()
     endforeach()
 
     set(rtti_entry_target ${arg_TARGET}_rtti_entry_gen)
-    set(rtti_entry_file_template ${CMAKE_SOURCE_DIR}/include/newbase/reflection/initialization_template.h.in)
+    set(rtti_entry_file_template ${NEWBASE_ROOT}/include/newbase/reflection/initialization_template.h.in)
     set(rtti_entry_file_output ${CMAKE_CURRENT_BINARY_DIR}/include/newbase/reflection/init.h)
     message("[newbase_prepare_executable] RTTI entry points: from '${rtti_entry_file_template}'")
     message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
     add_custom_target( ${rtti_entry_target}
         COMMAND ${PYTHON_INTERPRETER}
-            ${CMAKE_SOURCE_DIR}/scripts/codegen_rtti_entry_points.py
+            ${NEWBASE_ROOT}/scripts/codegen_rtti_entry_points.py
             "${rtti_entry_file_template}" 
             "${rtti_entry_file_output}" 
             "${filtered_systems}"
@@ -135,7 +143,7 @@ function(newbase_prepare_executable)
 
     # now, link the systems to the executable
     foreach(system ${filtered_systems})
-        set(system_target newbase_sys_${system})
+        set(system_target ${NEWBASE_TARGET_NS}newbase_sys_${system})
         if(TARGET ${system_target})
             message("[newbase_prepare_executable] linking system '${system}' to target '${arg_TARGET}'")
             target_link_libraries(${arg_TARGET} PUBLIC ${system_target})
@@ -203,7 +211,7 @@ function(newbase_declare_resources)
 
     # add core files to file list, unless NO_CORE_RESOURCES is set
     if(NOT arg_NO_CORE_RESOURCES)
-        list(APPEND arg_FILES "${CMAKE_CURRENT_LIST_DIR}/../res/_nb_core")
+        list(APPEND arg_FILES "${NEWBASE_ROOT}/res/_nb_core")
     endif()
 
     foreach(file ${arg_FILES})
@@ -236,7 +244,7 @@ function(newbase_declare_resources)
         set(res_index_target ${arg_TARGET}_res_index)
         add_custom_target( ${res_index_target} ALL
             COMMAND ${PYTHON_INTERPRETER}
-                ${CMAKE_SOURCE_DIR}/scripts/res_indexer.py
+                ${NEWBASE_ROOT}/scripts/res_indexer.py
                 "${links_dest_dir}"
             # BYPRODUCTS index file, if needed (?)
             # DEPENDS if another target is processing or generating resources
