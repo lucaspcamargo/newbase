@@ -33,7 +33,10 @@ script_lua::script_lua()
 
 script_lua::~script_lua()
 {
+    log::info("[script_lua] destroying");
+    lua_close(_d->L);
     delete _d;
+    log::info("[script_lua] destroyed");
 }
 
 bool script_lua::init(ryml::ConstNodeRef cfg)
