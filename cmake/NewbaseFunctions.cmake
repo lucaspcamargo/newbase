@@ -1,8 +1,5 @@
 # cmake functions used by newbase
 
-define_property(TARGET PROPERTY ALL_SYSTEMS BRIEF_DOCS 
-    "An auxiliary property to be used with the newbase target. It should contain a list of all available systems for that build.")
-
 # this variable should be set to a list of all systems as they are regsitered and enabled 
 set(NEWBASE_ALL_SYSTEMS "")
 
@@ -140,6 +137,11 @@ function(newbase_prepare_executable)
     )
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
     target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+    # if we are on android
+    if(NEWBASE_ANDROID_MAIN STREQUAL "${arg_TARGET}")
+        target_link_options(${arg_TARGET} PRIVATE "-Wl,-z,max-page-size=16384")
+    endif()
 
     # now, link the systems to the executable
     foreach(system ${filtered_systems})

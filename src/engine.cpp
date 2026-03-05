@@ -263,6 +263,18 @@ int engine::debug_action_register(std::string name, std::function<void(void)> ca
     return idx;
 }
 
+bool engine::debug_action_trigger(int idx)
+{
+    auto it = _d->dbg_action_callbacks.find(idx);
+    if(it != _d->dbg_action_callbacks.end())
+    {
+        log::info("[engine] debug action triggered: (%d) '%s'", it->first, _d->dbg_action_names[idx].c_str());
+        it->second();
+        return true;
+    }
+    return false;
+}
+
 bool engine::debug_action_unregister(int index)
 {
     if(_d->dbg_action_names.find(index) != _d->dbg_action_names.end())

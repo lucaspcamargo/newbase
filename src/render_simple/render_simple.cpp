@@ -402,7 +402,7 @@ void render_simple::draw_perf()
         ImGui::ShowDemoWindow(&show_demo);
 
     // TODO make proper perfcounters
-    static int location = 3;
+    static int location = 1;
     ImGuiIO& io = ImGui::GetIO();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     if (location >= 0)
@@ -452,7 +452,21 @@ void render_simple::draw_perf()
             if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
             if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
             if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
+            ImGui::Separator();
             if (ImGui::MenuItem("ImGui demo", NULL, show_demo)) show_demo = !show_demo;
+            ImGui::Separator();
+            // have a submenu with every debug action registered, to be able to trigger them from the overlay
+            if (ImGui::BeginMenu("Debug Actions"))
+            {
+                for(const auto& [idx, name]: engine::instance().debug_action_names())
+                {
+                    if (ImGui::MenuItem(name.c_str(), NULL, false))
+                    {
+                        engine::instance().debug_action_trigger(idx);
+                    }
+                }
+                ImGui::EndMenu();
+            }
             ImGui::EndPopup();
         }
     }

@@ -135,6 +135,15 @@ add_executable(dpi_test src/etc/imgui_dpi_test.cpp ${IMGUI_SOURCES})
 target_link_libraries(dpi_test SDL3::SDL3)
 target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
 
+# if we are building on android ndk, adjust SDL linking
+
+message( "[NB] on ANDROID??")
+if(DEFINED ANDROID_NDK)
+    message( "[NB] on ANDROID!!")
+    get_target_property( REAL_SDL3 SDL3::SDL3 ALIASED_TARGET)
+    message("[newbase] ensuring 16kb page boundary for SDL3 main lib (${REAL_SDL3})")
+    target_link_options( ${REAL_SDL3} PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
 
 # EXPORTS
 # let games use newbase and dependencies straight from the build folder

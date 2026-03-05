@@ -10,7 +10,7 @@ namespace nb::res_storage {
 sdl_file::sdl_file(ryml::ConstNodeRef cfg, std::string base_path)
     : _base_path(std::move(base_path)), _index_found( false )
 {
-    _search_index();
+    _index_found = _search_index();
 }
 
 sdl_file::~sdl_file()
@@ -25,7 +25,12 @@ bool sdl_file::writable() const
 
 bool sdl_file::scannable() const
 {
+    // we cannot scan on android, we need to use the index
+#ifdef ANDROID
+    return false;
+#else
     return true;
+#endif
 }
 
 bool sdl_file::has_index() const
@@ -40,10 +45,16 @@ std::vector<asset_handle> sdl_file::get_handles(bool try_scan, bool use_index)
     if(use_index && !_index_found)
     {
         _index_found = _search_index();
+
+        if(!_index_found)
+        {
+            log::error("[sdl_file] index requested but not found, falling back to scan (if supported)");
+        }
     }
 
     if(_index_found)
     {
+        log::error("[sdl_file] found index, using");
         for(const auto &pair : _handles)
         {
             result.push_back(pair.second);
@@ -75,7 +86,7 @@ std::vector<asset_handle> sdl_file::get_handles(bool try_scan, bool use_index)
         }
         else
         {
-            log::error("[sdl_storage] cannot scan storage directory!");
+            log::error("[sdl_file] cannot scan storage directory!");
         }
     }
 
@@ -125,7 +136,7 @@ bool sdl_file::_index_add(std::string path, size_t sz)
         return false;
     bool absolute = path[0] == '/';
     auto hash = entt::hashed_string(absolute? path.c_str()+1 : path.c_str());
-    log::info("[sdl_storage] registered: %s (%x)", path.c_str(), hash.value());
+    log::info("[sdl_file] registered: %s (%x)", path.c_str(), hash.value());
     _handles.insert(std::make_pair(hash.value(), 
         asset_handle{
             hash.value(), 

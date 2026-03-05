@@ -4,17 +4,17 @@ plugins {
 
 android {
     namespace "br.eng.camargo.newbase.demo"
-    compileSdkVersion 36
+    compileSdkVersion 33
     defaultConfig {
         minSdkVersion 33  // sets up -DANDROID_PLATFORM in CMake too
-        targetSdkVersion 36
+        targetSdkVersion 33
         versionCode 1
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                arguments /*"--trace",*/ "-DNEWBASE_SDL_STATIC=OFF", "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_STL=c++_static"
+                arguments /*"--trace",*/ "-DNEWBASE_SDL_STATIC=OFF", "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
                 // abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-                abiFilters 'arm64-v8a', 'x86_64'
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
                 targets "main"
             }
         }
@@ -25,21 +25,16 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    applicationVariants.all { variant ->
-        tasks["merge${variant.name.capitalize()}Assets"]
-            .dependsOn("externalNativeBuild${variant.name.capitalize()}")
-    }
-    if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
-        sourceSets.main {
-            jniLibs.srcDir 'libs'
-        }
-        externalNativeBuild {
-            cmake {
-                path '../../../CMakeLists.txt'
-            }
-        }
 
+    sourceSets.main {
+        jniLibs.srcDir 'libs'
     }
+    externalNativeBuild {
+        cmake {
+            path '../../../CMakeLists.txt'
+        }
+    }
+
     sourceSets.main {
         assets.srcDirs += ["./assets"]
     }
@@ -52,6 +47,11 @@ android {
     }
     afterEvaluate {
         android.sourceSets.main.assets.srcDirs.each{println it}
+    }
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
     }
 }
 

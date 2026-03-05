@@ -65,6 +65,8 @@ void script_lua::bind_meta_types()
     // push global meta table onto stack
     lua_getglobal(_d->L, "_meta");
 
+    
+
     // iterate over registered entt::meta types
     for (const auto&& [id, type] : entt::resolve())
     {
@@ -107,6 +109,7 @@ void script_lua::bind_meta_types()
             lua_setfield(_d->L, -2, "identifier");
         }
 
+        
         // iterate over functions in type
         int func_idx = 0;
         for(const auto &&func_pair : type.func())
@@ -116,13 +119,22 @@ void script_lua::bind_meta_types()
             const rtti::func_info *func_info = func.custom();
             if(!func_info)
             {
-                log::warn("[script_lua] skipping function with no info: %d args, const: %d, static: %d", func.arity(), func.is_const(), func.is_static());
-                ++func_idx;
+                log::warn("[script_lua] skipping function with no info at index: %d", func_idx);
                 continue;
             }
-            log::info("[script_lua] found function with index: %d, name: %s", func_idx, func_info->identifier);
+            else
+            {
+#ifndef ANDROID
+                // why this crashes android armv7 in SDL_GetLogPriority -> SDL_CheckInitLog -> SDL_GetAtomicInt --> __sync_or_and_fetch ????
+                // either gets stuck in debugging or segfaults outright
+                // I don't know for now :(
+                // There are strange forces at play here
+                log::info("[script_lua] found function with index: %d, name: %s", func_idx, func_info->identifier);
+#endif
+            }
             ++func_idx;
         }
+        
 
         // iterate over data members in type
         // --

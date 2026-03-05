@@ -15,7 +15,7 @@ sdl_storage::sdl_storage(ryml::ConstNodeRef cfg, std::string base_location)
         _storage = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
     }
 
-    _search_index();
+    _index_found = _search_index();
 }
 
 sdl_storage::~sdl_storage()
