@@ -9,7 +9,7 @@
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
-#include <newbase/utility/xdg.hpp>
+#include <newbase/utility/xdg.h>
 #endif
 
 #include <SDL3/SDL.h>

@@ -6,7 +6,9 @@
     + [ ] CI build for all target platforms (maybe except Android)
 - [ ] script_lua
     + [X] remove sol[23]
-    + [X] write new bindings based on entt::meta (WIP)
+    + [ ] write new bindings based on entt::meta (WIP)
+        - [ ] define data structures for bindings
+        - [ ] basic bindings 
 - [ ] audio
     + [ ] get graph system working
     + [ ] enable basic bgm and sfx api based off of graphs
@@ -19,8 +21,16 @@
     + [ ] get hello world compiling together
     + [ ] basic VDP emulation
     + [ ] high-level XGM emulation (without ymfm)
-
-
+- [ ] emscripten
+    + [X] itch.io CI deploy
+    + [ ] nicer html output
+- [ ] demo: asteroids
+- [ ] demo: fast rodent
+- [ ] demo: particles
+- [ ] demo: mixing modes
+- [ ] demo: sgdk compat
+- [ ] demo: audio graph
+- [ ] demo: (other interesting test to come)
 
 ## Nice-to-have
 

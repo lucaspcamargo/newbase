@@ -7,7 +7,7 @@
 #include <newbase/log.hpp>
 #include <newbase/utility/strings.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
-#include <newbase/utility/xdg.hpp>
+#include <newbase/utility/xdg.h>
 #endif
 
 #include <entt/entt.hpp>
