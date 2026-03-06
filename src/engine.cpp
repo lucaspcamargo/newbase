@@ -64,12 +64,9 @@ engine::engine()
     _d = new engine_p();
     _d->initflags = 0;
 
-#ifndef ANDROID
-    // leave android using default log handler
     log::setup_handler();
     _d->log_handler_handle = log::register_observer(std::bind(&engine::log_handler, this, 
         std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-#endif
 
     log::info("[engine] logging ready");
 

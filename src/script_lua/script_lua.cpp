@@ -125,16 +125,13 @@ void script_lua::bind_meta_types()
                 log::warn("[script_lua] skipping function with no info at index: %d", func_idx);
                 continue;
             }
-            else
-            {
 #ifndef ANDROID
-                // why this crashes android armv7 in SDL_GetLogPriority -> SDL_CheckInitLog -> SDL_GetAtomicInt --> __sync_or_and_fetch ????
-                // either gets stuck in debugging or segfaults outright
-                // I don't know for now :(
-                // There are strange forces at play here
-                log::info("[script_lua] found function with index: %d, name: %s", func_idx, func_info->identifier);
+            // why this crashes android armv7 in SDL_GetLogPriority -> SDL_CheckInitLog -> SDL_GetAtomicInt --> __sync_or_and_fetch ????
+            // either gets stuck in debugging or segfaults outright
+            // I don't know for now :(
+            // There are strange forces at play here
+            log::info("[script_lua] found function with index: %d, name: %s", func_idx, func_info->identifier);
 #endif
-            }
             ++func_idx;
         }
         
