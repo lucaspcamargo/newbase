@@ -16,6 +16,7 @@ using entt::operator""_hs;
 
 static bool _enabled = false;
 static bool _console_enabled = false;
+static bool _about_enabled = false;
 static int _log_observer = -1;
 static console c;
 
@@ -50,6 +51,44 @@ bool editor::step(step_phase phase)
         float fnt_size_unit = ImGui::GetFontSize();
         auto &scn = engine::instance().default_scene();
         auto &reg = scn.registry();
+
+        // draw global menu bar
+        if(ImGui::BeginMainMenuBar())
+        {
+            if(ImGui::BeginMenu("File"))
+            {
+                if(ImGui::MenuItem("Exit"))
+                {
+                    engine::instance().request_exit();
+                }
+                ImGui::EndMenu();
+            }
+
+            if(ImGui::BeginMenu("View"))
+            {
+                if(ImGui::MenuItem("Console", "F10", _console_enabled))
+                {
+                    _console_enabled = !_console_enabled;
+                }
+                if(ImGui::MenuItem("Editor", "F9", _enabled))
+                {
+                    _enabled = !_enabled;
+                }
+                ImGui::EndMenu();
+            }
+
+            if(ImGui::BeginMenu("Help"))
+            {
+                if(ImGui::MenuItem("About"))
+                {
+                    _about_enabled = true;
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMainMenuBar();
+        }
+
         ImGui::Begin(ICON_FK_TABLE " Entities");
             
             std::vector<std::string> columns;
@@ -116,6 +155,25 @@ bool editor::step(step_phase phase)
                 ImGui::EndTable();
             }
         ImGui::End();
+
+        if(_about_enabled)
+        {
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if(ImGui::Begin(ICON_FK_INFO_CIRCLE " About", &_about_enabled, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::Text("newbase Engine");
+                ImGui::Separator();
+                ImGui::Text("Version %s", NEWBASE_VERSION);
+                ImGui::Text("Authors: %s", NEWBASE_AUTHORS);
+                ImGui::Text("%s", NEWBASE_COPYRIGHT);
+                ImGui::Separator();
+                ImGui::Text("A little game engine of mine.");
+                ImGui::TextLinkOpenURL("More info...", NEWBASE_URL);
+            }
+            ImGui::End();
+        }
 
     }
     return true;
