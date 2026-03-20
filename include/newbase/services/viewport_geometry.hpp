@@ -26,6 +26,7 @@ public:
         float ui_scale; // how much UI drawing will be scaled by, when using ImGui to draw
     };
 
+    virtual ~viewport_geometry() = default;
     virtual bool get_2d_extents(extents_2d &) = 0;
 };
 
