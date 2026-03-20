@@ -29,3 +29,6 @@
 	path = vendored/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "vendored/imgui-node-editor"]
+	path = vendored/imgui-node-editor
+	url = https://github.com/thedmd/imgui-node-editor.git

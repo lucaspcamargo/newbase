@@ -14,10 +14,12 @@
 
 // for debug ui
 #include "imgui.h"
+#include "imgui_node_editor.h"
 #include <newbase/utility/imgui_icons.hpp>
 
 using namespace nb;
 using entt::operator""_hs;
+namespace ed = ax::NodeEditor;
 
 static SDL_AudioDeviceID _dev_out{ 0 };
 static SDL_AudioSpec _spec_out;
@@ -38,7 +40,8 @@ float _sfx_gain {1.0f};
 
 static bool _show_debug_ui {false};
 
-
+// TEST
+ed::EditorContext* m_Context {nullptr};
 
 // callbacks
 static void audio_out_cb(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
@@ -74,6 +77,8 @@ static void audio_out_cb(void *userdata, SDL_AudioStream *stream, int additional
 audio::audio()
 {
     nb::log::info("[audio] constructing");
+    auto config = new ed::Config();
+    m_Context = ed::CreateEditor(config);
 }
 
 audio::~audio()
@@ -247,6 +252,27 @@ void audio::show_debug_ui(bool *close)
         bgm_gain(_bgm_gain);
     if(ImGui::SliderFloat("SFX Gain", &_sfx_gain, 0.f, 1.f))
         ;//sfx_gain(_sfx_gain);
+
+    ImGui::Separator();
+    ed::SetCurrentEditor(m_Context);
+    ed::Begin("AudioGraph");
+
+    // nodes need to be drawn here
+    int uniqueId = 1;
+        ed::BeginNode(uniqueId++);  
+            ImGui::Text("Node A");
+            ed::BeginPin(uniqueId++, ed::PinKind::Input);
+                ImGui::Text("-> In");
+            ed::EndPin();
+            ImGui::SameLine();
+            ed::BeginPin(uniqueId++, ed::PinKind::Output);
+                ImGui::Text("Out ->");
+            ed::EndPin();
+        ed::EndNode();
+
+    ed::End();
+    ed::SetCurrentEditor(nullptr);
+
     ImGui::End();
 }
 

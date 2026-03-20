@@ -44,3 +44,41 @@ object Main_Output
 Mixer_1 --> Main_Output
 
 @enduml
+
+@startuml "Processing Graph Class Diagram"
+
+namespace nb::audio_graph {
+
+class graph {
+    +addNode(node: node): void
+    +removeNode(node: node): void
+    +connectNodes(source: AudioNode, destination: AudioNode): void
+    +disconnectNodes(source: AudioNode, destination: AudioNode): void
+}
+
+class node {
+    +produce_audio(nb::audio_buffer &buf)
+}
+
+enum op_type {
+    ADD_NODE
+    REMOVE_NODE
+    CONNECT
+    DISCONNECT
+}
+
+struct op {
+    type: op_type
+    src: node_id
+    dst: node_id
+    node_ptr: std::shared_ptr<node> 
+}
+
+graph --> node : contains
+node --> node : connects to
+op --> graph : modifies
+op_type --> op : defines type of operation
+
+}
+
+@enduml

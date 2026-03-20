@@ -33,7 +33,12 @@ namespace nb::audio_graph
     // Operation types for modifying the graph
     struct op 
     {
-        enum class type { add_node, remove_node, connect, disconnect };
+        enum class type { 
+            ADD_NODE, 
+            REMOVE_NODE, 
+            CONNECT, 
+            DISCONNECT
+        };
 
         type op_type;
         node_id src;
@@ -41,16 +46,16 @@ namespace nb::audio_graph
         std::shared_ptr<node> node_ptr; // Only used for add_node
 
         static op add_node_op(std::shared_ptr<node> n) {
-            return {type::add_node, n->id(), 0, n};
+            return {type::ADD_NODE, n->id(), 0, n};
         }
         static op remove_node_op(const node_id& id) {
-            return {type::remove_node, id, 0, nullptr};
+            return {type::REMOVE_NODE, id, 0, nullptr};
         }
         static op connect_op(const node_id& src, const node_id& dst) {
-            return {type::connect, src, dst, nullptr};
+            return {type::CONNECT, src, dst, nullptr};
         }
         static op disconnect_op(const node_id& src, const node_id& dst) {
-            return {type::disconnect, src, dst, nullptr};
+            return {type::DISCONNECT, src, dst, nullptr};
         }
     };
 
@@ -74,16 +79,16 @@ namespace nb::audio_graph
         // Apply an operation to the graph
         void apply(const op& operation) {
             switch (operation.op_type) {
-                case op::type::add_node:
+                case op::type::ADD_NODE:
                     add_node(operation.node_ptr);
                     break;
-                case op::type::remove_node:
+                case op::type::REMOVE_NODE:
                     remove_node(operation.src);
                     break;
-                case op::type::connect:
+                case op::type::CONNECT:
                     connect(operation.src, operation.dst);
                     break;
-                case op::type::disconnect:
+                case op::type::DISCONNECT:
                     disconnect(operation.src, operation.dst);
                     break;
             }
