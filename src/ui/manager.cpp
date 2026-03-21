@@ -202,19 +202,27 @@ void ui_manager_simple::draw_perf()
                     SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
         ImGui::Separator();
 
-        int fc_end = engine::instance().frametime_data_offset();
-        int fc_offset = fc_end + 1;
-        ImGui::PlotLines("##frametimes_phys", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::PHYSICS_UPDATE)), 
-            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Phys");
-        ImGui::PlotLines("##frametimes_update", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::GENERAL_UPDATE)), 
-            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Update");
-        ImGui::PlotLines("##frametimes_render", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::RENDER)), 
-            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Render");
-        ImGui::PlotLines("##frametimes_total", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)), 
-            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Total");
+        if(ImGui::TreeNodeEx("Frametimes",ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanFullWidth))
+        {
+            int fc_end = engine::instance().frametime_data_offset();
+            int fc_offset = fc_end + 1;
+            float scale_min = 0.0f;
+            float scale_max = 3e10f;                                                                                                                                        
+            ImVec2 graph_size {0, 50};
+            ImGui::PlotLines("##frametimes_phys", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::PHYSICS_UPDATE)), 
+                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Physics", scale_min, FLT_MAX, graph_size);
+            ImGui::PlotLines("##frametimes_update", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::GENERAL_UPDATE)), 
+                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Update", scale_min, FLT_MAX, graph_size);
+            ImGui::PlotLines("##frametimes_render", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::RENDER)), 
+                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Render & Swap", scale_min, scale_max, graph_size);
+            ImGui::PlotLines("##frametimes_total", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)), 
+                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Total", scale_min, scale_max, graph_size);
+
+            ImGui::TreePop();
+        }
         
         ImGui::Text("FPS: %.1f", io.Framerate);
-        ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
+        //ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
 #ifdef TRACY_ENABLED
         ImGui::Separator();
         ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
@@ -226,7 +234,13 @@ void ui_manager_simple::draw_perf()
             ImGui::Text("[%c] %s", c, name.c_str());
         }
 
-        if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
+        if (ImGui::BeginPopupContextWindow(nullptr, 
+#ifdef ANDROID
+            ImGuiPopupFlags_MouseButtonLeft
+#else
+            ImGuiPopupFlags_MouseButtonRight
+#endif
+        ))
         {
             if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
             if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;

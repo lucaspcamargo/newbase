@@ -259,7 +259,7 @@ void audio::_draw_tool_window(bool *close)
 
     ImGui::Begin(ICON_KI_SOUND_ON " Audio", close);
 
-    if(ImGui::TreeNode("Mixer"))
+    if(ImGui::TreeNodeEx("Mixer", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if(ImGui::Checkbox(ICON_KI_SOUND_OFF " Out Mute", &_out_mute))
             out_mute(_out_mute);
@@ -275,7 +275,7 @@ void audio::_draw_tool_window(bool *close)
         ImGui::TreePop();
     }
 
-    if(ImGui::TreeNode("Graphplan"))
+    if(ImGui::TreeNodeEx("Graphplan", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if(!_graphplan_editor)
         {
