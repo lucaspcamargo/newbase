@@ -15,9 +15,15 @@ namespace nb
         ui_manager_simple();
         ~ui_manager_simple();
 
+        bool ui_init() override;
+        void ui_init_finish(float scale) override;
+        void ui_new_frame(int safe_x, int safe_y, int safe_w, int safe_h) override;
+        void ui_destroy() override;
+
         void register_tool_window(const char* name, std::function<void(bool*)> draw_fn) override;
         void unregister_tool_window(const char* name) override;
         void draw_tool_windows() override;
+        void draw_perf() override;
 
         bool toggle_tool_window(const char *name) override;
     private:

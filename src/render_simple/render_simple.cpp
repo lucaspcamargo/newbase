@@ -8,7 +8,7 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
-#include <newbase/utility/imgui_style.hpp>
+#include <newbase/ui/imgui_style.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/log.hpp>
 
@@ -28,9 +28,8 @@
 using namespace nb;
 using entt::operator""_hs;
 
-static std::string _imguiCfgFile {};
-static ImGuiID _dockspace_id {};
 static SDL_Rect _safe {};
+bool _has_ui {false};
 float _cam2d_cx {0.0f};
 float _cam2d_cy {0.0f};
 float _cam2d_wmax {1024.0f};
@@ -53,12 +52,20 @@ _wx(0), _wy(0)
 render_simple::~render_simple()
 {
     log::info("[render_simple] destroying");
-    if(_render)
+    if(_has_ui)
     {
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
-        ImGui::DestroyContext();
-
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
+        {
+            ui_mgr->ui_destroy();
+        }
+        else
+            log::warn("[render_simple] could not locate ui service for destruction");
+    }
+    if(_render)
+    {
         SDL_DestroyRenderer(_render);
     }
 
@@ -135,35 +142,28 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     SDL_ShowWindow(_win);
     SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
 
-    // Setup Dear ImGui context
-    char * prefs = SDL_GetPrefPath(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING), SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING));
-    _imguiCfgFile = prefs;
-    SDL_free(prefs);
-    assert(_imguiCfgFile.size());
-    if(_imguiCfgFile[_imguiCfgFile.size()-1]!='/')
-        _imguiCfgFile += "/";
-    _imguiCfgFile += "ImGui.cfg";
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = _imguiCfgFile.c_str();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-    imgui_style_setup();
+    // init gui via ui manager
+    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+    if(ui_mgr)
+    {
+        _has_ui = ui_mgr->ui_init();
+    }
+    else
+        log::warn("[render_simple] could not init ui via ui_manager service");
     
-    // Setup Platform/Renderer backends
-    ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
-    ImGui_ImplSDLRenderer3_Init(_render);
+    if(_has_ui)
+    {
+        // Setup Platform/Renderer backends
+        ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
+        ImGui_ImplSDLRenderer3_Init(_render);
 
+        ui_mgr->ui_init_finish(_scale);
+    }
+    else
+    {
+        log::warn("[render_simple] no ui, not initializing ImGui renderer");
+    }
 
-#ifdef ANDROID
-    ImGui::GetStyle().ScaleAllSizes(_scale);
-    ImGui::GetIO().FontGlobalScale = _scale;
-#endif
-
-    imgui_style_fonts_setup(_scale);
 
     SDL_GetWindowSafeArea(_win, &_safe);
     log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
@@ -182,17 +182,14 @@ bool render_simple::step(nb::step_phase phase)
         // Start the Dear ImGui frame
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-        _dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-        ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(_safe.x);
-        ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(_safe.y);
-        ImGui::GetMainViewport()->WorkSize.x = static_cast<float>(_safe.w);
-        ImGui::GetMainViewport()->WorkSize.y = static_cast<float>(_safe.h);
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
+        {
+            ui_mgr->ui_new_frame(_safe.x, _safe.y, _safe.w, _safe.h);
+        }
     }
     else if(phase == step_phase::POST_UPDATE)
     {
-        // prepare viewport rendering data for ImGui
-        //ImGui::GetPlatformIO().
     }
     else if(phase == step_phase::PRE_RENDER)
     {
@@ -269,10 +266,10 @@ bool render_simple::step(nb::step_phase phase)
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
         if(ui_mgr)
         {
-            ZoneScopedN("DrawUI");
+            ZoneScopedN("RenderDrawUI");
             ui_mgr->draw_tool_windows();
+            ui_mgr->draw_perf();
         }
-        draw_perf();
         ImGui::Render();
 
 #ifndef ANDROID
@@ -401,92 +398,6 @@ bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
         _scale};
     return true;
 }
-
-void render_simple::draw_perf()
-{
-    // TODO make proper perfcounters
-    static int location = 1;
-    ImGuiIO& io = ImGui::GetIO();
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
-    if (location >= 0)
-    {
-        const float PAD = 10.0f;
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
-        ImVec2 work_size = viewport->WorkSize;
-
-        ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(_dockspace_id); 
-        if (central_node)
-        {
-            // if there is a window docked in the central node, abort drawing this overlay
-            if(central_node->Windows.Size > 0)
-                return;
-
-            // If there is a DockSpace, use its bounds instead of the entire viewport
-            work_pos = central_node->Pos;
-            work_size = central_node->Size;
-        }
-
-        ImVec2 window_pos, window_pos_pivot;
-        window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
-        window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
-        window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
-        window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
-        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-        window_flags |= ImGuiWindowFlags_NoMove;
-    }
-    else if (location == -2)
-    {
-        // Center window
-        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        window_flags |= ImGuiWindowFlags_NoMove;
-    }
-    ImGui::SetNextWindowBgAlpha(0.5f); // Transparent background
-    if (ImGui::Begin("fps overlay", nullptr, window_flags))
-    {
-        ImGui::Text("%s %s", SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING),
-                    SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
-        ImGui::Separator();
-        ImGui::Text("FPS: %.1f", io.Framerate);
-        ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
-#ifdef TRACY_ENABLED
-        ImGui::Separator();
-        ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
-#endif
-        ImGui::Separator();
-        for(const auto& [idx, name]: engine::instance().debug_action_names())
-        {
-            char c = idx == 0? '`' : '0' + idx;
-            ImGui::Text("[%c] %s", c, name.c_str());
-        }
-
-        if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonLeft))
-        {
-            if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
-            if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
-            if (ImGui::MenuItem("Top-left",     NULL, location == 0)) location = 0;
-            if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
-            if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
-            if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
-            ImGui::Separator();
-            // have a submenu with every debug action registered, to be able to trigger them from the overlay
-            if (ImGui::BeginMenu("Debug Actions"))
-            {
-                for(const auto& [idx, name]: engine::instance().debug_action_names())
-                {
-                    if (ImGui::MenuItem(name.c_str(), NULL, false))
-                    {
-                        engine::instance().debug_action_trigger(idx);
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            ImGui::EndPopup();
-        }
-    }
-    ImGui::End();
-}
-
 
 
 // RTTI metadata

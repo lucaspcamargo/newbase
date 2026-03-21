@@ -6,7 +6,6 @@
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/reflection/lib_glm.hpp>
-#include <newbase/nb_config.h>
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/ui/manager.hpp>
@@ -35,6 +34,7 @@
 using namespace nb;
 using entt::operator""_hs;
 
+using framecounter_data = nb::engine::framecounter_data;
 
 struct nb::engine_p {
     std::vector<std::shared_ptr<system>> _systems;
@@ -49,11 +49,8 @@ struct nb::engine_p {
 
     bool exit_requested {false};
 
-    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_start;
-    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_update_end;
-    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_min_event_start;
-    std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES+1> fc_max_event_end;
-    int framecounter_start;
+    std::array<framecounter_data, nb::step_phase::_STEP_PHASE_COUNT+1> fc_data; // last one is for total
+    size_t fc_end = 0;
 
     std::map<int, std::string> dbg_action_names;
     std::map<int, std::function<void(void)>> dbg_action_callbacks;
@@ -186,17 +183,38 @@ bool engine::step()
         return false;
     }
 
+    bool ret = true;
+
     for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
     {
-        for(auto s: _d->_systems)
+        if(ret)
         {
-        // TODO check if system uses this phase (use some sort of mask?)
-            if(!s->step(static_cast<nb::step_phase>(i)))
-                return false;
+            auto phase = static_cast<nb::step_phase>(i);
+            uint64_t start_time = SDL_GetTicksNS();
+
+            for(auto s: _d->_systems)
+            {
+                // TODO check if system uses this phase (use some sort of mask?)
+                if(!s->step(phase))
+                {
+                    ret = false;
+                    break;
+                }
+            }
+            _d->fc_data[i].fc_phase_start[_d->fc_end] = start_time;
+            _d->fc_data[i].fc_phase_end[_d->fc_end] = SDL_GetTicksNS();
         }
+        else
+            break;
     }
 
-    return true;
+    // update totals and advance end index
+    _d->fc_data[step_phase::_STEP_PHASE_COUNT].fc_phase_start[_d->fc_end] = _d->fc_data[0].fc_phase_start[_d->fc_end];
+    _d->fc_data[step_phase::_STEP_PHASE_COUNT].fc_phase_end[_d->fc_end] = _d->fc_data[step_phase::_STEP_PHASE_COUNT-1].fc_phase_end[_d->fc_end];
+    _d->fc_end++;
+    _d->fc_end %= NB_FRAMECOUNTER_SAMPLES;
+
+    return ret;
 }
 
 bool engine::event(SDL_Event *evt)
@@ -316,6 +334,18 @@ void engine::log_handler(int category, int prio, const char *msg)
     std::cout << (ansi.first? ansi.first : "") <<"["<< ::nb::log::priority_str(static_cast<::nb::log::priority>(prio)) <<
          "] [" << ::nb::log::category_str(static_cast<::nb::log::category>(category)) << "] "<< msg << (ansi.second? ansi.second : "") << std::endl;
 }
+
+
+framecounter_data& engine::frametime_data(int phase)
+{
+    return _d->fc_data[static_cast<size_t>(phase)];
+}
+
+int engine::frametime_data_offset()
+{
+    return _d->fc_end;
+}
+
 
 engine& engine::instance()
 {

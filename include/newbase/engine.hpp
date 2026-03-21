@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/mixins.hpp>
+#include <newbase/nb_config.h>
 #include <entt/core/ident.hpp>
 #include <vector>
 #include <memory>
@@ -52,6 +53,15 @@ public:
     // default engine log handler
     void log_handler(int category, int prio, const char *msg);
     static engine& instance();
+
+    struct framecounter_data
+    {
+        std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES> fc_phase_start {};
+        std::array<uint64_t, NB_FRAMECOUNTER_SAMPLES> fc_phase_end {};
+    };
+
+    framecounter_data& frametime_data(int phase);
+    int frametime_data_offset();
 
 private:
     engine();

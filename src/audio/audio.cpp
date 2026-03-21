@@ -19,7 +19,7 @@
 // for debug ui
 #include "imgui.h"
 #include "imgui_node_editor.h"
-#include <newbase/utility/imgui_icons.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 
 using namespace nb;
 using entt::operator""_hs;

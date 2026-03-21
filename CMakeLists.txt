@@ -88,9 +88,8 @@ add_library(newbase STATIC
 
     # ui
     src/ui/manager.cpp
-
-    # utility
-    src/utility/imgui_style.cpp
+    src/ui/overlay.cpp
+    src/ui/imgui_style.cpp
 
     # optional subsystems
     ${SGDK_SUPPORT_SOURCES}

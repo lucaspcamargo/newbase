@@ -1,5 +1,5 @@
-#include <newbase/utility/imgui_style.hpp>
-#include <newbase/utility/imgui_icons.hpp>
+#include <newbase/ui/imgui_style.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/log.hpp>
 #include "imgui.h"

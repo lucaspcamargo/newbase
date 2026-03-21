@@ -28,7 +28,6 @@ public:
     bool get_2d_extents(viewport_geometry::extents_2d &extents) override;
 
 private:
-    void draw_perf();
 
     SDL_Window *_win;
     SDL_Renderer* _render;
