@@ -157,6 +157,86 @@ static float get_frametime_point(void *data, int index)
     return delta_ns * 1000.0f;
 }
 
+static ImU32 frametimes_bar_color(float t)
+{
+    // t=0: 120fps (blue), t=0.33: 60fps (green), t=0.66: 30fps (yellow), t=1: 15fps (red)
+    float r, g, b;
+    if (t < 1.0f/3.0f) {
+        float f = t * 3.0f;
+        r = 0.0f; g = f; b = 1.0f - f;
+    } else if (t < 2.0f/3.0f) {
+        float f = (t - 1.0f/3.0f) * 3.0f;
+        r = f; g = 1.0f; b = 0.0f;
+    } else {
+        float f = (t - 2.0f/3.0f) * 3.0f;
+        r = 1.0f; g = 1.0f - f; b = 0.0f;
+    }
+    return IM_COL32((int)(r * 255), (int)(g * 255), (int)(b * 255), 255);
+}
+
+static void draw_frametimes_bar_graph(const engine::framecounter_data& fc, int fc_end)
+{
+    const auto &col_bg = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+    const auto &col_outline = ImGui::GetStyleColorVec4(ImGuiCol_Border);
+
+    const float canvas_h    = 50.0f;
+    const float min_h       = 2.0f;
+    const float max_h       = canvas_h - 4.0f;
+    const float min_dt      = 1.0f / 120.0f;  // 120 fps
+    const float max_dt      = 1.0f / 15.0f;   // 15 fps
+    const float log2_min_dt = log2f(min_dt);
+    const float log2_range  = log2f(max_dt) - log2_min_dt;
+
+    ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+    float canvas_w = ImGui::GetContentRegionAvail().x;
+    if (canvas_w < 150.0f) 
+        canvas_w = 150.0f;
+    ImGui::Dummy(ImVec2(canvas_w, canvas_h));
+    ImVec2 post_canvas_pos = ImGui::GetCursorScreenPos();
+    ImGui::SetNextItemAllowOverlap();
+    ImGui::SetCursorScreenPos(canvas_pos);
+    ImGui::TextAligned(0.5f, ImGui::GetContentRegionAvail().x, "Sawicki");
+    ImGui::SetCursorScreenPos(post_canvas_pos);
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(canvas_pos,
+        ImVec2(canvas_pos.x + canvas_w, canvas_pos.y + canvas_h),
+        ImGui::ColorConvertFloat4ToU32(col_bg));
+    dl->AddRect(canvas_pos,
+        ImVec2(canvas_pos.x + canvas_w, canvas_pos.y + canvas_h),
+        ImGui::ColorConvertFloat4ToU32(col_outline));
+
+    float x = canvas_pos.x + canvas_w;
+    for (int i = 0; i < NB_FRAMECOUNTER_SAMPLES && x > canvas_pos.x; i++)
+    {
+        int idx = ((fc_end - i) % NB_FRAMECOUNTER_SAMPLES + NB_FRAMECOUNTER_SAMPLES) % NB_FRAMECOUNTER_SAMPLES;
+        uint64_t start = fc.fc_phase_start[idx];
+        uint64_t end   = fc.fc_phase_end[idx];
+        if (start == 0 || end <= start)
+            continue;
+
+        float dt = (end - start) * 1e-9f;  // nanoseconds -> seconds
+
+        float frame_w = dt / min_dt;
+        float draw_right = ceilf(x);
+        float draw_left  = floorf(x - frame_w);
+        if (draw_right - draw_left < 1.0f)
+            draw_left = draw_right - 1.0f;
+
+        float factor = (log2f(fmaxf(dt, min_dt)) - log2_min_dt) / log2_range;
+        factor = fmaxf(0.0f, fminf(1.0f, factor));
+        float bar_h = min_h + factor * (max_h - min_h);
+
+        float top_y = canvas_pos.y + canvas_h - bar_h;
+        float bot_y = canvas_pos.y + canvas_h;
+
+        dl->AddRectFilled(ImVec2(draw_left-1, top_y-1), ImVec2(draw_right-1, bot_y-1),
+            frametimes_bar_color(factor));
+
+        x -= frame_w;
+    }
+}
+
 void ui_manager_simple::draw_perf()
 {
     static int location = 1;
@@ -202,24 +282,22 @@ void ui_manager_simple::draw_perf()
                     SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
         ImGui::Separator();
 
-        if(ImGui::TreeNodeEx("Frametimes",ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanFullWidth))
-        {
-            int fc_end = engine::instance().frametime_data_offset();
-            int fc_offset = fc_end + 1;
-            float scale_min = 0.0f;
-            float scale_max = 3e10f;                                                                                                                                        
-            ImVec2 graph_size {0, 50};
-            ImGui::PlotLines("##frametimes_phys", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::PHYSICS_UPDATE)), 
-                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Physics", scale_min, FLT_MAX, graph_size);
-            ImGui::PlotLines("##frametimes_update", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::GENERAL_UPDATE)), 
-                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Update", scale_min, FLT_MAX, graph_size);
-            ImGui::PlotLines("##frametimes_render", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::RENDER)), 
-                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Render & Swap", scale_min, scale_max, graph_size);
-            ImGui::PlotLines("##frametimes_total", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)), 
-                NB_FRAMECOUNTER_SAMPLES, fc_offset, "Total", scale_min, scale_max, graph_size);
+        int fc_end = engine::instance().frametime_data_offset();
+        int fc_offset = fc_end + 1;
+        float scale_min = 0.0f;
+        float scale_max = 3e10f;                                                                                                                                        
+        ImVec2 graph_size {0, 50};
+        ImGui::PlotLines("##frametimes_phys", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::PHYSICS_UPDATE)), 
+            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Physics", scale_min, FLT_MAX, graph_size);
+        ImGui::PlotLines("##frametimes_update", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::GENERAL_UPDATE)), 
+            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Update", scale_min, FLT_MAX, graph_size);
+        ImGui::PlotLines("##frametimes_render", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::RENDER)), 
+            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Render & Swap", scale_min, scale_max, graph_size);
+        ImGui::PlotLines("##frametimes_total", &get_frametime_point, &engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)),
+            NB_FRAMECOUNTER_SAMPLES, fc_offset, "Total", scale_min, scale_max, graph_size);
 
-            ImGui::TreePop();
-        }
+        draw_frametimes_bar_graph(engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)), fc_end);
+
         
         ImGui::Text("FPS: %.1f", io.Framerate);
         //ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
