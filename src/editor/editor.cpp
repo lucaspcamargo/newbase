@@ -17,6 +17,7 @@ using entt::operator""_hs;
 static bool _enabled = false;
 static bool _console_enabled = false;
 static bool _about_enabled = false;
+static bool _show_demo = false;
 static int _log_observer = -1;
 static console c;
 
@@ -52,42 +53,7 @@ bool editor::step(step_phase phase)
         auto &scn = engine::instance().default_scene();
         auto &reg = scn.registry();
 
-        // draw global menu bar
-        if(ImGui::BeginMainMenuBar())
-        {
-            if(ImGui::BeginMenu("File"))
-            {
-                if(ImGui::MenuItem("Exit"))
-                {
-                    engine::instance().request_exit();
-                }
-                ImGui::EndMenu();
-            }
-
-            if(ImGui::BeginMenu("View"))
-            {
-                if(ImGui::MenuItem("Console", "F10", _console_enabled))
-                {
-                    _console_enabled = !_console_enabled;
-                }
-                if(ImGui::MenuItem("Editor", "F9", _enabled))
-                {
-                    _enabled = !_enabled;
-                }
-                ImGui::EndMenu();
-            }
-
-            if(ImGui::BeginMenu("Help"))
-            {
-                if(ImGui::MenuItem("About"))
-                {
-                    _about_enabled = true;
-                }
-                ImGui::EndMenu();
-            }
-
-            ImGui::EndMainMenuBar();
-        }
+        _draw_main_menu();
 
         ImGui::Begin(ICON_FK_TABLE " Entities");
             
@@ -156,6 +122,11 @@ bool editor::step(step_phase phase)
             }
         ImGui::End();
 
+        if(_show_demo)
+        {
+            ImGui::ShowDemoWindow(&_show_demo);
+        }
+
         if(_about_enabled)
         {
             ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -169,7 +140,7 @@ bool editor::step(step_phase phase)
                 ImGui::Text("Authors: %s", NEWBASE_AUTHORS);
                 ImGui::Text("%s", NEWBASE_COPYRIGHT);
                 ImGui::Separator();
-                ImGui::Text("A little game engine of mine.");
+                ImGui::Text("A little game/multimedia engine of mine.");
                 ImGui::TextLinkOpenURL("More info...", NEWBASE_URL);
             }
             ImGui::End();
@@ -184,6 +155,71 @@ bool editor::event(SDL_Event* evt)
     return true;
 }
 
+void editor::_draw_main_menu()
+{
+    // draw global menu bar
+    if(ImGui::BeginMainMenuBar())
+    {
+        if(ImGui::BeginMenu("File"))
+        {
+            if(ImGui::MenuItem("Exit", "Esc"))
+            {
+                engine::instance().request_exit();
+            }
+            ImGui::EndMenu();
+        }
+
+        if(ImGui::BeginMenu("View"))
+        {
+            if(ImGui::MenuItem("Console", "F10", _console_enabled))
+            {
+                _console_enabled = !_console_enabled;
+            }
+            if(ImGui::MenuItem("Editor", "F9", _enabled))
+            {
+                _enabled = !_enabled;
+            }
+            ImGui::EndMenu();
+        }
+
+        if(ImGui::BeginMenu("Help"))
+        {
+            if(ImGui::MenuItem("ImGui demo", NULL, _show_demo))
+            {
+                _show_demo = !_show_demo;
+            }
+
+            if(ImGui::MenuItem("About"))
+            {
+                _about_enabled = true;
+            }
+            ImGui::EndMenu();
+        }
+
+        // on the right edge of the menu bar, add a combo box for the currently selected scene
+            ImGui::Separator();
+            ImGui::Text("      Scene: ");
+            if(ImGui::BeginCombo("##scenescombo", "default scene"))
+            {
+                // for(int n = 0; n < scene_names.size(); n++)
+                // {
+                //     bool is_selected = (current_scene_idx == n);
+                //     if(ImGui::Selectable(scene_names[n].c_str(), is_selected))
+                //     {
+                //         current_scene_idx = n;
+                //         // TODO switch to selected scene
+                //     }
+                //     if(is_selected)
+                //         ImGui::SetItemDefaultFocus();
+                // }
+                ImGui::Selectable("default scene", true);
+                ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
+            }
+
+        ImGui::EndMainMenuBar();
+    }
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_editor()

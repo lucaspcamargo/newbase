@@ -10,7 +10,9 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/res/vorbis.hpp>
 #include <newbase/log.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <entt/meta/factory.hpp>
+#include <entt/locator/locator.hpp>
 
 // for debug ui
 #include "imgui.h"
@@ -37,8 +39,6 @@ SDL_AudioStream *_bgm {nullptr};
 audio_producer * _bgm_prod {nullptr};
 float _bgm_gain {1.0f};
 float _sfx_gain {1.0f};
-
-static bool _show_debug_ui {false};
 
 // TEST
 ed::EditorContext* m_Context {nullptr};
@@ -158,8 +158,18 @@ bool audio::init(ryml::ConstNodeRef cfg)
         cfg["sfx_gain"] >> _sfx_gain; 
     }
 
+    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+    if(ui_mgr)
+    {
+        ui_mgr->register_tool_window("audio", [this](bool *open){
+            show_debug_ui(open);
+        });
+    }
+
     engine::instance().debug_action_register("audio debug toggle", [](){
-        _show_debug_ui = !_show_debug_ui;
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
+            ui_mgr->toggle_tool_window("audio");
     }, 9);
 
     return true;
@@ -168,18 +178,6 @@ bool audio::init(ryml::ConstNodeRef cfg)
 
 bool audio::step(step_phase phase)
 {
-    if(phase == step_phase::POST_UPDATE)
-    {
-        // some test code for audio goes here, hardcoded
-        static bool first = true;
-        if(first)
-        {
-            first = false;
-        }
-
-        if(_show_debug_ui)
-            show_debug_ui(&_show_debug_ui);
-    }
 
     return true;
 }
@@ -255,8 +253,8 @@ void audio::show_debug_ui(bool *close)
 
     ImGui::Separator();
     ed::SetCurrentEditor(m_Context);
-    ed::Begin("AudioGraph");
-
+    ed::Begin("audiograph");
+    
     // nodes need to be drawn here
     int uniqueId = 1;
         ed::BeginNode(uniqueId++);  
@@ -270,7 +268,7 @@ void audio::show_debug_ui(bool *close)
             ed::EndPin();
         ed::EndNode();
 
-    ed::End();
+    ed::End(); // ---> this can fall into an infinite loop if zoom is screwed up, when drawing the grid
     ed::SetCurrentEditor(nullptr);
 
     ImGui::End();

@@ -38,10 +38,6 @@ android {
     sourceSets.main {
         assets.srcDirs += ["./assets"]
     }
-    aaptOptions{
-        // we may have assets beginning with _, which are ignored by default. Override.
-        ignoreAssetsPattern  '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-    }
     lint {
         abortOnError false
     }
@@ -52,6 +48,9 @@ android {
         jniLibs {
             useLegacyPackaging true
         }
+    }
+    aaptOptions {
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
 }
 

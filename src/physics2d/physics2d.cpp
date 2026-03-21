@@ -7,6 +7,7 @@
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
 #include <newbase/services/viewport_geometry.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <entt/entt.hpp>
@@ -94,9 +95,21 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
     b2SetLengthUnitsPerMeter(_d->world_scale);
 
     physics2d_setup_debug_draw(_d->debug_draw, this);
-    engine::instance().debug_action_register("physics2d debug draw", [this](){
-        _d->debug_draw_enabled = !_d->debug_draw_enabled;
+
+    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+    if(ui_mgr)
+    {
+        ui_mgr->register_tool_window("physics2d", [this](bool *open){
+            _draw_tool_window(open);
+        });
+    }
+
+    engine::instance().debug_action_register("toggle physics2d tools", [](){
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
+            ui_mgr->toggle_tool_window("physics2d");
     }, 8);
+
 
     // TODO: do this per scene in the future
     _d->world_def = b2DefaultWorldDef();
@@ -198,49 +211,6 @@ bool physics2d::step(step_phase phase)
     {
         if(_d->debug_draw_enabled)
         {
-            ImGui::Begin(ICON_FK_SQUARE " Physics 2D Debug Draw");
-            ImGui::Text("World scale: %f", _d->world_scale);
-            ImGui::Checkbox("drawShapes", &_d->debug_draw.drawShapes);
-            ImGui::Checkbox("drawJoints", &_d->debug_draw.drawJoints);
-            ImGui::Checkbox("drawJointExtras", &_d->debug_draw.drawJointExtras);
-            ImGui::Checkbox("drawBounds", &_d->debug_draw.drawBounds);
-            ImGui::Checkbox("drawMass", &_d->debug_draw.drawMass);
-            ImGui::Checkbox("drawBodyNames", &_d->debug_draw.drawBodyNames);
-            ImGui::Checkbox("drawContacts", &_d->debug_draw.drawContacts);
-            ImGui::Checkbox("drawGraphColors", &_d->debug_draw.drawGraphColors);
-            ImGui::Checkbox("drawContactNormals", &_d->debug_draw.drawContactNormals);
-            ImGui::Checkbox("drawContactForces", &_d->debug_draw.drawContactForces);
-            ImGui::Checkbox("drawContactFeatures", &_d->debug_draw.drawContactFeatures);
-            ImGui::Checkbox("drawFrictionImpulses", &_d->debug_draw.drawFrictionForces);
-            ImGui::Checkbox("drawIslands", &_d->debug_draw.drawIslands);
-            if(ImGui::Button("Hello Box2D!"))
-            {
-                static bool ground_added = false;
-                if(!ground_added)
-                {
-                    b2BodyDef groundBodyDef = b2DefaultBodyDef();
-                    groundBodyDef.position.x = 0.0f;
-                    groundBodyDef.position.y = 10.0f;
-                    b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
-                    b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
-                    b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-                    b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
-                    ground_added = true;
-                }
-
-                b2BodyDef bodyDef = b2DefaultBodyDef();
-                bodyDef.type = b2_dynamicBody;
-                bodyDef.position.x = 0.0f;
-                bodyDef.position.y = -75.0f;
-                b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
-                b2Polygon dynamicBox = b2MakeBox(10.0f, 10.0f);
-                b2ShapeDef shapeDef = b2DefaultShapeDef();
-                shapeDef.density = 1.0f;
-                shapeDef.material.friction = 0.3f;
-                b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
-            }
-            ImGui::End();
-
             viewport_geometry* vg = entt::locator<viewport_geometry*>::value();
             if(vg)
             {
@@ -264,6 +234,53 @@ bool physics2d::step(step_phase phase)
 bool physics2d::event(SDL_Event*)
 {
     return true;
+}
+
+void physics2d::_draw_tool_window(bool *close)
+{
+    ImGui::Begin(ICON_FK_SQUARE " Physics 2D Tools");
+    ImGui::Checkbox("debug draw", &_d->debug_draw_enabled);
+    ImGui::Text("World scale: %f", _d->world_scale);
+    ImGui::Checkbox("drawShapes", &_d->debug_draw.drawShapes);
+    ImGui::Checkbox("drawJoints", &_d->debug_draw.drawJoints);
+    ImGui::Checkbox("drawJointExtras", &_d->debug_draw.drawJointExtras);
+    ImGui::Checkbox("drawBounds", &_d->debug_draw.drawBounds);
+    ImGui::Checkbox("drawMass", &_d->debug_draw.drawMass);
+    ImGui::Checkbox("drawBodyNames", &_d->debug_draw.drawBodyNames);
+    ImGui::Checkbox("drawContacts", &_d->debug_draw.drawContacts);
+    ImGui::Checkbox("drawGraphColors", &_d->debug_draw.drawGraphColors);
+    ImGui::Checkbox("drawContactNormals", &_d->debug_draw.drawContactNormals);
+    ImGui::Checkbox("drawContactForces", &_d->debug_draw.drawContactForces);
+    ImGui::Checkbox("drawContactFeatures", &_d->debug_draw.drawContactFeatures);
+    ImGui::Checkbox("drawFrictionImpulses", &_d->debug_draw.drawFrictionForces);
+    ImGui::Checkbox("drawIslands", &_d->debug_draw.drawIslands);
+    if(ImGui::Button("Hello Box2D!"))
+    {
+        static bool ground_added = false;
+        if(!ground_added)
+        {
+            b2BodyDef groundBodyDef = b2DefaultBodyDef();
+            groundBodyDef.position.x = 0.0f;
+            groundBodyDef.position.y = 10.0f;
+            b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
+            b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
+            b2ShapeDef groundShapeDef = b2DefaultShapeDef();
+            b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
+            ground_added = true;
+        }
+
+        b2BodyDef bodyDef = b2DefaultBodyDef();
+        bodyDef.type = b2_dynamicBody;
+        bodyDef.position.x = 0.0f;
+        bodyDef.position.y = -75.0f;
+        b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
+        b2Polygon dynamicBox = b2MakeBox(10.0f, 10.0f);
+        b2ShapeDef shapeDef = b2DefaultShapeDef();
+        shapeDef.density = 1.0f;
+        shapeDef.material.friction = 0.3f;
+        b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
+    }
+    ImGui::End();
 }
 
 void physics2d::set_gravity(glm::vec2 grav)

@@ -8,9 +8,12 @@
 #include <newbase/reflection/lib_glm.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
+#include <newbase/services/ui_manager.hpp>
+#include <newbase/ui/manager.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
 #endif
+
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_thread.h>
@@ -140,6 +143,8 @@ bool engine::init(int argc, char ** argv)
 {
     log::info("[engine] init");
 
+    _register_default_services();
+
     // TODO collect SDL systems to init from systems
     if(!SDL_Init(_d->initflags))
     {
@@ -239,6 +244,13 @@ void engine::request_exit()
 {
     log::info("[engine] exit requested");
     _d->exit_requested = true;
+}
+
+void engine::_register_default_services()
+{
+    // we use a simple ui manager by default
+    // this can be overriden by the editor system if enabled
+    entt::locator<ui_manager*>::emplace(new ui_manager_simple());
 }
 
 

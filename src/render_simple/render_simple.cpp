@@ -9,6 +9,7 @@
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/utility/imgui_style.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <newbase/log.hpp>
 
 #include "imgui.h"
@@ -28,6 +29,7 @@ using namespace nb;
 using entt::operator""_hs;
 
 static std::string _imguiCfgFile {};
+static ImGuiID _dockspace_id {};
 static SDL_Rect _safe {};
 float _cam2d_cx {0.0f};
 float _cam2d_cy {0.0f};
@@ -145,6 +147,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = _imguiCfgFile.c_str();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -154,7 +157,6 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     ImGui_ImplSDL3_InitForSDLRenderer(_win, _render);
     ImGui_ImplSDLRenderer3_Init(_render);
 
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 #ifdef ANDROID
     ImGui::GetStyle().ScaleAllSizes(_scale);
@@ -181,7 +183,7 @@ bool render_simple::step(nb::step_phase phase)
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-        ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+        _dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(_safe.x);
         ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(_safe.y);
         ImGui::GetMainViewport()->WorkSize.x = static_cast<float>(_safe.w);
@@ -264,6 +266,12 @@ bool render_simple::step(nb::step_phase phase)
         }
         
         // GUI
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
+        {
+            ZoneScopedN("DrawUI");
+            ui_mgr->draw_tool_windows();
+        }
         draw_perf();
         ImGui::Render();
 
@@ -396,11 +404,6 @@ bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
 
 void render_simple::draw_perf()
 {
-    // TODO move to editor system maybe
-    static bool show_demo = false;
-    if(show_demo)
-        ImGui::ShowDemoWindow(&show_demo);
-
     // TODO make proper perfcounters
     static int location = 1;
     ImGuiIO& io = ImGui::GetIO();
@@ -411,6 +414,19 @@ void render_simple::draw_perf()
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
         ImVec2 work_size = viewport->WorkSize;
+
+        ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(_dockspace_id); 
+        if (central_node)
+        {
+            // if there is a window docked in the central node, abort drawing this overlay
+            if(central_node->Windows.Size > 0)
+                return;
+
+            // If there is a DockSpace, use its bounds instead of the entire viewport
+            work_pos = central_node->Pos;
+            work_size = central_node->Size;
+        }
+
         ImVec2 window_pos, window_pos_pivot;
         window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
         window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
@@ -452,8 +468,6 @@ void render_simple::draw_perf()
             if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
             if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
             if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
-            ImGui::Separator();
-            if (ImGui::MenuItem("ImGui demo", NULL, show_demo)) show_demo = !show_demo;
             ImGui::Separator();
             // have a submenu with every debug action registered, to be able to trigger them from the overlay
             if (ImGui::BeginMenu("Debug Actions"))

@@ -81,6 +81,9 @@ add_library(newbase STATIC
     src/reflection/contexts.cpp
     src/reflection/lib_glm.cpp
 
+    # ui
+    src/ui/manager.cpp
+
     # utility
     src/utility/imgui_style.cpp
 

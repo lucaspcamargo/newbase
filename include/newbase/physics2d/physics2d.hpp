@@ -33,6 +33,8 @@ public:
     bool body_warp(entt::entity ent, glm::vec2 position);
 
 private:
+    void _draw_tool_window(bool *close);
+
     physics2d_p *_d;
 };
 

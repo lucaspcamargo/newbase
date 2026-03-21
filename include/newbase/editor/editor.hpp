@@ -18,6 +18,8 @@ public:
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
 
+private:
+    void _draw_main_menu();
 };
 
 }

@@ -55,6 +55,9 @@ public:
 
 private:
     engine();
+
+    void _register_default_services();
+
 public:  // HACK -- entt::meta does not like private destructors
     ~engine();
 private:  // HACK -- entt::meta does not like private destructors
