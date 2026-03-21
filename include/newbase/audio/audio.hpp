@@ -34,7 +34,8 @@ public:
     bool sfx_play(entt::id_type res_id, float gain);
 
 private:
-    void show_debug_ui(bool *);
+    void _draw_tool_window(bool *);
+    void _init_graphplan();
 };
 
 }

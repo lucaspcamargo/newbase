@@ -67,6 +67,11 @@ add_library(newbase STATIC
     src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
 
+    # graphplan
+    src/graphplan/domain.cpp
+    src/graphplan/plan.cpp
+    src/graphplan/editor.cpp
+
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp

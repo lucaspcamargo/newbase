@@ -11,6 +11,8 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
+#include <newbase/graphplan/plan.hpp>
+#include <newbase/graphplan/editor.hpp>
 #include <entt/meta/factory.hpp>
 #include <entt/locator/locator.hpp>
 
@@ -21,7 +23,6 @@
 
 using namespace nb;
 using entt::operator""_hs;
-namespace ed = ax::NodeEditor;
 
 static SDL_AudioDeviceID _dev_out{ 0 };
 static SDL_AudioSpec _spec_out;
@@ -40,8 +41,8 @@ audio_producer * _bgm_prod {nullptr};
 float _bgm_gain {1.0f};
 float _sfx_gain {1.0f};
 
-// TEST
-ed::EditorContext* m_Context {nullptr};
+graphplan::plan * _graphplan {nullptr};
+graphplan::editor * _graphplan_editor {nullptr};
 
 // callbacks
 static void audio_out_cb(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
@@ -74,19 +75,29 @@ static void audio_out_cb(void *userdata, SDL_AudioStream *stream, int additional
     SDL_PutAudioStreamData(stream, buf, static_cast<size_t>(additional_amount));
 }
 
+
 audio::audio()
 {
     nb::log::info("[audio] constructing");
-    auto config = new ed::Config();
-    m_Context = ed::CreateEditor(config);
 }
 
 audio::~audio()
 {
     nb::log::info("[audio] destroying");
+    if(_graphplan_editor)
+    {
+        delete _graphplan_editor;
+        _graphplan_editor = nullptr;
+    }
+    if(_graphplan)
+    {
+        delete _graphplan;
+        _graphplan = nullptr;
+    }
     if(_bgm)
     {
         SDL_DestroyAudioStream(_bgm);
+        _bgm = 0;
     }
     if(_dev_out)
     {
@@ -162,7 +173,7 @@ bool audio::init(ryml::ConstNodeRef cfg)
     if(ui_mgr)
     {
         ui_mgr->register_tool_window("audio", [this](bool *open){
-            show_debug_ui(open);
+            _draw_tool_window(open);
         });
     }
 
@@ -172,6 +183,9 @@ bool audio::init(ryml::ConstNodeRef cfg)
             ui_mgr->toggle_tool_window("audio");
     }, 9);
 
+    _init_graphplan();
+    
+    log::info("[audio] initialized");
     return true;
 }
 
@@ -239,39 +253,50 @@ bool audio::sfx_play(entt::id_type res_id, float gain)
 }
 
 // debug
-void audio::show_debug_ui(bool *close)
+void audio::_draw_tool_window(bool *close)
 {
+    ImVec2 slider_size {25, 120};
+
     ImGui::Begin(ICON_KI_SOUND_ON " Audio", close);
-    if(ImGui::Checkbox(ICON_KI_SOUND_OFF " Out Mute", &_out_mute))
-        out_mute(_out_mute);
-    if(ImGui::SliderFloat("Out Gain", &_out_gain, 0.f, 1.f))
-        out_gain(_out_gain);
-    if(ImGui::SliderFloat("BGM Gain", &_bgm_gain, 0.f, 1.f))
-        bgm_gain(_bgm_gain);
-    if(ImGui::SliderFloat("SFX Gain", &_sfx_gain, 0.f, 1.f))
-        ;//sfx_gain(_sfx_gain);
 
-    ImGui::Separator();
-    ed::SetCurrentEditor(m_Context);
-    ed::Begin("audiograph");
-    
-    // nodes need to be drawn here
-    int uniqueId = 1;
-        ed::BeginNode(uniqueId++);  
-            ImGui::Text("Node A");
-            ed::BeginPin(uniqueId++, ed::PinKind::Input);
-                ImGui::Text("-> In");
-            ed::EndPin();
-            ImGui::SameLine();
-            ed::BeginPin(uniqueId++, ed::PinKind::Output);
-                ImGui::Text("Out ->");
-            ed::EndPin();
-        ed::EndNode();
+    if(ImGui::TreeNode("Mixer"))
+    {
+        if(ImGui::Checkbox(ICON_KI_SOUND_OFF " Out Mute", &_out_mute))
+            out_mute(_out_mute);
+        if(ImGui::VSliderFloat("OUT", slider_size, &_out_gain, 0.f, 1.f, "%.1f"))
+            out_gain(_out_gain);
+        ImGui::SameLine();
+        if(ImGui::VSliderFloat("BGM", slider_size, &_bgm_gain, 0.f, 1.f, "%.1f"))
+            bgm_gain(_bgm_gain);
+        ImGui::SameLine();
+        if(ImGui::VSliderFloat("SFX", slider_size, &_sfx_gain, 0.f, 1.f, "%.1f"))
+            ;//sfx_gain(_sfx_gain);
 
-    ed::End(); // ---> this can fall into an infinite loop if zoom is screwed up, when drawing the grid
-    ed::SetCurrentEditor(nullptr);
+        ImGui::TreePop();
+    }
+
+    if(ImGui::TreeNode("Graphplan"))
+    {
+        if(!_graphplan_editor)
+        {
+            _graphplan_editor = new graphplan::editor(*_graphplan);
+        }
+        _graphplan_editor->draw();
+        ImGui::TreePop();
+    }
 
     ImGui::End();
+}
+
+void audio::_init_graphplan()
+{
+    log::info("[audio] creating graphplan");
+    _graphplan = new graphplan::plan(graphplan::domain{"audio_graph", {0}, true});
+    // sound output node
+    uint64_t node_id = _graphplan->get_next_unique_id();
+    uint64_t pin_id = node_id + 1;
+    _graphplan->nodes.insert({node_id, graphplan::node_data{node_id, 0, {pin_id}, {}, 0, 0}});
+    _graphplan->pins.insert({pin_id, graphplan::pin_data{pin_id, node_id}});
 }
 
 // RTTI metadata
