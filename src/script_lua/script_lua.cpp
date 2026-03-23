@@ -1,5 +1,6 @@
 #include <newbase/script_lua/script_lua.hpp>
 #include <newbase/script_lua/lua.hpp>
+#include <newbase/script_lua/bindings.hpp>
 #include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/script_lua/utility.hpp>
 #include <newbase/components/script.hpp>
@@ -49,6 +50,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     lua_newtable(_d->L);
     lua_setglobal(_d->L, "_meta");
 
+    lua::register_box_metatable(_d->L);
     bind_meta_types();
     bind_systems();
     
@@ -172,19 +174,12 @@ void script_lua::bind_systems()
                 log::warn("[script_lua] skipping system with no instance: %s (%x)", (const char*)info->identifier, type.id());
                 continue;
             }
-            log::warn("[script_lua] UNIMPLEMENTEND binding system: %s (%x)", (const char*)info->identifier, type.id());
-            /*
 
-            if(sys->can_bind())
-            {
-                log::info("[script_lua] requesting bind: %s (%x)", (const char*)info->identifier, type.id());
-                sys->bind(_d->L);
-            }
-            else
-            {
-                log::warn("[script_lua] system cannot bind: %s (%x)", (const char*)info->identifier, type.id());
-            }
-            */
+            std::string global_name = "sys_";
+            global_name += info->identifier;
+            lua::push_meta_any(_d->L, type.from_void(sys.get()), sys);
+            lua_setglobal(_d->L, global_name.c_str());
+            log::info("[script_lua] bound system: %s", global_name.c_str());
         }
     }
 
@@ -248,66 +243,76 @@ bool script_lua::step(step_phase phase)
                 {
                     log::info("[script_lua] setup: %x", id);
 
-                    // prepate the meta
-                    // prepare_env();
+                    int func_idx = lua_gettop(_d->L);
 
-                    /*sol::state_view lua{_d->L};
-                    sol::protected_function f(_d->L, lua.stack_top());
-                    sol::environment env {lua, sol::create, lua.globals()};
-                    env.set_on(f);
+                    // create per-script environment, falling back to globals via __index
+                    lua_newtable(_d->L);
+                    int env_idx = lua_gettop(_d->L);
+                    lua_newtable(_d->L);
+                    lua_pushglobaltable(_d->L);
+                    lua_setfield(_d->L, -2, "__index");
+                    lua_setmetatable(_d->L, env_idx);
 
-                    env.set("eid", id);
-                    
-                    // check which components to make available
-                    for(auto&& curr : reg.storage())
+                    // expose entity id
+                    lua_pushinteger(_d->L, (lua_Integer)id);
+                    lua_setfield(_d->L, env_idx, "eid");
+
+                    // register a getter function per component present on this entity
+                    for (auto&& curr : reg.storage())
                     {
-                        if(auto& storage = curr.second; storage.contains(id))
-                        {
-                            entt::id_type comp_id = curr.first;
-                            log::info("[script_lua] entity %x has component %x", id, comp_id);
-                            auto it = _d->bound_components.find(comp_id);
-                            const char *userdata_id = nullptr;
-                            if(it == _d->bound_components.end())
-                            {
-                                // haven't bound the component before
-                                log::info("[script_lua] needs registration");
-                                auto comp_type = entt::resolve(comp_id);
-                                log::info("[script_lua] meta type info: %s", std::string(comp_type.info().name()).c_str());
-                                if(comp_type.info() == entt::type_id<void>())
-                                {
-                                    log::warn("[script_lua] unregistered component: %x", comp_id);
-                                    continue;
-                                }
-                                rtti::component_type_info *info = comp_type.custom();
-                                if(!info)
-                                {
-                                    log::error("[script_lua] component has no info: %x", comp_id);
-                                    continue;
-                                }
-                                auto bind_result = info->_bind_func(_d->L);
-                                _d->bound_components[comp_id] = bind_result;
-                                userdata_id = bind_result.first;
-                            }
-                            else
-                                userdata_id = it->second.first;
+                        auto& storage = curr.second;
+                        if (!storage.contains(id))
+                            continue;
 
-                            auto mt = lua[userdata_id].get<sol::metatable>();
-                            assert(mt.valid());
-                            assert(storage.value(id));
-                            _d->bound_components[comp_id].second(&env, id, reg);
-                            // we have asked the binding to add the component to the current lua state
+                        entt::id_type comp_id = curr.first;
+                        auto comp_type = entt::resolve(comp_id);
+                        if (comp_type.info() == entt::type_id<void>())
+                        {
+                            log::warn("[script_lua] unregistered component: %x", comp_id);
+                            continue;
                         }
+                        const rtti::type_info *comp_info = comp_type.custom();
+                        if (!comp_info)
+                        {
+                            log::warn("[script_lua] component has no info: %x", comp_id);
+                            continue;
+                        }
+
+                        log::info("[script_lua] registering component getter %s for entity %x", (const char*)comp_info->identifier, id);
+
+                        lua_pushinteger(_d->L, (lua_Integer)id);
+                        lua_pushinteger(_d->L, (lua_Integer)comp_id);
+                        lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+                            auto eid    = (entt::entity)  lua_tointeger(L, lua_upvalueindex(1));
+                            auto cid    = (entt::id_type) lua_tointeger(L, lua_upvalueindex(2));
+                            auto *stor  = engine::instance().default_scene().registry().storage(cid);
+                            if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
+                            auto ctype  = entt::resolve(cid);
+                            auto any    = ctype.from_void(stor->value(eid));
+                            if (!any) { lua_pushnil(L); return 1; }
+                            lua::push_meta_any(L, std::move(any));
+                            return 1;
+                        }, 2);
+                        lua_setfield(_d->L, env_idx, (const char*)comp_info->identifier);
                     }
 
-                    sol::protected_function_result result = f();
-                    if (result.valid()) {
+                    // attach environment to function's _ENV (upvalue 1)
+                    lua_pushvalue(_d->L, env_idx);
+                    lua_setupvalue(_d->L, func_idx, 1);
+                    lua_pop(_d->L, 1);  // pop env
+
+                    // call the chunk
+                    int call_ret = lua_pcall(_d->L, 0, 0, 0);
+                    if (call_ret == LUA_OK)
+                    {
                         log::info("[script_lua] script ok: %x", id);
                     }
-                    else {
-                        sol::error err = result;
-                        log::error("[script_lua] script failed: %x: %s", id, err.what());
+                    else
+                    {
+                        const char *err = lua_tostring(_d->L, -1);
+                        log::error("[script_lua] script failed: %x: %s", id, err ? err : "(no message)");
+                        lua_pop(_d->L, 1);
                     }
-                        */
                     script.ready = true;
                 }
             }

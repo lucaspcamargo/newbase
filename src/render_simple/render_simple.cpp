@@ -149,7 +149,6 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
         SDL_SetWindowIcon(_win, icon_tex->surf);
     }
 
-
     // init gui via ui manager
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
     if(ui_mgr)
