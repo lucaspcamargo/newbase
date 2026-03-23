@@ -396,7 +396,17 @@ extern "C" void _rtti_init_physics2d()
     entt::meta_factory<nb::physics2d>{}
         .type("physics2d"_hs)
         .custom<rtti::type_info>(rtti::type_info{"physics2d", rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&nb::physics2d::set_gravity>("set_gravity"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"set_gravity"})
+        .func<&nb::physics2d::body_force>("body_force"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_force"})
+        .func<&nb::physics2d::body_force_center>("body_force_center"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_force_center"})
+        .func<&nb::physics2d::body_torque>("body_torque"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_torque"})
+        .func<&nb::physics2d::body_warp>("body_warp"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_warp"});
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::physics2d>>()

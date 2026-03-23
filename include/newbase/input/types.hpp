@@ -1,6 +1,7 @@
 #pragma once
 
 #include <entt/entt.hpp>
+#include <newbase/utility/glm.hpp>
 #include <set>
 
 namespace nb {
@@ -112,7 +113,7 @@ struct input_action_state
     bool was_pressed {false};
     bool was_released {false};
     bool is_pressed {false};
-    std::array<float, 3> direction {.0f, .0f, .0f};
+    glm::vec3 direction {.0f, .0f, .0f};
 };
 
 }

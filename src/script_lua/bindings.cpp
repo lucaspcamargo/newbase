@@ -1,7 +1,11 @@
 #include <newbase/script_lua/bindings.hpp>
 #include <newbase/log.hpp>
+#include <entt/meta/factory.hpp>
 #include <string>
 #include <vector>
+#include <functional>
+
+using entt::operator""_hs;
 
 using namespace nb;
 using namespace nb::lua;
@@ -12,6 +16,92 @@ static int box_index(lua_State *L);
 static int box_newindex(lua_State *L);
 static int box_tostring(lua_State *L);
 static int box_func_call(lua_State *L);
+
+// helper: invoke a named binary op on lhs (box op box)
+static int box_arith_vv(lua_State *L, entt::id_type op_hash)
+{
+    auto *a = static_cast<lua_nb_box*>(luaL_testudata(L, 1, BOX_METATABLE));
+    auto *b = static_cast<lua_nb_box*>(luaL_testudata(L, 2, BOX_METATABLE));
+    if (!a || !a->value || !b || !b->value) { lua_pushnil(L); return 1; }
+    auto func = a->value.type().func(op_hash);
+    if (!func) { lua_pushnil(L); return 1; }
+    auto bref = b->value.as_ref();
+    auto result = func.invoke(a->value, &bref, 1);
+    if (result) { push_meta_any(L, std::move(result)); return 1; }
+    lua_pushnil(L);
+    return 1;
+}
+
+// helper: invoke op_mul_f / op_div_f (box op scalar, or scalar op box for mul)
+static int box_arith_vf(lua_State *L, entt::id_type op_hash)
+{
+    lua_nb_box *box = nullptr;
+    float scalar = 0.f;
+    if (luaL_testudata(L, 1, BOX_METATABLE) && lua_isnumber(L, 2))
+    {
+        box    = static_cast<lua_nb_box*>(lua_touserdata(L, 1));
+        scalar = static_cast<float>(lua_tonumber(L, 2));
+    }
+    else if (lua_isnumber(L, 1) && luaL_testudata(L, 2, BOX_METATABLE))
+    {
+        box    = static_cast<lua_nb_box*>(lua_touserdata(L, 2));
+        scalar = static_cast<float>(lua_tonumber(L, 1));
+    }
+    if (!box || !box->value) { lua_pushnil(L); return 1; }
+    auto func = box->value.type().func(op_hash);
+    if (!func) { lua_pushnil(L); return 1; }
+    entt::meta_any farg { scalar };
+    auto result = func.invoke(box->value, &farg, 1);
+    if (result) { push_meta_any(L, std::move(result)); return 1; }
+    lua_pushnil(L);
+    return 1;
+}
+
+static int box_add(lua_State *L) { return box_arith_vv(L, "op_add"_hs); }
+static int box_sub(lua_State *L) { return box_arith_vv(L, "op_sub"_hs); }
+static int box_div(lua_State *L)
+{
+    // prefer vec/vec, fall back to vec/scalar
+    if (luaL_testudata(L, 1, BOX_METATABLE) && luaL_testudata(L, 2, BOX_METATABLE))
+        return box_arith_vv(L, "op_div"_hs);
+    return box_arith_vf(L, "op_div_f"_hs);
+}
+static int box_mul(lua_State *L)
+{
+    // prefer vec*vec, fall back to vec*scalar (or scalar*vec)
+    if (luaL_testudata(L, 1, BOX_METATABLE) && luaL_testudata(L, 2, BOX_METATABLE))
+        return box_arith_vv(L, "op_mul"_hs);
+    return box_arith_vf(L, "op_mul_f"_hs);
+}
+static int box_unm(lua_State *L)
+{
+    auto *a = static_cast<lua_nb_box*>(luaL_testudata(L, 1, BOX_METATABLE));
+    if (!a || !a->value) { lua_pushnil(L); return 1; }
+    auto func = a->value.type().func("op_unm"_hs);
+    if (!func) { lua_pushnil(L); return 1; }
+    auto result = func.invoke(a->value, nullptr, 0);
+    if (result) { push_meta_any(L, std::move(result)); return 1; }
+    lua_pushnil(L);
+    return 1;
+}
+static int box_eq(lua_State *L)
+{
+    auto *a = static_cast<lua_nb_box*>(luaL_testudata(L, 1, BOX_METATABLE));
+    auto *b = static_cast<lua_nb_box*>(luaL_testudata(L, 2, BOX_METATABLE));
+    if (!a || !b || !a->value || !b->value) { lua_pushboolean(L, false); return 1; }
+    auto func = a->value.type().func("op_eq"_hs);
+    if (!func) { lua_pushboolean(L, false); return 1; }
+    auto bref = b->value.as_ref();
+    auto result = func.invoke(a->value, &bref, 1);
+    if (result)
+    {
+        auto *v = result.try_cast<bool>();
+        lua_pushboolean(L, v && *v);
+        return 1;
+    }
+    lua_pushboolean(L, false);
+    return 1;
+}
 
 void nb::lua::register_box_metatable(lua_State *L)
 {
@@ -29,11 +119,38 @@ void nb::lua::register_box_metatable(lua_State *L)
     lua_pushcfunction(L, box_tostring);
     lua_setfield(L, -2, "__tostring");
 
+    lua_pushcfunction(L, box_add);
+    lua_setfield(L, -2, "__add");
+    lua_pushcfunction(L, box_sub);
+    lua_setfield(L, -2, "__sub");
+    lua_pushcfunction(L, box_mul);
+    lua_setfield(L, -2, "__mul");
+    lua_pushcfunction(L, box_div);
+    lua_setfield(L, -2, "__div");
+    lua_pushcfunction(L, box_unm);
+    lua_setfield(L, -2, "__unm");
+    lua_pushcfunction(L, box_eq);
+    lua_setfield(L, -2, "__eq");
+
     lua_pop(L, 1);
 }
 
 void nb::lua::push_meta_any(lua_State *L, entt::meta_any value, std::shared_ptr<void> owner)
 {
+    if (!value) { lua_pushnil(L); return; }
+
+    // unbox primitive types directly onto the Lua stack — use exact type id to
+    // avoid matching complex types that happen to be coercible to bool/int/etc.
+    auto ti = value.type().info();
+    if      (ti == entt::type_id<bool>())          { lua_pushboolean(L, *value.try_cast<bool>());         return; }
+    else if (ti == entt::type_id<float>())         { lua_pushnumber(L,  *value.try_cast<float>());        return; }
+    else if (ti == entt::type_id<double>())        { lua_pushnumber(L,  *value.try_cast<double>());       return; }
+    else if (ti == entt::type_id<int>())           { lua_pushinteger(L, *value.try_cast<int>());          return; }
+    else if (ti == entt::type_id<unsigned int>())  { lua_pushinteger(L, *value.try_cast<unsigned int>()); return; }
+    else if (ti == entt::type_id<lua_Integer>())   { lua_pushinteger(L, *value.try_cast<lua_Integer>());  return; }
+    else if (ti == entt::type_id<entt::entity>())  { lua_pushinteger(L, entt::to_integral(*value.try_cast<entt::entity>())); return; }
+    else if (ti == entt::type_id<std::string>())   { lua_pushstring(L,  value.try_cast<std::string>()->c_str()); return; }
+
     auto *box = static_cast<lua_nb_box*>(lua_newuserdata(L, sizeof(lua_nb_box)));
     new (box) lua_nb_box { std::move(value), std::move(owner) };
     luaL_getmetatable(L, BOX_METATABLE);
@@ -53,6 +170,9 @@ entt::meta_any nb::lua::lua_to_meta_any(lua_State *L, int idx)
             return entt::meta_any{ (double)lua_tonumber(L, idx) };
     case LUA_TSTRING:
         return entt::meta_any{ std::string{lua_tostring(L, idx)} };
+    case LUA_TFUNCTION:
+        lua_pushvalue(L, idx);           // copy to top — luaL_ref pops it
+        return entt::meta_any{ lua_function{L} };
     case LUA_TUSERDATA:
         if(luaL_testudata(L, idx, BOX_METATABLE))
         {
@@ -144,9 +264,42 @@ static int box_tostring(lua_State *L)
         return 1;
     }
 
-    auto name = box->value.type().info().name();
-    lua_pushfstring(L, "nb.meta_any (%.*s)", (int)name.size(), name.data());
+    auto name = std::string{box->value.type().info().name()};
+    lua_pushfstring(L, "nb.meta_any (%s)", name.c_str());
     return 1;
+}
+
+static std::function<void()> conv_lua_fn_to_void(const lua_function &f)
+{
+    return [s = f._s]() {
+        lua_rawgeti(s->L, LUA_REGISTRYINDEX, s->ref);
+        if(lua_pcall(s->L, 0, 0, 0) != LUA_OK)
+        {
+            log::error("[lua_function] call error: %s", lua_tostring(s->L, -1));
+            lua_pop(s->L, 1);
+        }
+    };
+}
+
+static std::function<void(float)> conv_lua_fn_to_void_float(const lua_function &f)
+{
+    return [s = f._s](float v) {
+        lua_rawgeti(s->L, LUA_REGISTRYINDEX, s->ref);
+        lua_pushnumber(s->L, v);
+        if(lua_pcall(s->L, 1, 0, 0) != LUA_OK)
+        {
+            log::error("[lua_function] call error: %s", lua_tostring(s->L, -1));
+            lua_pop(s->L, 1);
+        }
+    };
+}
+
+void nb::lua::register_lua_function_type()
+{
+    entt::meta_factory<lua_function>{}
+        .type("lua_function"_hs)
+        .conv<&conv_lua_fn_to_void>()
+        .conv<&conv_lua_fn_to_void_float>();
 }
 
 static int box_func_call(lua_State *L)

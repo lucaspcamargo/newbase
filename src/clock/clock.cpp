@@ -49,7 +49,9 @@ extern "C" void _rtti_init_clock()
     entt::meta_factory<nb::clock>{}
         .type("clock"_hs)
         .custom<rtti::type_info>(rtti::type_info{.identifier="clock", .type_class=rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&nb::clock::update_add>("update_add"_hs)
+        .custom<rtti::func_info>(rtti::func_info{.identifier="update_add"});
     entt::meta_factory<std::shared_ptr<nb::clock>>{rtti::ctx_systems()}
         .type("clock_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::clock>>()

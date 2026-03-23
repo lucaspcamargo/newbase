@@ -219,7 +219,8 @@ void script_lua::bind_systems()
                     auto       fhash = (entt::id_type)lua_tointeger(L, lua_upvalueindex(3));
                     auto mtype = entt::resolve(tid);
                     auto func  = mtype.func(fhash);
-                    if (!func) return 0;
+                    if (!func)
+                        return luaL_error(L, "system function not found in meta (tid=%x fhash=%x)", tid, fhash);
                     auto instance = mtype.from_void(ptr);
                     int argc = lua_gettop(L);
                     std::vector<entt::meta_any> args;
@@ -228,7 +229,17 @@ void script_lua::bind_systems()
                         args.push_back(lua::lua_to_meta_any(L, i));
                     auto result = func.invoke(instance, args.empty() ? nullptr : args.data(), args.size());
                     if (result) { lua::push_meta_any(L, std::move(result)); return 1; }
-                    return 0;
+
+                    // invocation failed — build a diagnostic error
+                    std::string err = "system function invocation failed\n  expected args (";
+                    err += std::to_string(func.arity()) + "):";
+                    for (size_t i = 0; i < func.arity(); ++i)
+                        err += std::string{"\n    ["} + std::to_string(i) + "] " + std::string{func.arg(i).info().name()};
+                    err += "\n  got args (";
+                    err += std::to_string(args.size()) + "):";
+                    for (size_t i = 0; i < args.size(); ++i)
+                        err += std::string{"\n    ["} + std::to_string(i) + "] " + std::string{args[i].type().info().name()};
+                    return luaL_error(L, "%s", err.c_str());
                 }, 3);
                 lua_setglobal(_d->L, fname.c_str());
             }
@@ -502,4 +513,5 @@ extern "C" void _rtti_init_script_lua()
         .conv<std::shared_ptr<nb::system>>();
 
     cscript::_ensure_rtti();
+    lua::register_lua_function_type();
 }

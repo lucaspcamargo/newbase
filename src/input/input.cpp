@@ -11,8 +11,8 @@ using entt::operator""_hs;
 
 static gamepad_button _conv_gp_button(SDL_GamepadButton btn);
 static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis);
-static void _apply_dir_axis(std::array<float, 3> &arr, input_axis axis, float value);
-static void _apply_dir(std::array<float, 3> &arr, input_direction dir);
+static void _apply_dir_axis(glm::vec3 &arr, input_axis axis, float value);
+static void _apply_dir(glm::vec3 &arr, input_direction dir);
 
 struct gamepad_data
 {
@@ -100,11 +100,11 @@ bool input::step(step_phase phase)
         {
             const auto &action = action_p.second;
             auto &action_state = _d->action_states[action_p.first];
-            std::array<float, 3> &dir_result  = action_state.direction;
-            
+            glm::vec3 &dir_result  = action_state.direction;
+
             // reset action state
             action_state = {};
-            action_state.direction.fill(0.f);
+            action_state.direction = {.0f, .0f, .0f};
             
             // first, gamepads
             for(auto &gp_p: _d->gamepads)
@@ -162,21 +162,11 @@ bool input::step(step_phase phase)
                 }
 
                 // normalize direction if larger than one
-                float len = sqrtf(dir_result[0]*dir_result[0] +
-                            dir_result[1]*dir_result[1] +
-                            dir_result[2]*dir_result[2]);
+                float len = glm::length(dir_result);
                 if(len > 1.0f)
-                {
-                    dir_result[0] /= len;
-                    dir_result[1] /= len;
-                    dir_result[2] /= len;
-                }
+                    dir_result /= len;
                 else if(len < 0.1f)
-                {
-                    // deadzone
-                    // TODO not hardcode this
-                    dir_result.fill(0.0f);
-                }
+                    dir_result = {.0f, .0f, .0f}; // deadzone — TODO not hardcode this
             }
         }
         
@@ -375,9 +365,8 @@ bool input::action_was_released(entt::id_type action_id)
 }
 
 
-std::array<float, 3> input::action_direction(entt::id_type action_id)
+glm::vec3 input::action_direction(entt::id_type action_id)
 {
-
     auto it = _d->action_states.find(action_id);
     if(it != _d->action_states.end())
     {
@@ -603,7 +592,21 @@ extern "C" void _rtti_init_input()
     entt::meta_factory<nb::input>{}
         .type("input"_hs)
         .custom<rtti::type_info>(rtti::type_info{"input", rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&nb::input::action_add>("action_add"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_add"})
+        .func<&nb::input::action_remove>("action_remove"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_remove"})
+        .func<&nb::input::action_is_pressed>("action_is_pressed"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_is_pressed"})
+        .func<&nb::input::action_was_pressed>("action_was_pressed"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_was_pressed"})
+        .func<&nb::input::action_was_released>("action_was_released"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_was_released"})
+        .func<&nb::input::action_direction>("action_direction"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"action_direction"})
+        .func<&nb::input::rumble>("rumble"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"rumble"});
     entt::meta_factory<std::shared_ptr<nb::input>>{rtti::ctx_systems()}
         .type("input_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::input>>()
@@ -680,7 +683,7 @@ static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis)
     return gamepad_axis::GPA_NONE;
 }
 
-static void _apply_dir_axis(std::array<float, 3> &arr, input_axis axis, float val)
+static void _apply_dir_axis(glm::vec3 &arr, input_axis axis, float val)
 {
     switch(axis)
     {
@@ -697,7 +700,7 @@ static void _apply_dir_axis(std::array<float, 3> &arr, input_axis axis, float va
 }
 
 
-static void _apply_dir(std::array<float, 3> &arr, input_direction dir)
+static void _apply_dir(glm::vec3 &arr, input_direction dir)
 {
     switch(dir)
     {

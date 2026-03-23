@@ -3,12 +3,38 @@
 #include <newbase/script_lua/lua.hpp>
 #include <entt/entt.hpp>
 #include <memory>
+#include <functional>
 
 namespace nb {
 namespace lua {
 
 
     
+// Ref-counted handle to a Lua function stored in the registry.
+// Copyable (shared ownership); registry ref is released when the last copy dies.
+struct lua_function {
+    struct _ref {
+        _ref(lua_State *_L, int _iref) : L(_L), ref(_iref)
+        {
+        }
+        lua_State *L;
+        int ref;
+        ~_ref() { luaL_unref(L, LUA_REGISTRYINDEX, ref); }
+    };
+    std::shared_ptr<_ref> _s;
+
+    lua_function() = default;
+    // Expects a Lua function on top of the stack; pops it.
+    explicit lua_function(lua_State *L)
+        : _s(std::make_shared<_ref>(L, luaL_ref(L, LUA_REGISTRYINDEX))) {}
+
+    bool valid() const { return _s != nullptr; }
+};
+
+// Register the lua_function entt meta type and std::function coercions.
+// Call once during Lua state init (no lua_State needed — meta is global).
+void register_lua_function_type();
+
 // Registry key for the box metatable
 constexpr const char *BOX_METATABLE = "nb.meta_any";
 

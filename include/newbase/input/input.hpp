@@ -38,7 +38,7 @@ public:
     bool action_is_pressed(entt::id_type action_id);
     bool action_was_pressed(entt::id_type action_id);
     bool action_was_released(entt::id_type action_id);
-    std::array<float, 3> action_direction(entt::id_type action_id);
+    glm::vec3 action_direction(entt::id_type action_id);
 
     // we need api to identify different input devices
     // so that it can be assigned to different players

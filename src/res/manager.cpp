@@ -159,7 +159,7 @@ std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type
         log::error("[rmanager] unregistered resource type: %x", type_id);
         return nullptr;
     }
-    const rtti::type_info *info = mtype.custom<rtti::type_info>();
+    const rtti::type_info *info = mtype.custom().operator rtti::type_info*();
     if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->loader_fn)
     {
         log::error("[rmanager] resource type has no loader: %x", type_id);
