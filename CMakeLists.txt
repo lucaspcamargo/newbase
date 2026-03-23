@@ -84,7 +84,9 @@ add_library(newbase STATIC
 
     # rtti
     src/reflection/contexts.cpp
+    src/reflection/coercions.cpp
     src/reflection/lib_glm.cpp
+    src/res/rtti.cpp
 
     # ui
     src/ui/manager.cpp

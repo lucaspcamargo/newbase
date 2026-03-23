@@ -5,7 +5,9 @@
 #include <newbase/sdl/logging_handler.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/reflection/coercions.hpp>
 #include <newbase/reflection/lib_glm.hpp>
+#include <newbase/res/rtti.hpp>
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/ui/manager.hpp>
@@ -358,6 +360,8 @@ engine& engine::instance()
 
 extern "C" void _rtti_init_engine()
 {
+    ::nb::rtti::register_coercions();
+    ::nb::rtti::_rtti_init_resources();
     ::nb::rtti::register_lib_glm();
 
     /* unsure non how to register singletons, asked on discord

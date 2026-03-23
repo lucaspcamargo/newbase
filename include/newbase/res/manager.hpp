@@ -1,10 +1,12 @@
 #pragma once
 
 #include <newbase/res/fwd.hpp>
+#include <newbase/res/resource.hpp>
 #include <newbase/res/storage/handle.hpp>
-#include <entt/resource/cache.hpp>
 #include <entt/resource/resource.hpp>
+#include <entt/resource/cache.hpp>
 #include <ryml.hpp>
+#include <memory>
 #include <string_view>
 #include <unordered_map>
 
@@ -21,19 +23,29 @@ public:
 
     bool configure(const ryml::NodeRef &config);
     void clear();
-    
-    bool known(entt::id_type id); // whether this resource hash is known
-    bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const; // read all data into byte vector
+
+    bool known(entt::id_type id);
+    bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const;
 
     const std::unordered_map<entt::id_type, rmanager::asset_handle>& handles() const;
 
-    entt::resource<retree> get_etree(entt::id_type id, bool forceload = false);
-    entt::resource<rsprite> get_sprite(entt::id_type id, bool forceload = false);
-    entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
-    entt::resource<rscript> get_script(entt::id_type id, bool forceload = false);
-    entt::resource<rvorbis> get_vorbis(entt::id_type id, bool forceload = false);
-    entt::resource<ryaml> get_yaml(entt::id_type id, bool forceload = false);
+    // Generic load: looks up the registered loader via RTTI
+    std::shared_ptr<nb::resource> get(entt::id_type type_id, entt::id_type asset_id, bool forceload = false);
 
+    // Typed convenience wrapper
+    template<typename T>
+    std::shared_ptr<T> get(entt::id_type asset_id, bool forceload = false)
+    {
+        return std::static_pointer_cast<T>(get(entt::resolve<T>().id(), asset_id, forceload));
+    }
+
+    // Backwards-compatible typed accessors
+    entt::resource<retree>   get_etree  (entt::id_type id, bool forceload = false);
+    entt::resource<rsprite>  get_sprite (entt::id_type id, bool forceload = false);
+    entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
+    entt::resource<rscript>  get_script (entt::id_type id, bool forceload = false);
+    entt::resource<rvorbis>  get_vorbis (entt::id_type id, bool forceload = false);
+    entt::resource<ryaml>    get_yaml   (entt::id_type id, bool forceload = false);
 
 private:
 };
@@ -41,4 +53,3 @@ private:
 rmanager& rman();
 
 }
-

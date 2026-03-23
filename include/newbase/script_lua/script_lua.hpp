@@ -22,6 +22,7 @@ public:
 private:
     void bind_meta_types();
     void bind_systems();
+    void bind_global_api();
 
     // our own allocator provided to lua
     static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize);

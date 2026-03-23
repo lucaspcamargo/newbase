@@ -1,8 +1,6 @@
 #pragma once
 
-extern "C" {
-#include <lua.h>
-}
+#include <newbase/res/resource.hpp>
 #include <vector>
 #include <string>
 
@@ -13,11 +11,13 @@ enum class script_type {
     LUA_BYTECODE
 };
 
-struct rscript {
-    bool valid;
+struct rscript : public resource {
+    explicit rscript(entt::id_type id = 0) : resource(id, entt::hashed_string{"rscript"}.value()) {}
+
+    bool valid {false};
     script_type type {script_type::LUA_SOURCE};
     std::vector<char> raw {};
-    std::string chunkname;  // TODO find out from resource manager in loader?
+    std::string chunkname;
 };
 
 }

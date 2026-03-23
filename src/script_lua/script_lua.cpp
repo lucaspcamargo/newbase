@@ -53,6 +53,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     lua::register_box_metatable(_d->L);
     bind_meta_types();
     bind_systems();
+    bind_global_api();
     
     log::info("[script_lua] initialized");
     return true;
@@ -69,8 +70,6 @@ void script_lua::bind_meta_types()
 
     // push global meta table onto stack
     lua_getglobal(_d->L, "_meta");
-
-    
 
     // iterate over registered entt::meta types
     for (const auto&& [id, type] : entt::resolve())
@@ -95,23 +94,43 @@ void script_lua::bind_meta_types()
 
         // check if metatype has custom identifier set
         const rtti::type_info * t_info = type.custom();
+        std::string identifier;
         if(t_info)
         {
             log::info("[script_lua] found type info: %s", (const char*)t_info->identifier);
-
-            // set type identifier in typeinfo table
-            lua_pushstring(_d->L, t_info->identifier);
-            lua_setfield(_d->L, -2, "identifier");
+            identifier = t_info->identifier;
         }
         else
         {
             // auto-determine type identifier
-            std::string identifier = _util_auto_identifier(name_sv);
+            identifier = _util_auto_identifier(name_sv);
             log::info("[script_lua] no type info, auto identifier: %s", identifier.c_str());
-    
-            // set type identifier in typeinfo table
-            lua_pushlstring(_d->L, identifier.c_str(), identifier.size());
-            lua_setfield(_d->L, -2, "identifier");
+        }
+
+        // set type identifier in typeinfo table
+        lua_pushlstring(_d->L, identifier.c_str(), identifier.size());
+        lua_setfield(_d->L, -2, "identifier");
+
+        // register global type table with constructor: e.g. vec2.new(x, y)
+        {
+            entt::id_type type_id = type.id();
+            lua_newtable(_d->L);
+            lua_pushinteger(_d->L, (lua_Integer)type_id);
+            lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+                auto tid = (entt::id_type)lua_tointeger(L, lua_upvalueindex(1));
+                auto mtype = entt::resolve(tid);
+                int argc = lua_gettop(L);
+                std::vector<entt::meta_any> args;
+                args.reserve(argc);
+                for (int i = 1; i <= argc; ++i)
+                    args.push_back(lua::lua_to_meta_any(L, i));
+                auto result = mtype.construct(args.empty() ? nullptr : args.data(), args.size());
+                if (!result) { lua_pushnil(L); return 1; }
+                lua::push_meta_any(L, std::move(result));
+                return 1;
+            }, 1);
+            lua_setfield(_d->L, -2, "new");
+            lua_setglobal(_d->L, identifier.c_str());
         }
 
         
@@ -180,9 +199,57 @@ void script_lua::bind_systems()
             lua::push_meta_any(_d->L, type.from_void(sys.get()), sys);
             lua_setglobal(_d->L, global_name.c_str());
             log::info("[script_lua] bound system: %s", global_name.c_str());
+
+            // register per-function globals: ${sys_name}_${func_name}()
+            for (const auto&& [fhash, func] : type.func())
+            {
+                const rtti::func_info *func_info = func.custom();
+                if (!func_info)
+                    continue;
+
+                std::string fname = std::string(info->identifier) + "_" + static_cast<const char*>(func_info->identifier);
+                log::info("[script_lua] registering system function: %s", fname.c_str());
+
+                lua_pushlightuserdata(_d->L, sys.get());
+                lua_pushinteger(_d->L, (lua_Integer)type.id());
+                lua_pushinteger(_d->L, (lua_Integer)fhash);
+                lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+                    void      *ptr   = lua_touserdata(L, lua_upvalueindex(1));
+                    auto       tid   = (entt::id_type)lua_tointeger(L, lua_upvalueindex(2));
+                    auto       fhash = (entt::id_type)lua_tointeger(L, lua_upvalueindex(3));
+                    auto mtype = entt::resolve(tid);
+                    auto func  = mtype.func(fhash);
+                    if (!func) return 0;
+                    auto instance = mtype.from_void(ptr);
+                    int argc = lua_gettop(L);
+                    std::vector<entt::meta_any> args;
+                    args.reserve(argc);
+                    for (int i = 1; i <= argc; ++i)
+                        args.push_back(lua::lua_to_meta_any(L, i));
+                    auto result = func.invoke(instance, args.empty() ? nullptr : args.data(), args.size());
+                    if (result) { lua::push_meta_any(L, std::move(result)); return 1; }
+                    return 0;
+                }, 3);
+                lua_setglobal(_d->L, fname.c_str());
+            }
         }
     }
 
+}
+
+void script_lua::bind_global_api()
+{
+    // hs(str) -> integer: entt hashed_string at runtime
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        const char *s = luaL_checkstring(L, 1);
+        lua_pushinteger(L, (lua_Integer)entt::hashed_string{s}.value());
+        return 1;
+    });
+    lua_setglobal(_d->L, "hs");
+
+    // engine: non-owning reference to nb::engine::instance()
+    lua::push_meta_any(_d->L, entt::forward_as_meta(engine::instance()));
+    lua_setglobal(_d->L, "engine");
 }
 
 bool script_lua::step(step_phase phase)
@@ -213,7 +280,10 @@ bool script_lua::step(step_phase phase)
                 {
                     // lets parse this
                     reader_state_t state = std::make_pair<size_t, std::vector<char>*>(0, &(script_res->raw));
-                    int load_ret = lua_load(script.state, &_lua_batch_reader, &state, "_unnamed_chunk", nullptr);
+                    std::string chunk_name = script_res->chunkname.empty()
+                        ? "=unnamed"
+                        : ("=" + script_res->chunkname);
+                    int load_ret = lua_load(script.state, &_lua_batch_reader, &state, chunk_name.c_str(), nullptr);
 
                     log::info("[script_lua] loaded %x, ret: %d", id, load_ret);
 
@@ -278,7 +348,7 @@ bool script_lua::step(step_phase phase)
                             continue;
                         }
 
-                        log::info("[script_lua] registering component getter %s for entity %x", (const char*)comp_info->identifier, id);
+                        log::info("[script_lua] registering component getter c_%s for entity %x", (const char*)comp_info->identifier, id);
 
                         lua_pushinteger(_d->L, (lua_Integer)id);
                         lua_pushinteger(_d->L, (lua_Integer)comp_id);
@@ -293,7 +363,9 @@ bool script_lua::step(step_phase phase)
                             lua::push_meta_any(L, std::move(any));
                             return 1;
                         }, 2);
-                        lua_setfield(_d->L, env_idx, (const char*)comp_info->identifier);
+                        std::string getter_name = "c_";
+                        getter_name += comp_info->identifier;
+                        lua_setfield(_d->L, env_idx, getter_name.c_str());
                     }
 
                     // attach environment to function's _ENV (upvalue 1)

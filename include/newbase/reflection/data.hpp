@@ -4,6 +4,8 @@
 #include <cstring>
 #include <entt/entt.hpp>
 
+namespace nb { class resource; }
+
 // These structures are used to augment the entt::meta reflection facility with some extra data 
 // that is useful for our editor and scripting systems, such as type identifiers and editor icons for components,
 // or writability flags for resource storage types. 
@@ -99,6 +101,9 @@ struct type_info
     } data;
 
     void *uptr {nullptr};
+
+    // for TYPE_CLASS_RESOURCE: load function returning a base resource pointer
+    std::shared_ptr<nb::resource>(*loader_fn)(entt::id_type) {nullptr};
 };
 
 struct func_info

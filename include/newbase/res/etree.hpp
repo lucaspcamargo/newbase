@@ -1,13 +1,13 @@
 #pragma once
 
 #include <newbase/res/yaml.hpp>
-#include <vector>
 
 namespace nb {
 
-    struct retree : public ryaml
-    {
-        bool etree_valid {false};
-    };
+struct retree : public ryaml {
+    explicit retree(entt::id_type id = 0) : ryaml(id, entt::hashed_string{"retree"}.value()) {}
+
+    bool etree_valid {false};
+};
 
 }

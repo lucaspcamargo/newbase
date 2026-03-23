@@ -24,7 +24,7 @@ namespace nb {
     rloader_etree::result_type rloader_etree::operator()(entt::id_type id) const
     {
         log::info("[rloader_etree] loading: %x", id);
-        auto ret = std::make_shared<retree>();
+        auto ret = std::make_shared<retree>(id);
         auto read_success = rman().read_all_sync(id, ret->data, true);
         if(read_success)
         {
@@ -46,7 +46,7 @@ namespace nb {
         log::info("[rloader_sprite] loading: %x", id);
         // TODO have sprite data file?
         // for now just load texture
-        auto ret = std::make_shared<rsprite>();
+        auto ret = std::make_shared<rsprite>(id);
         ret->id_tex = id;
         return ret;
     }
@@ -83,7 +83,7 @@ namespace nb {
         SDL_DestroySurface(surface);
         stbi_image_free(ptr);
 
-        auto tex = std::make_shared<rtexture>();
+        auto tex = std::make_shared<rtexture>(id);
         tex->surf = final;
         tex->tex = nullptr;
         tex->uploaded = false;
@@ -93,7 +93,7 @@ namespace nb {
     rloader_script::result_type rloader_script::operator()(entt::id_type id) const
     {
         log::info("[rloader_script] loading: %x", id);
-        auto script = std::make_shared<rscript>();
+        auto script = std::make_shared<rscript>(id);
         script->valid = false;
         if(!rman().read_all_sync(id, script->raw))
         {
@@ -105,7 +105,18 @@ namespace nb {
         script->type = script_type::LUA_SOURCE;
         script->valid = true;
         // TODO allow to use some sort of workqueue to parse source in parallel?
+
+        auto &handles = rman().handles();
+        auto it = handles.find(id);
+        if (it != handles.end() && !it->second.path.empty())
         
+            script->chunkname = it->second.path;
+        else
+        {    
+            char buf[18];
+            snprintf(buf, sizeof(buf), "%x", id);
+            script->chunkname = buf;
+        }
 
         return script;
     }
@@ -114,7 +125,7 @@ namespace nb {
     rloader_vorbis::result_type rloader_vorbis::operator()(entt::id_type id) const
     {
         log::info("[rloader_vorbis] loading: %x", id);
-        auto vorbis = std::make_shared<rvorbis>();
+        auto vorbis = std::make_shared<rvorbis>(id);
         vorbis->valid = false;
         if(!rman().read_all_sync(id, vorbis->data))
         {
@@ -151,7 +162,7 @@ namespace nb {
     rloader_wav::result_type rloader_wav::operator()(entt::id_type id) const
     {
         log::info("[rloader_wav] loading: %x", id);
-        auto wav = std::make_shared<rwav>();
+        auto wav = std::make_shared<rwav>(id);
         wav->valid = false;
         std::vector<char> data;
         if(!rman().read_all_sync(id, data))
@@ -195,7 +206,7 @@ namespace nb {
     rloader_yaml::result_type rloader_yaml::operator()(entt::id_type id) const
     {
         log::info("[rloader_yaml] loading: %x", id);
-        auto ret = std::make_shared<ryaml>();
+        auto ret = std::make_shared<ryaml>(id);
         auto read_success = rman().read_all_sync(id, ret->data, true);
         if(read_success)
         {

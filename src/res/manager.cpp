@@ -1,8 +1,16 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/res/loaders.hpp>
+#include <newbase/res/etree.hpp>
+#include <newbase/res/sprite.hpp>
+#include <newbase/res/texture.hpp>
+#include <newbase/res/script.hpp>
+#include <newbase/res/vorbis.hpp>
+#include <newbase/res/wav.hpp>
+#include <newbase/res/yaml.hpp>
 #include <newbase/res/storage/interface.hpp>
 #include <newbase/res/storage/sdl_file.hpp>
 #include <newbase/res/storage/sdl_storage.hpp>
+#include <newbase/reflection/data.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
 #include <newbase/utility/strings.hpp>
@@ -25,12 +33,9 @@ namespace nb{
 static rmanager _rman_inst;
 rmanager& rman() {return _rman_inst;}
 
-static entt::resource_cache<retree, rloader_etree> _cache_etree{};
-static entt::resource_cache<rsprite, rloader_sprite> _cache_sprite{};
-static entt::resource_cache<rtexture, rloader_texture> _cache_texture{};
-static entt::resource_cache<rscript, rloader_script> _cache_script{};
-static entt::resource_cache<rvorbis, rloader_vorbis> _cache_vorbis{};
-static entt::resource_cache<ryaml, rloader_yaml> _cache_yaml{};
+// dynamic cache: resource_type_id -> { asset_id -> shared_ptr<resource> }
+static std::unordered_map<entt::id_type,
+    std::unordered_map<entt::id_type, std::shared_ptr<nb::resource>>> _caches;
 
 // NEW asset infrastructure
 static std::vector<std::unique_ptr<res_storage::storage_interface>> _storage_interfaces {};
@@ -50,18 +55,14 @@ void rmanager::clear()
 {
     log::info("[rmanager] clearing resource pools and storage interfaces");
 
-    // release asset handles
+    _caches.clear();
     _asset_handles.clear();
-
-    // release storage interfaces
     _storage_interfaces.clear();
 }
 
 bool rmanager::configure(const ryml::NodeRef &config)
 {
     log::info("[rmanager] configuring...");
-    // WIP new asset infrastructure
-    // for now we don't use config, just open appropriate storage according to platform :)
     (void) config;
     bool use_sdl_file = false;
 #ifdef ANDROID
@@ -87,7 +88,6 @@ bool rmanager::configure(const ryml::NodeRef &config)
         _storage_interfaces.emplace_back(std::move(sstorage));
     }
 
-    // Now, we manage our storage interfaces
     int sintf_idx = 0;
     for(auto &sintf : _storage_interfaces)
     {
@@ -98,9 +98,6 @@ bool rmanager::configure(const ryml::NodeRef &config)
                   scannable? "yes" : "no",
                   has_index? "yes" : "no");
 
-        // ask for asset handles
-        // if we have an index, use it
-        // otherwise, try scanning if possible
         auto handles = sintf->get_handles(scannable, has_index);
 
         for(auto &handle : handles)
@@ -121,7 +118,7 @@ bool rmanager::known(entt::id_type id)
     return _asset_handles.find(id) != _asset_handles.end();
 }
 
-bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate) const // read all data into byte vector
+bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate) const
 {
     auto it = _asset_handles.find(id);
     if(it == _asset_handles.end())
@@ -145,50 +142,72 @@ const std::unordered_map<entt::id_type, rmanager::asset_handle>& rmanager::handl
     return _asset_handles;
 }
 
-template <typename Cache>
-static inline std::pair<typename Cache::iterator, bool> load_maybe_force(Cache &cache, entt::id_type id, bool forceload)
+std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type asset_id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? cache.force_load(id, id)
-                                 : cache.load(id, id));
+    auto &type_cache = _caches[type_id];
+
+    if (!forceload)
+    {
+        auto it = type_cache.find(asset_id);
+        if (it != type_cache.end())
+            return it->second;
+    }
+
+    auto mtype = entt::resolve(type_id);
+    if (!mtype)
+    {
+        log::error("[rmanager] unregistered resource type: %x", type_id);
+        return nullptr;
+    }
+    const rtti::type_info *info = mtype.custom<rtti::type_info>();
+    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->loader_fn)
+    {
+        log::error("[rmanager] resource type has no loader: %x", type_id);
+        return nullptr;
+    }
+
+    auto res = info->loader_fn(asset_id);
+    if (res)
+        type_cache[asset_id] = res;
+    return res;
 }
 
+// Backwards-compatible typed accessors
 
 entt::resource<retree> rmanager::get_etree(entt::id_type id, bool forceload)
 {
-    auto result = load_maybe_force(_cache_etree, id, forceload);
-    bool loaded = result.second;
-    assert(loaded);
-    return result.first->second;
+    return entt::resource<retree>{std::static_pointer_cast<retree>(
+        get(entt::resolve<retree>().id(), id, forceload))};
 }
 
 entt::resource<rsprite> rmanager::get_sprite(entt::id_type id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? _cache_sprite.force_load(id, id)
-                                 : _cache_sprite.load(id, id)).first->second;
+    return entt::resource<rsprite>{std::static_pointer_cast<rsprite>(
+        get(entt::resolve<rsprite>().id(), id, forceload))};
 }
 
 entt::resource<rtexture> rmanager::get_texture(entt::id_type id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? _cache_texture.force_load(id, id)
-                                 : _cache_texture.load(id, id)).first->second;
+    return entt::resource<rtexture>{std::static_pointer_cast<rtexture>(
+        get(entt::resolve<rtexture>().id(), id, forceload))};
 }
 
 entt::resource<rscript> rmanager::get_script(entt::id_type id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? _cache_script.force_load(id, id)
-                                 : _cache_script.load(id, id)).first->second;
+    return entt::resource<rscript>{std::static_pointer_cast<rscript>(
+        get(entt::resolve<rscript>().id(), id, forceload))};
 }
 
 entt::resource<rvorbis> rmanager::get_vorbis(entt::id_type id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? _cache_vorbis.force_load(id, id)
-                                 : _cache_vorbis.load(id, id)).first->second;
+    return entt::resource<rvorbis>{std::static_pointer_cast<rvorbis>(
+        get(entt::resolve<rvorbis>().id(), id, forceload))};
 }
 
 entt::resource<ryaml> rmanager::get_yaml(entt::id_type id, bool forceload)
 {
-    return (C4_UNLIKELY(forceload)? _cache_yaml.force_load(id, id)
-                                 : _cache_yaml.load(id, id)).first->second;
+    return entt::resource<ryaml>{std::static_pointer_cast<ryaml>(
+        get(entt::resolve<ryaml>().id(), id, forceload))};
 }
 
 }
