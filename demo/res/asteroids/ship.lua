@@ -12,20 +12,14 @@ local thruster_spr = hs("res/asteroids/sprites/ship-t.png")
 clock_update_add(function (delta)
 
     local dir = input_action_direction(dir_hs)
-    print("dir "..dir.x.." "..dir.y.." "..dir.z)
     local sp = c_spatial()
-    print(sp)
 
     local thrust_dir = math.rad(sp.rot.z + THRUST_ANGLE_DELTA)
     local thrust_x = math.cos(thrust_dir)*THRUST*dir.y
     local thrust_y = math.sin(thrust_dir)*THRUST*dir.y
 
-    print("thrust "..thrust_x .." "..thrust_y)
-
     physics2d_body_force_center(eid, vec2.new(thrust_x, thrust_y), false) -- reset forces
     physics2d_body_torque(eid, dir.x * ROT_TORQUE, true)  -- awake now
-
-    print("done?")
 
     -- local w = render_window_width() / render_cam_2d_scale()
     -- local h = render_window_height() / render_cam_2d_scale()

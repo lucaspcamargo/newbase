@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/script_lua/lua.hpp>
+#include <newbase/utility/meta_callback.hpp>
 #include <entt/entt.hpp>
 #include <memory>
 #include <functional>
@@ -31,9 +32,16 @@ struct lua_function {
     bool valid() const { return _s != nullptr; }
 };
 
-// Register the lua_function entt meta type and std::function coercions.
+// Register the lua_function entt meta type.
 // Call once during Lua state init (no lua_State needed — meta is global).
 void register_lua_function_type();
+
+// Build a meta_callback that dispatches through a Lua function.
+meta_callback make_meta_callback_from_lua(const lua_function &lf);
+
+// If arg holds a lua_function and expected is meta_callback, coerce it.
+// Otherwise returns arg unchanged.
+entt::meta_any coerce_lua_function_arg(entt::meta_any arg, entt::meta_type expected);
 
 // Registry key for the box metatable
 constexpr const char *BOX_METATABLE = "nb.meta_any";

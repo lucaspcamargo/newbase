@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/system.hpp>
+#include <newbase/utility/meta_callback.hpp>
 
 namespace nb {
 
@@ -18,14 +19,14 @@ public:
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
 
-    int update_add(std::function<void(float)> func)
+    int update_add(meta_callback cb)
     {
-        m_update.emplace(++m_update_counter, func);
+        m_update.emplace(++m_update_counter, std::move(cb));
         return m_update_counter;
     }
 
 private:
-    std::map<int, std::function<void(float)>> m_update;
+    std::map<int, meta_callback> m_update;
     int m_update_counter {0};
 };
 

@@ -1,4 +1,5 @@
 #include <newbase/script_lua/bindings.hpp>
+#include <newbase/utility/meta_callback.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include <string>
@@ -84,6 +85,24 @@ static int box_unm(lua_State *L)
     lua_pushnil(L);
     return 1;
 }
+static int box_call(lua_State *L)
+{
+    auto *box = static_cast<lua_nb_box*>(luaL_checkudata(L, 1, BOX_METATABLE));
+    auto *cb = box->value.try_cast<nb::meta_callback>();
+    if (!cb || !cb->valid())
+        return luaL_error(L, "attempt to call a non-callable nb.meta_any");
+
+    int top = lua_gettop(L);
+    std::vector<entt::meta_any> args;
+    args.reserve(top - 1);
+    for (int i = 2; i <= top; ++i)
+        args.push_back(lua_to_meta_any(L, i));
+
+    auto result = cb->invoke(args.empty() ? nullptr : args.data(), args.size());
+    if (result) { push_meta_any(L, std::move(result)); return 1; }
+    return 0;
+}
+
 static int box_eq(lua_State *L)
 {
     auto *a = static_cast<lua_nb_box*>(luaL_testudata(L, 1, BOX_METATABLE));
@@ -131,6 +150,8 @@ void nb::lua::register_box_metatable(lua_State *L)
     lua_setfield(L, -2, "__unm");
     lua_pushcfunction(L, box_eq);
     lua_setfield(L, -2, "__eq");
+    lua_pushcfunction(L, box_call);
+    lua_setfield(L, -2, "__call");
 
     lua_pop(L, 1);
 }
@@ -297,9 +318,36 @@ static std::function<void(float)> conv_lua_fn_to_void_float(const lua_function &
 void nb::lua::register_lua_function_type()
 {
     entt::meta_factory<lua_function>{}
-        .type("lua_function"_hs)
-        .conv<&conv_lua_fn_to_void>()
-        .conv<&conv_lua_fn_to_void_float>();
+        .type("lua_function"_hs);
+}
+
+nb::meta_callback nb::lua::make_meta_callback_from_lua(const lua_function &lf)
+{
+    return {
+        lf._s,
+        [](void *cap, entt::meta_any *args, size_t n) -> entt::meta_any {
+            auto *ref = static_cast<lua_function::_ref *>(cap);
+            lua_rawgeti(ref->L, LUA_REGISTRYINDEX, ref->ref);
+            for (size_t i = 0; i < n; ++i)
+                push_meta_any(ref->L, args[i].as_ref());
+            if (lua_pcall(ref->L, static_cast<int>(n), 1, 0) != LUA_OK)
+            {
+                log::error("[meta_callback] lua error: %s", lua_tostring(ref->L, -1));
+                lua_pop(ref->L, 1);
+                return {};
+            }
+            auto result = lua_to_meta_any(ref->L, -1);
+            lua_pop(ref->L, 1);
+            return result;
+        }
+    };
+}
+
+entt::meta_any nb::lua::coerce_lua_function_arg(entt::meta_any arg, entt::meta_type expected)
+{
+    if (arg.type().info()  != entt::type_id<lua_function>())    return arg;
+    if (expected.info()    != entt::type_id<nb::meta_callback>()) return arg;
+    return entt::meta_any{ make_meta_callback_from_lua(*arg.try_cast<lua_function>()) };
 }
 
 static int box_func_call(lua_State *L)

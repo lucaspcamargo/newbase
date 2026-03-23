@@ -227,6 +227,8 @@ void script_lua::bind_systems()
                     args.reserve(argc);
                     for (int i = 1; i <= argc; ++i)
                         args.push_back(lua::lua_to_meta_any(L, i));
+                    for (size_t i = 0; i < args.size() && i < func.arity(); ++i)
+                        args[i] = lua::coerce_lua_function_arg(std::move(args[i]), func.arg(i));
                     auto result = func.invoke(instance, args.empty() ? nullptr : args.data(), args.size());
                     if (result) { lua::push_meta_any(L, std::move(result)); return 1; }
 
