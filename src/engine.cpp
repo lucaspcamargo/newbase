@@ -225,8 +225,9 @@ bool engine::event(SDL_Event *evt)
 #ifndef EMSCRIPTEN
         if(evt->key.key == SDLK_ESCAPE)
             return false;
+        else
 #endif
-        else if((evt->key.key >= SDLK_0 && evt->key.key <= SDLK_9) || evt->key.scancode == SDL_SCANCODE_GRAVE)
+        if((evt->key.key >= SDLK_0 && evt->key.key <= SDLK_9) || evt->key.scancode == SDL_SCANCODE_GRAVE)
         {
             int idx = evt->key.key - SDLK_0;
             if(evt->key.scancode == SDL_SCANCODE_GRAVE)

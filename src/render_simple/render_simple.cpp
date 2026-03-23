@@ -142,6 +142,14 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     SDL_ShowWindow(_win);
     SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
 
+    // attempt to load and set window icon
+    auto icon_tex = rman().get_texture("_nb_core/icon_192.png"_hs);
+    if(icon_tex && icon_tex->surf)
+    {
+        SDL_SetWindowIcon(_win, icon_tex->surf);
+    }
+
+
     // init gui via ui manager
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
     if(ui_mgr)

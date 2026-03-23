@@ -198,23 +198,15 @@ void editor::_draw_main_menu()
 
         // on the right edge of the menu bar, add a combo box for the currently selected scene
             ImGui::Separator();
-            ImGui::Text("      Scene: ");
-            if(ImGui::BeginCombo("##scenescombo", "default scene"))
+            if (ImGui::BeginTabBar("##TabBar"))
             {
-                // for(int n = 0; n < scene_names.size(); n++)
-                // {
-                //     bool is_selected = (current_scene_idx == n);
-                //     if(ImGui::Selectable(scene_names[n].c_str(), is_selected))
-                //     {
-                //         current_scene_idx = n;
-                //         // TODO switch to selected scene
-                //     }
-                //     if(is_selected)
-                //         ImGui::SetItemDefaultFocus();
-                // }
-                ImGui::Selectable("default scene", true);
-                ImGui::SetItemDefaultFocus();
-                ImGui::EndCombo();
+                if (ImGui::BeginTabItem("Blah"))
+                    ImGui::EndTabItem();
+                if (ImGui::BeginTabItem("Blih"))
+                    ImGui::EndTabItem();
+                if (ImGui::BeginTabItem("Blou"))
+                    ImGui::EndTabItem();
+                ImGui::EndTabBar();
             }
 
         ImGui::EndMainMenuBar();

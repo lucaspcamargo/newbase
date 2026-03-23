@@ -176,6 +176,8 @@ static ImU32 frametimes_bar_color(float t)
 
 static void draw_frametimes_bar_graph(const engine::framecounter_data& fc, int fc_end)
 {
+    // for more on this: https://web.archive.org/web/20250323005822/https://asawicki.info/news_1758_an_idea_for_visualization_of_frame_times
+
     const auto &col_bg = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
     const auto &col_outline = ImGui::GetStyleColorVec4(ImGuiCol_Border);
 
