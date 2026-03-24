@@ -53,6 +53,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     lua::register_box_metatable(_d->L);
     bind_meta_types();
     bind_systems();
+    bind_services();
     bind_global_api();
     
     log::info("[script_lua] initialized");
@@ -171,7 +172,7 @@ void script_lua::bind_meta_types()
 void script_lua::bind_systems()
 {
     auto system_t = entt::resolve<nb::system>();
-    for (auto&& [id, type] : entt::resolve())
+    for (auto&& [cpp_id, type] : entt::resolve())
     {
         if (type.can_cast(system_t))
         {
@@ -248,6 +249,54 @@ void script_lua::bind_systems()
         }
     }
 
+}
+
+void script_lua::bind_services()
+{
+    for (auto&& [cpp_id, mtype] : entt::resolve())
+    {
+        auto *info = mtype.custom().operator rtti::type_info*();
+        if (!info || info->type_class != rtti::TYPE_CLASS_SERVICE || !info->data.service.getter)
+        {
+            continue;
+        }
+
+        std::string gname = std::string{"svc_"} + static_cast<const char*>(info->identifier);
+        log::info("[script_lua] registering service getter: %s (%x)", gname.c_str(), (int)mtype.id());
+
+        lua_pushinteger(_d->L, (lua_Integer)mtype.id());
+        lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+            auto  tid   = (entt::id_type)lua_tointeger(L, lua_upvalueindex(1));
+            auto  mtype = entt::resolve(tid);
+            if(!mtype)
+            {
+                log::warn("[script_lua] service '%x': invalid type id", (int) tid);
+                lua_pushnil(L); 
+                return 1;
+            }
+            auto *info  = mtype.custom().operator rtti::type_info*();
+            if (!info)
+            { 
+                log::warn("[script_lua] service '%x': no metainfo", (int) tid);
+                lua_pushnil(L); 
+                return 1;
+            }
+            if(!info->data.service.getter) 
+            {
+                log::warn("[script_lua] service '%s': no service getter", info->identifier.operator const char *());
+                lua_pushnil(L); 
+                return 1;
+            }
+            void *ptr  = info->data.service.getter();
+            if (!ptr) { 
+                log::warn("[script_lua] service '%s': getter returned null");
+                lua_pushnil(L); return 1; 
+            }
+            lua::push_meta_any(L, mtype.from_void(ptr));
+            return 1;
+        }, 1);
+        lua_setglobal(_d->L, gname.c_str());
+    }
 }
 
 void script_lua::bind_global_api()

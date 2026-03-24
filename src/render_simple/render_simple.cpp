@@ -47,6 +47,9 @@ _scale(1.0),
 _wx(0), _wy(0)
 {
     log::info("[render_simple] constructed");
+    
+    // register services
+    entt::locator<viewport_geometry*>::emplace(this);
 }
 
 render_simple::~render_simple()
@@ -174,9 +177,6 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
 
     SDL_GetWindowSafeArea(_win, &_safe);
     log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
-
-    // register services
-    entt::locator<viewport_geometry*>::emplace(this);
 
     return true;
 }

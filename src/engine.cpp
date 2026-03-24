@@ -10,6 +10,8 @@
 #include <newbase/res/rtti.hpp>
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
+#include <newbase/services/rtti_info.hpp>
+#include <newbase/services/viewport_geometry.hpp>
 #include <newbase/ui/manager.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
@@ -363,6 +365,7 @@ extern "C" void _rtti_init_engine()
     ::nb::rtti::register_coercions();
     ::nb::rtti::_rtti_init_resources();
     ::nb::rtti::register_lib_glm();
+    ::nb::rtti::_rtti_init_services();
 
     /* unsure non how to register singletons, asked on discord
        can possibly can be solved via some sort of proxy type that forwards to the singleton instance?

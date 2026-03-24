@@ -78,6 +78,7 @@ add_library(newbase STATIC
     src/res/resource.cpp
     src/res/storage/sdl_file.cpp
     src/res/storage/sdl_storage.cpp
+    src/res/rtti.cpp
 
     # yaml conversions
     src/yaml/glm.cpp
@@ -86,7 +87,7 @@ add_library(newbase STATIC
     src/reflection/contexts.cpp
     src/reflection/coercions.cpp
     src/reflection/lib_glm.cpp
-    src/res/rtti.cpp
+    src/services/rtti_info.cpp
 
     # ui
     src/ui/manager.cpp

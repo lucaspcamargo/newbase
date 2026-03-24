@@ -21,26 +21,37 @@ clock_update_add(function (delta)
     physics2d_body_force_center(eid, vec2.new(thrust_x, thrust_y), false) -- reset forces
     physics2d_body_torque(eid, dir.x * ROT_TORQUE, true)  -- awake now
 
-    -- local w = render_window_width() / render_cam_2d_scale()
-    -- local h = render_window_height() / render_cam_2d_scale()
+    local vp = svc_viewport_geometry()
+    if vp then
+        -- we know our viewport info, we know when to warp
+        local e = vp:get_2d_extents()  -- returns extents_2d box
+        
+        local w = e.xspan
+        local h = e.yspan
+    
+        local new_x = sp.pos.x 
+        local new_y = sp.pos.y
+    
+        if sp.pos.x < (-w)/2 then
+            new_x = sp.pos.x + w
+        elseif sp.pos.x > w/2 then
+            new_x = sp.pos.x - w
+        end
+    
+        if sp.pos.y < (-h)/2 then
+            new_y = sp.pos.y + h
+        elseif sp.pos.y > h/2 then
+            new_y = sp.pos.y - h
+        end
+    
+        if new_x ~= sp.pos.x or new_y ~= sp.pos.y then
+            physics2d_body_warp(eid, vec2.new(new_x, new_y))
+        end
+    
+    else
+        print("COULD NOT GET VIEWPORT SERVICE")
 
-    -- local new_x = sp.pos.x 
-    -- local new_y = sp.pos.y
+    end
 
-    -- if sp.pos.x < (-w)/2 then
-    --     new_x = sp.pos.x + w
-    -- elseif sp.pos.x > w/2 then
-    --     new_x = sp.pos.x - w
-    -- end
-
-    -- if sp.pos.y < (-h)/2 then
-    --     new_y = sp.pos.y + h
-    -- elseif sp.pos.y > h/2 then
-    --     new_y = sp.pos.y - h
-    -- end
-
-    -- if new_x ~= sp.pos.x or new_y ~= sp.pos.y then
-    --     physics2d_body_warp(eid, vec2.new(new_x, new_y))
-    -- end
 
 end)

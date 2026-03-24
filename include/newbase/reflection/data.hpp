@@ -77,6 +77,7 @@ enum type_class_t {
     TYPE_CLASS_SYSTEM = 3,
     TYPE_CLASS_SINGLETON = 4,
     TYPE_CLASS_RES_STORAGE = 5,
+    TYPE_CLASS_SERVICE = 6,
 };
 
 struct type_info
@@ -98,6 +99,11 @@ struct type_info
             bool sure_scaneable;
             bool maybe_scaneable;
         } res_storage;
+
+        struct {
+            // returns a void* to the service instance via entt::locator, or nullptr if unavailable
+            void* (*getter)();
+        } service;
     } data;
 
     void *uptr {nullptr};
