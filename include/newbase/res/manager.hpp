@@ -3,6 +3,7 @@
 #include <newbase/res/fwd.hpp>
 #include <newbase/res/resource.hpp>
 #include <newbase/res/storage/handle.hpp>
+#include <newbase/res/vfs.hpp>
 #include <entt/resource/resource.hpp>
 #include <entt/resource/cache.hpp>
 #include <ryml.hpp>
@@ -13,6 +14,8 @@
 struct SDL_Storage;
 
 namespace nb {
+
+struct rmanager_p;
 
 class rmanager final {
 public:
@@ -28,6 +31,8 @@ public:
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const;
 
     const std::unordered_map<entt::id_type, rmanager::asset_handle>& handles() const;
+    const vfs_tree& vfs() const;
+    vfs_tree build_vfs_tree() const;
 
     // Generic load: looks up the registered loader via RTTI
     std::shared_ptr<nb::resource> get(entt::id_type type_id, entt::id_type asset_id, bool forceload = false);
@@ -48,6 +53,7 @@ public:
     entt::resource<ryaml>    get_yaml   (entt::id_type id, bool forceload = false);
 
 private:
+    rmanager_p *_d {nullptr};
 };
 
 rmanager& rman();
