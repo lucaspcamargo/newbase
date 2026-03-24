@@ -105,6 +105,11 @@ struct type_info
             // returns a void* to the service instance via entt::locator, or nullptr if unavailable
             void* (*getter)();
         } service;
+
+        struct {
+            const char *editor_icon; // icon glyph (e.g. from ForkAwesome) shown in the resource browser
+            const char *extensions;  // space-separated list of handled file extensions (without dot, e.g. "png jpg jpeg")
+        } resource;
     } data;
 
     void *uptr {nullptr};

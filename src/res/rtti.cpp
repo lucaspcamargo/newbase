@@ -9,6 +9,7 @@
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
 #include <entt/meta/factory.hpp>
+#include "IconsForkAwesome.h"
 
 using entt::operator""_hs;
 
@@ -21,6 +22,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "script",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_CODE_O, .extensions = "lua"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_script{}(id);
                 }
@@ -31,6 +33,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "texture",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_texture{}(id);
                 }
@@ -41,6 +44,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "sprite",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "sprite"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_sprite{}(id);
                 }
@@ -51,6 +55,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "vorbis",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "ogg"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_vorbis{}(id);
                 }
@@ -61,6 +66,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "wav",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "wav"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_wav{}(id);
                 }
@@ -71,6 +77,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "yaml",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "yaml yml"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_yaml{}(id);
                 }
@@ -81,6 +88,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "etree",
                 .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "etree"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_etree{}(id);
                 }
