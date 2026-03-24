@@ -7,9 +7,11 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/log.hpp>
 #include <newbase/sdl/logging_handler.hpp>
+#include <newbase/utility/glm.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
+#include <string>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -20,6 +22,67 @@ static bool _about_enabled = false;
 static bool _show_demo = false;
 static int _log_observer = -1;
 static console c;
+
+static entt::entity _selected_entity  = entt::null;
+static entt::id_type _selected_comp_id = 0;
+
+static bool _draw_meta_any_editor(const char *label, entt::meta_any &ref)
+{
+    if (!ref) return false;
+    auto ti = ref.type().info();
+    bool changed = false;
+
+    if (ti == entt::type_id<bool>()) {
+        bool v = *ref.try_cast<bool>();
+        if (ImGui::Checkbox(label, &v)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<float>()) {
+        float v = *ref.try_cast<float>();
+        if (ImGui::DragFloat(label, &v, 0.01f)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<int>()) {
+        int v = *ref.try_cast<int>();
+        if (ImGui::DragInt(label, &v)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<unsigned int>()) {
+        int v = (int)*ref.try_cast<unsigned int>();
+        if (ImGui::DragInt(label, &v, 1, 0)) { ref.assign((unsigned int)v); changed = true; }
+    } else if (ti == entt::type_id<glm::vec2>()) {
+        glm::vec2 v = *ref.try_cast<glm::vec2>();
+        if (ImGui::DragFloat2(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<glm::vec3>()) {
+        glm::vec3 v = *ref.try_cast<glm::vec3>();
+        if (ImGui::DragFloat3(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<glm::vec4>()) {
+        glm::vec4 v = *ref.try_cast<glm::vec4>();
+        if (ImGui::DragFloat4(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<glm::quat>()) {
+        glm::quat v = *ref.try_cast<glm::quat>();
+        if (ImGui::DragFloat4(label, &v.x, 0.001f)) { ref.assign(v); changed = true; }
+    } else if (ti == entt::type_id<entt::entity>()) {
+        if (auto *v = ref.try_cast<entt::entity>()) ImGui::Text("%s: %x", label, entt::to_integral(*v));
+    } else if (ti == entt::type_id<std::string>()) {
+        if (auto *v = ref.try_cast<std::string>()) {
+            char buf[256]; strncpy(buf, v->c_str(), 255); buf[255] = 0;
+            if (ImGui::InputText(label, buf, sizeof(buf))) { *v = buf; changed = true; }
+        }
+    } else {
+        // recurse into registered data members
+        auto type = ref.type();
+        auto data_range = type.data();
+        bool has_data = data_range.begin() != data_range.end();
+        if (has_data && ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (auto [did, d] : data_range) {
+                const rtti::data_info *di = d.custom().operator const rtti::data_info*();
+                const char *fname = di ? di->identifier.operator const char*() : "?";
+                auto member = d.get(ref);
+                if (_draw_meta_any_editor(fname, member))
+                    d.set(ref, member);
+            }
+            ImGui::TreePop();
+        } else if (!has_data) {
+            ImGui::LabelText(label, "(unknown type)");
+        }
+    }
+    return changed;
+}
 
 bool editor::init(ryml::ConstNodeRef cfg)
 {
@@ -91,7 +154,14 @@ bool editor::step(step_phase phase)
                                 continue;
                             }
                             ImGui::SameLine();
-                            ImGui::Button(info->data.component.editor_icon? info->data.component.editor_icon: "??");
+                            bool selected = (_selected_entity == id && _selected_comp_id == comp_id);
+                            if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                            if (ImGui::Button(info->data.component.editor_icon ? info->data.component.editor_icon : "??"))
+                            {
+                                _selected_entity  = id;
+                                _selected_comp_id = comp_id;
+                            }
+                            if (selected) ImGui::PopStyleColor();
                         }
                     }
                     ImGui::PopID();
@@ -99,6 +169,40 @@ bool editor::step(step_phase phase)
                 }
                 ImGui::EndTable();
             }
+        ImGui::End();
+
+        ImGui::Begin(ICON_FK_PENCIL " Properties");
+        if (_selected_entity != entt::null && _selected_comp_id != 0)
+        {
+            auto *storage = reg.storage(_selected_comp_id);
+            if (storage && storage->contains(_selected_entity))
+            {
+                auto comp_type = entt::resolve(_selected_comp_id);
+                rtti::type_info *info = comp_type.custom();
+                ImGui::TextDisabled("%s  [entity %x]",
+                    info ? info->identifier.operator const char*() : "?",
+                    entt::to_integral(_selected_entity));
+                ImGui::Separator();
+                auto ref = comp_type.from_void(storage->value(_selected_entity));
+                for (auto [did, d] : comp_type.data())
+                {
+                    const rtti::data_info *di = d.custom().operator const rtti::data_info*();
+                    const char *fname = di ? di->identifier.operator const char*() : "?";
+                    auto member = d.get(ref);
+                    if (_draw_meta_any_editor(fname, member))
+                        d.set(ref, member);
+                }
+            }
+            else
+            {
+                _selected_entity  = entt::null;
+                _selected_comp_id = 0;
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("(select a component)");
+        }
         ImGui::End();
 
         ImGui::Begin(ICON_FK_ARCHIVE " Resources");
