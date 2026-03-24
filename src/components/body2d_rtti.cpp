@@ -22,7 +22,8 @@ void cbody2d::_ensure_rtti()
             .data {
                 .component = {
                     .editor_icon = ICON_FK_SQUARE_O,
-                    .notify = [](entt::registry &r, entt::entity e) {
+                    .notify = [](entt::registry &r, entt::entity e, void* comp) {
+                        if(comp) static_cast<cbody2d*>(comp)->dirty = true;
                         r.patch<cbody2d>(e, [](auto&){});
                     }
                 }

@@ -186,7 +186,8 @@ bool editor::step(step_phase phase)
                     info ? info->identifier.operator const char*() : "?",
                     entt::to_integral(_selected_entity));
                 ImGui::Separator();
-                auto ref = comp_type.from_void(storage->value(_selected_entity));
+                void * void_val = storage->value(_selected_entity);
+                auto ref = comp_type.from_void(void_val);
                 // for (auto [did, d] : comp_type.data())
                 // {
                 //     const rtti::data_info *di = d.custom().operator const rtti::data_info*();
@@ -201,7 +202,7 @@ bool editor::step(step_phase phase)
                 if(_draw_meta_any_editor(info ? info->identifier.operator const char*() : "?", ref))
                 {
                     if (info && info->data.component.notify)
-                        info->data.component.notify(reg, _selected_entity);
+                        info->data.component.notify(reg, _selected_entity, void_val);
                 }
             }
             else

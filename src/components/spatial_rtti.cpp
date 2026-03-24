@@ -13,7 +13,14 @@ void cspatial::_ensure_rtti()
         .custom<rtti::type_info>(rtti::type_info{
             .identifier = "spatial",
             .type_class = rtti::TYPE_CLASS_COMPONENT,
-            .data{ .component {.editor_icon = ICON_FK_ARROWS} }
+            .data {
+                .component {
+                    .editor_icon = ICON_FK_ARROWS,
+                    .notify = [](entt::registry &r, entt::entity e, void* comp) {
+                        if(comp) static_cast<cspatial*>(comp)->apply();
+                    }
+                }
+            }
         })
         .ctor<>()
         .data<&cspatial::pos>("pos"_hs)
