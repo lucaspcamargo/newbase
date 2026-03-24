@@ -66,7 +66,7 @@ extern "C" void _rtti_init_steam()
     // main interface
     entt::meta_factory<nb::steam>{}
         .type("steam"_hs)
-        .custom<rtti::system_info>(rtti::system_info{"steam"})
+        .custom<rtti::type_info>(rtti::type_info{"steam", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>();
 
     // factory
