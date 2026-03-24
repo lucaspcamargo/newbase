@@ -1,7 +1,7 @@
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <newbase/log.hpp>
-#ifdef EMSCRIPTEN
+#ifdef __EMSCRIPTEN__
 #include <newbase/utility/emscripten.hpp>
 #endif
 // for draw_perf
