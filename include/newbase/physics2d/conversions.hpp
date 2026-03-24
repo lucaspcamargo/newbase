@@ -39,9 +39,9 @@ namespace nb
         def.isBullet = comp.bullet;
 
         def.gravityScale = comp.gravity_scale;
-        if(comp.angular_damping != -1.0f)
+        if(comp.angular_damping >= 0.0f)
             def.angularDamping = comp.angular_damping;
-        if(comp.linear_damping != -1.0f)
+        if(comp.linear_damping >= 0.0f)
             def.linearDamping = comp.linear_damping;
 
         return true;

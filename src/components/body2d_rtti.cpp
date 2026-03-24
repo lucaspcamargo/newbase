@@ -2,6 +2,7 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
+#include <entt/entity/registry.hpp>
 #include <IconsForkAwesome.h>
 
 using namespace nb;
@@ -20,7 +21,10 @@ void cbody2d::_ensure_rtti()
             .type_class = rtti::TYPE_CLASS_COMPONENT,
             .data {
                 .component = {
-                    .editor_icon = ICON_FK_SQUARE_O
+                    .editor_icon = ICON_FK_SQUARE_O,
+                    .notify = [](entt::registry &r, entt::entity e) {
+                        r.patch<cbody2d>(e, [](auto&){});
+                    }
                 }
             }
         })

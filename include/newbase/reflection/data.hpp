@@ -89,6 +89,7 @@ struct type_info
     union {
         struct {
             const char *editor_icon;
+            void (*notify)(entt::registry &, entt::entity) {nullptr};
         } component;
 
         struct {

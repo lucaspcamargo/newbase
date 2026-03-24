@@ -74,7 +74,10 @@ static bool _draw_meta_any_editor(const char *label, entt::meta_any &ref)
                 const char *fname = di ? di->identifier.operator const char*() : "?";
                 auto member = d.get(ref);
                 if (_draw_meta_any_editor(fname, member))
+                {
                     d.set(ref, member);
+                    changed = true;
+                }
             }
             ImGui::TreePop();
         } else if (!has_data) {
@@ -184,13 +187,21 @@ bool editor::step(step_phase phase)
                     entt::to_integral(_selected_entity));
                 ImGui::Separator();
                 auto ref = comp_type.from_void(storage->value(_selected_entity));
-                for (auto [did, d] : comp_type.data())
+                // for (auto [did, d] : comp_type.data())
+                // {
+                //     const rtti::data_info *di = d.custom().operator const rtti::data_info*();
+                //     const char *fname = di ? di->identifier.operator const char*() : "?";
+                //     auto member = d.get(ref);
+                //     if (_draw_meta_any_editor(fname, member))
+                //     {
+                //         d.set(ref, member);
+                //         changed = true;
+                //     }
+                // }
+                if(_draw_meta_any_editor(info ? info->identifier.operator const char*() : "?", ref))
                 {
-                    const rtti::data_info *di = d.custom().operator const rtti::data_info*();
-                    const char *fname = di ? di->identifier.operator const char*() : "?";
-                    auto member = d.get(ref);
-                    if (_draw_meta_any_editor(fname, member))
-                        d.set(ref, member);
+                    if (info && info->data.component.notify)
+                        info->data.component.notify(reg, _selected_entity);
                 }
             }
             else
