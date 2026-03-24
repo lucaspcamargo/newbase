@@ -196,7 +196,7 @@ bool physics2d::step(step_phase phase)
                         spatial->apply();
                     }
                     else
-                        log::warn("[p2d] no spatial: body_id=%lx", b2StoreBodyId(event->bodyId));
+                        log::warn("[p2d] no spatial: body_id=%llx", b2StoreBodyId(event->bodyId));
                 }
             }
         }

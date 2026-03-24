@@ -1,17 +1,20 @@
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <newbase/log.hpp>
-#include <unordered_map>
-#include <string>
-
+#ifdef EMSCRIPTEN
+#include <newbase/utility/emscripten.hpp>
+#endif
 // for draw_perf
 #include <newbase/nb_config.h>
 #include <newbase/engine.hpp>
 #include <newbase/system.hpp>
+
 #include <SDL3/SDL.h>
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "tracy/Tracy.hpp"
+#include <unordered_map>
+#include <string>
 
 using namespace nb;
 
@@ -39,6 +42,11 @@ ui_manager_simple::ui_manager_simple()
 
 ui_manager_simple::~ui_manager_simple()
 {
+    log::info("[ui_manager] syncing ui settings");
+    ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
+#ifdef __EMSCRIPTEN__
+    ::nb::ems::sync_pref_path();
+#endif
     delete _d;
     log::info("[ui_manager] destroyed");
 }
@@ -62,11 +70,13 @@ bool ui_manager_simple::ui_init()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = _d->ini_path.c_str();
+    io.IniFilename = nullptr; // we drive saving manually to hook post-save sync
     io.IniSavingRate = 1.0f;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    ImGui::LoadIniSettingsFromDisk(_d->ini_path.c_str());
 
     imgui_style_setup();
 
@@ -87,6 +97,16 @@ void ui_manager_simple::ui_init_finish(float scale)
 
 void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int safe_h)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantSaveIniSettings) {
+        ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
+        io.WantSaveIniSettings = false;
+#ifdef __EMSCRIPTEN__
+        ::nb::ems::sync_pref_path();
+#endif
+        log::info("[ui_manager] ini save");
+    }
+
     ImGui::NewFrame();
     _d->dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(safe_x);

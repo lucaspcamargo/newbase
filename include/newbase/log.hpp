@@ -34,6 +34,9 @@ namespace log {
 
 // TODO: respect static log level in all logging function templates
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-security"
+
     template<typename... Params>
     inline void verb(const char *msg, Params... params)
     {
@@ -70,6 +73,8 @@ namespace log {
     {
         SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, msg, params...);
     }
+
+#pragma GCC diagnostic pop
 
 }
 }
