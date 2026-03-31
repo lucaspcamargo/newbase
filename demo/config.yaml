@@ -15,6 +15,7 @@ systems:
     world_scale: 100
   steam:
     app_id: 480
+  sgdk: {}
 resources:
   scanners:
     - type: "fs_raw"

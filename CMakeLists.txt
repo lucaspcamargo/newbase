@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.13.0)
 
 project(newbase)
 set(CMAKE_CXX_STANDARD 17)
@@ -10,6 +10,7 @@ set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Low
 option(NEWBASE_LTO "Enable LTO if available" OFF)
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
 option(NEWBASE_SGDK "Enable SGDK compatibility subsystem" ON)
+set(NEWBASE_SGDK_PATH "${CMAKE_SOURCE_DIR}/vendored/SGDK" CACHE PATH "Path to SGDK root")
 option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
 option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
@@ -21,6 +22,9 @@ set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into
 # further options and logging
 include(cmake/NewbaseOptions.cmake)
 include(cmake/NewbaseLogging.cmake)
+
+# python 3 must be available
+include(cmake/NewbasePythonInterp.cmake)
 
 # dependencies
 include(cmake/NewbaseImGui.cmake)
@@ -79,6 +83,7 @@ add_library(newbase STATIC
     src/res/storage/sdl_file.cpp
     src/res/storage/sdl_storage.cpp
     src/res/rtti.cpp
+    src/res/writers.cpp
 
     # yaml conversions
     src/yaml/glm.cpp
@@ -93,9 +98,6 @@ add_library(newbase STATIC
     src/ui/manager.cpp
     src/ui/overlay.cpp
     src/ui/imgui_style.cpp
-
-    # optional subsystems
-    ${SGDK_SUPPORT_SOURCES}
 
     # dependencies
     src/stb_impl.c
@@ -113,13 +115,14 @@ set_target_properties(newbase PROPERTIES
 )
 
 # CORE SYSTEMS
-add_subdirectory(src/render_simple)
 add_subdirectory(src/audio)
-add_subdirectory(src/input)
 add_subdirectory(src/clock)
-add_subdirectory(src/script_lua)
-add_subdirectory(src/physics2d)
 add_subdirectory(src/editor)
+add_subdirectory(src/input)
+add_subdirectory(src/physics2d)
+add_subdirectory(src/render_simple)
+add_subdirectory(src/script_lua)
+add_subdirectory(src/sgdk)
 
 # OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)
@@ -131,7 +134,7 @@ set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_compile_options(newbase PUBLIC -fno-exceptions )
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d ymfm -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)

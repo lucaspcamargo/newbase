@@ -11,8 +11,9 @@ sdl_storage::sdl_storage(ryml::ConstNodeRef cfg, std::string base_location)
     _storage = SDL_OpenTitleStorage(base_location.c_str(), SDL_CreateProperties());
     if(!_storage)
     {
-        log::warn("[rmanager] cannot open title storage. Falling back to raw fs...");
+        log::warn("[sdl_storage] cannot open title storage. Falling back to file storage...");
         _storage = SDL_OpenFileStorage(NEWBASE_DEFAULT_RES_PREFIX);
+        _writable = (_storage != nullptr);
     }
 
     _index_found = _search_index();
@@ -28,7 +29,7 @@ sdl_storage::~sdl_storage()
 
 bool sdl_storage::writable() const
 {
-    return false;  // user storage will come later
+    return _writable;
 }
 
 bool sdl_storage::scannable() const
@@ -151,6 +152,21 @@ bool sdl_storage::_index_add(std::string path, size_t sz)
     return true;
 }
 
+
+bool sdl_storage::write_all_sync(const asset_handle &hnd, const void *data, std::size_t size)
+{
+    if (!_storage || !_writable)
+    {
+        log::error("[sdl_storage] write_all_sync: storage is not writable (path: %s)", hnd.path.c_str());
+        return false;
+    }
+    if (!SDL_WriteStorageFile(_storage, hnd.path.c_str(), data, static_cast<Uint64>(size)))
+    {
+        log::error("[sdl_storage] cannot write file: %s: %s", hnd.path.c_str(), SDL_GetError());
+        return false;
+    }
+    return true;
+}
 
 bool sdl_storage::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
 {

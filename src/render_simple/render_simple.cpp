@@ -49,7 +49,7 @@ _wx(0), _wy(0)
     log::info("[render_simple] constructed");
     
     // register services
-    entt::locator<viewport_geometry*>::emplace(this);
+    entt::locator<renderer_service*>::emplace(this);
 }
 
 render_simple::~render_simple()
@@ -391,7 +391,7 @@ float render_simple::cam_2d_scale()
     return _cam2d_scale;
 }
 
-bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
+bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
 {
     float span_x = _wx/_cam2d_scale;
     float span_y = _wy/_cam2d_scale;
@@ -406,6 +406,21 @@ bool render_simple::get_2d_extents(viewport_geometry::extents_2d &extents)
     return true;
 }
 
+
+renderer_service::texture_handle render_simple::create_texture(int w, int h)
+{
+    return SDL_CreateTexture(_render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
+}
+
+void render_simple::update_texture(texture_handle tex, const void* pixels, int pitch)
+{
+    SDL_UpdateTexture(static_cast<SDL_Texture*>(tex), nullptr, pixels, pitch);
+}
+
+void render_simple::destroy_texture(texture_handle tex)
+{
+    SDL_DestroyTexture(static_cast<SDL_Texture*>(tex));
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_render_simple()

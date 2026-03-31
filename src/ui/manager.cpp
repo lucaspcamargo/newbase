@@ -104,7 +104,6 @@ void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int saf
 #ifdef __EMSCRIPTEN__
         ::nb::ems::sync_pref_path();
 #endif
-        log::info("[ui_manager] ini save");
     }
 
     ImGui::NewFrame();

@@ -4,6 +4,10 @@
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
 #endif
+#ifdef NEWBASE_SGDK
+#include <newbase/sgdk/api/sys.h>
+extern void nb_sgdk_main(bool);  // game entry point, renamed via -Dmain=nb_sgdk_main
+#endif
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
@@ -48,6 +52,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 #endif
 
     _rtti_init_newbase();
+
+#ifdef NEWBASE_SGDK
+    nb_sgdk_set_main(nb_sgdk_main);
+#endif
 
 	(*appstate) = NULL;
 	return bool_to_app_result(_nb_engine_init(appstate, argc, argv));

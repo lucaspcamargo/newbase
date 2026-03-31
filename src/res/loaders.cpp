@@ -51,42 +51,41 @@ namespace nb {
         return ret;
     }
 
+    // Standalone surface loader: reads asset bytes via the resource manager and decodes
+    // them with stb_image.  Returns a caller-owned SDL_Surface*, or nullptr on failure.
+    static SDL_Surface* load_texture_surface(entt::id_type id)
+    {
+        std::vector<char> data;
+        if (!rman().read_all_sync(id, data))
+        {
+            log::error("[load_texture_surface] data loading failed: %x", id);
+            return nullptr;
+        }
+        int w, h, chs;
+        auto ptr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(data.data()),
+                                         static_cast<int>(data.size()), &w, &h, &chs, 4);
+        if (!ptr)
+        {
+            log::error("[load_texture_surface] stbi decode failed: %x", id);
+            return nullptr;
+        }
+        log::info("[load_texture_surface] loaded: %dx%d, %dchs", w, h, chs);
+        SDL_Surface* tmp  = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_ABGR8888, ptr, w * 4);
+        SDL_Surface* surf = SDL_DuplicateSurface(tmp);
+        SDL_DestroySurface(tmp);
+        stbi_image_free(ptr);
+        return surf;
+    }
+
     // texture loader
     rloader_texture::result_type rloader_texture::operator()(entt::id_type id) const
     {
         log::info("[rloader_texture] loading: %x", id);
-        std::vector<char> data;
-        if(!rman().read_all_sync(id, data))
-            log::error("[rloader_texture] data loading failed: %x", id);
-        SDL_Surface *surf;
-        int w, h, chs;
-        auto ptr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(data.data()), data.size(), &w, &h, &chs, 4);
-        assert(ptr);
-        log::info("[rloader_texture] loaded: %dx%d, %dchs", w, h, chs);
-        int pitch;
-        pitch = w * 4;
-        
-        SDL_PixelFormat fmt;
-        switch(chs)
-        {
-            case 4:
-                fmt = SDL_PIXELFORMAT_ABGR8888;
-                break;
-            case 3:
-                fmt = SDL_PIXELFORMAT_ABGR8888;
-                break;
-            default:
-                assert(0);
-        }
-        SDL_Surface* surface = SDL_CreateSurfaceFrom(w, h, fmt, ptr, pitch);
-        SDL_Surface* final = SDL_DuplicateSurface(surface);
-        SDL_DestroySurface(surface);
-        stbi_image_free(ptr);
-
         auto tex = std::make_shared<rtexture>(id);
-        tex->surf = final;
-        tex->tex = nullptr;
-        tex->uploaded = false;
+        tex->surf           = load_texture_surface(id);
+        tex->tex            = nullptr;
+        tex->uploaded       = false;
+        tex->reload_surface = load_texture_surface;
         return tex;
     }
 

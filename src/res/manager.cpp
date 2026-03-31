@@ -145,6 +145,52 @@ bool rmanager::read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero
     return sintf->read_all_sync(handle, dst, zero_terminate);
 }
 
+bool rmanager::save_resource(nb::resource* res)
+{
+    if (!res)
+    {
+        log::error("[rmanager] save_resource: null resource");
+        return false;
+    }
+    auto mtype = entt::resolve(res->type_id());
+    if (!mtype)
+    {
+        log::error("[rmanager] save_resource: unregistered type %x", res->type_id());
+        return false;
+    }
+    const rtti::type_info* info = mtype.custom().operator rtti::type_info*();
+    if (!info || !info->saver_fn)
+    {
+        log::error("[rmanager] save_resource: no saver registered for type %x", res->type_id());
+        return false;
+    }
+    return info->saver_fn(res);
+}
+
+bool rmanager::write_all_sync(entt::id_type id, const void *data, std::size_t size)
+{
+    auto it = _d->asset_handles.find(id);
+    if (it == _d->asset_handles.end())
+    {
+        log::error("[rmanager] write_all_sync: unknown asset id: %x", id);
+        return false;
+    }
+    const auto &handle = it->second;
+    int sintf_idx = handle.storage_interface_idx;
+    if (sintf_idx < 0 || sintf_idx >= static_cast<int>(_d->storage_interfaces.size()))
+    {
+        log::error("[rmanager] write_all_sync: invalid storage interface index %d for asset: %x", sintf_idx, id);
+        return false;
+    }
+    auto &sintf = _d->storage_interfaces[sintf_idx];
+    if (!sintf->writable())
+    {
+        log::error("[rmanager] write_all_sync: storage is not writable for asset: %s", handle.path.c_str());
+        return false;
+    }
+    return sintf->write_all_sync(handle, data, size);
+}
+
 const std::unordered_map<entt::id_type, rmanager::asset_handle>& rmanager::handles() const
 {
     return _d->asset_handles;

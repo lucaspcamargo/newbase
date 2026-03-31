@@ -1,11 +1,11 @@
 #pragma once
 
 #include <newbase/system.hpp>
-#include <newbase/services/viewport_geometry.hpp>
+#include <newbase/services/renderer_service.hpp>
 
 namespace nb {
 
-class render_simple : public system, public viewport_geometry
+class render_simple : public system, public renderer_service
 {
 public:
     render_simple();
@@ -24,8 +24,11 @@ public:
     void cam_2d_setup(float cx, float cy, float wmax, float hmax);
     float cam_2d_scale();
 
-    // service: viewport_geometry
-    bool get_2d_extents(viewport_geometry::extents_2d &extents) override;
+    // service: renderer_service
+    bool get_2d_extents(renderer_service::extents_2d &extents) override;
+    texture_handle create_texture(int w, int h) override;
+    void update_texture(texture_handle tex, const void* pixels, int pitch) override;
+    void destroy_texture(texture_handle tex) override;
 
 private:
 

@@ -6,7 +6,7 @@
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
-#include <newbase/services/viewport_geometry.hpp>
+#include <newbase/services/renderer_service.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
@@ -211,10 +211,10 @@ bool physics2d::step(step_phase phase)
     {
         if(_d->debug_draw_enabled)
         {
-            viewport_geometry* vg = entt::locator<viewport_geometry*>::value();
+            renderer_service* vg = entt::locator<renderer_service*>::value();
             if(vg)
             {
-                viewport_geometry::extents_2d extents;
+                renderer_service::extents_2d extents;
                 if(vg->get_2d_extents(extents))
                 {
                     float cx = (extents.right+extents.left)/2.0f;

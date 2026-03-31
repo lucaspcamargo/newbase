@@ -11,7 +11,7 @@
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/services/rtti_info.hpp>
-#include <newbase/services/viewport_geometry.hpp>
+#include <newbase/services/renderer_service.hpp>
 #include <newbase/ui/manager.hpp>
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>

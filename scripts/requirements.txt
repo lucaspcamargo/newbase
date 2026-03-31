@@ -1,2 +1,4 @@
 jinja2
-PyYAML 
+PyYAML
+tree-sitter==0.25.2
+tree-sitter-c==0.24.1

@@ -19,8 +19,11 @@ sdl_file::~sdl_file()
 
 bool sdl_file::writable() const
 {
-    // not for now
+#ifdef ANDROID
     return false;
+#else
+    return true;
+#endif
 }
 
 bool sdl_file::scannable() const
@@ -147,6 +150,22 @@ bool sdl_file::_index_add(std::string path, size_t sz)
     return true;
 }
 
+
+bool sdl_file::write_all_sync(const asset_handle &hnd, const void *data, std::size_t size)
+{
+#ifdef ANDROID
+    log::error("[sdl_file] write_all_sync: writes not supported on Android");
+    return false;
+#else
+    std::string full_path = _base_path + "/" + hnd.path;
+    if (!SDL_SaveFile(full_path.c_str(), data, size))
+    {
+        log::error("[sdl_file] cannot write file: %s: %s", full_path.c_str(), SDL_GetError());
+        return false;
+    }
+    return true;
+#endif
+}
 
 bool sdl_file::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
 {

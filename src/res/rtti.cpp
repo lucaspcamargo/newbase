@@ -1,6 +1,7 @@
 #include <newbase/res/rtti.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/res/loaders.hpp>
+#include <newbase/res/writers.hpp>
 #include <newbase/res/etree.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
@@ -36,7 +37,8 @@ namespace nb::rtti {
                 .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp"}},
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_texture{}(id);
-                }
+                },
+                .saver_fn = rwriter_texture,
             });
 
         entt::meta_factory<rsprite>{}

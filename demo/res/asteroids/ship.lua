@@ -21,10 +21,10 @@ clock_update_add(function (delta)
     physics2d_body_force_center(eid, vec2.new(thrust_x, thrust_y), false) -- reset forces
     physics2d_body_torque(eid, dir.x * ROT_TORQUE, true)  -- awake now
 
-    local vp = svc_viewport_geometry()
-    if vp then
+    local renderer_svc = svc_renderer_service()
+    if renderer_svc then
         -- we know our viewport info, we know when to warp
-        local e = vp:get_2d_extents()  -- returns extents_2d box
+        local e = renderer_svc:get_2d_extents()  -- returns extents_2d box
         
         local w = e.xspan
         local h = e.yspan

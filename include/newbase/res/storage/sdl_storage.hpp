@@ -25,6 +25,9 @@ public:
 
     /** @brief Read all bytes of a resource into a buffer. May change in the future. */
     bool read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate = false) override;
+
+    /** @brief Write data over an existing asset. Not supported (title storage is read-only). */
+    bool write_all_sync(const asset_handle &hnd, const void *data, std::size_t size) override;
     
 private:
     bool _search_index();
@@ -33,6 +36,7 @@ private:
     // since this is intimately tied to res_manager, we don't benefit much from a d-pointer
     std::string _base_path;
     SDL_Storage * _storage {nullptr};
+    bool _writable {false};
     bool _index_found {false};
     std::unordered_map<entt::id_type, asset_handle> _handles {};
 };

@@ -29,6 +29,10 @@ public:
 
     bool known(entt::id_type id);
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const;
+    bool write_all_sync(entt::id_type id, const void *data, std::size_t size);
+
+    // Serialize a resource back to its underlying storage using the type's registered saver.
+    bool save_resource(nb::resource* res);
 
     const std::unordered_map<entt::id_type, rmanager::asset_handle>& handles() const;
     const vfs_tree& vfs() const;

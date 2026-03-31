@@ -28,6 +28,9 @@ public:
     /** @brief Read all bytes of a resource into a buffer. May change in the future. */
     bool read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate = false) override;
 
+    /** @brief Write data over an existing asset. */
+    bool write_all_sync(const asset_handle &hnd, const void *data, std::size_t size) override;
+
 private:
     bool _search_index();
     bool _index_add(std::string path, size_t sz);

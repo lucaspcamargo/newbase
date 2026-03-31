@@ -34,7 +34,7 @@ std::shared_ptr<nb::system> nb::system::build(const std::string &id, const void 
     }
     else
     {
-        log::error("[system_factory] not found!");
+        log::error("[system_factory] '%s' (%x) not found!", s.c_str(), hashval);
         return nullptr;
     }
 }

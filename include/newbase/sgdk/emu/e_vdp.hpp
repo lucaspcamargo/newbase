@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <SDL3/SDL_surface.h>
 
 namespace nb {
 
@@ -10,8 +11,16 @@ public:
     sgdk_vdp();
     ~sgdk_vdp();
 
-    // renders a frame
-    void render_frame();
+    // renders a frame into an RGBA32 SDL_Surface
+    void render_frame(SDL_Surface* out);
+
+    // port interface (called by api.cpp shims)
+    void     write_ctrl(uint32_t value);
+    void     write_ctrl16(uint16_t value);
+    uint32_t read_ctrl();
+    void     write_data(uint16_t value);
+    uint16_t read_data();
+    uint16_t read_hvcounter();
 
     std::vector<uint8_t>& vram() {return m_vram;}
     std::vector<uint16_t>& cram() {return m_cram;}
@@ -28,10 +37,18 @@ public:
     static constexpr size_t REG_COUNT = 0x18; // sprite def size in bytes
     
 private:
-    uint16_t m_reg_status;
+    // status / register file
+    uint16_t             m_reg_status;
     std::vector<uint8_t> m_regs;
-    
-    std::vector<uint8_t> m_vram;
+
+    // control port state machine
+    bool     m_ctrl_pending;   // waiting for second word of address command
+    uint16_t m_ctrl_first;     // first word buffered
+    uint16_t m_addr;           // current VRAM/CRAM/VSRAM address
+    uint8_t  m_access;         // current access type (CD5-CD0)
+
+    // memory
+    std::vector<uint8_t>  m_vram;
     std::vector<uint16_t> m_cram;
     std::vector<uint16_t> m_vsram;
 };

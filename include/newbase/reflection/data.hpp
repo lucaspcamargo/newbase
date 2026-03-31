@@ -116,6 +116,10 @@ struct type_info
 
     // for TYPE_CLASS_RESOURCE: load function returning a base resource pointer
     std::shared_ptr<nb::resource>(*loader_fn)(entt::id_type) {nullptr};
+
+    // for TYPE_CLASS_RESOURCE: optional save function — serializes the in-memory resource
+    // back to storage via rman().write_all_sync(). Returns false if unsupported or failed.
+    bool (*saver_fn)(nb::resource*) {nullptr};
 };
 
 struct func_info

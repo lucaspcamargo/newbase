@@ -7,5 +7,6 @@ newbase_add_system(NAME editor SOURCES
     ./res_browser.cpp
     ./res_editor_window.cpp
     ./meta_any_editor.cpp
+    ./texture_editor_widget.cpp
 )
 newbase_commit_systems()
