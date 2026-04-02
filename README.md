@@ -1,4 +1,4 @@
-# newbase
+# newbase engine
 
 ![icon](res/_nb_core/icon.svg)
 
@@ -11,26 +11,33 @@ A *new base* for making games and interactive stuff.
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom
 
+<!--ENGBR_SECTION
 ## Demo
 
 If a picture is worth a thousand words, can you imagine what a demo is worth? Well, let's see for ourselves:
 
-**TODO:** Emscripten build of the "demo" app goes here.
+```{emscripten} newbase_emscripten_*.zip
+    :entry: demo/newbase_demo.js
+    :caption: $FILENAME_NO_EXT$ ($DATE$)
+    :aspect-ratio: 16/9
+    :idbfs-mount: /libsdl
+```
 
 *Nice. (I hope? Please let me know is something is amiss. Works on my machine :)*
+ENGBR_SECTION-->
 
 ## Features
 
-TODO fill this up as it grows
+*TODO:* fill this up as it grows
 
-Plans to have:
+For now, we have:
 - SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
-- SDL\_GPU-based renderer for 2D and 3D (uses Vulkan, DX12, or Metal depending on the platform)
-    + later goal, for now the bsic renderer suffices 
+- ~~SDL\_GPU-based renderer for 2D and 3D (uses Vulkan, DX12, or Metal depending on the platform)~~
+    + later goal, for now the basic 2D renderer suffices 
 - Resource manager
 - Data-driven Entity-Component-System architecture
 - Physics and collision handling
-- Particle system
+- ~~Particle system~~ (WIP)
 - Integrated editor
 
 ## Platforms

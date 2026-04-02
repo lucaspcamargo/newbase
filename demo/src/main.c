@@ -7,6 +7,7 @@
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
+#include "SDL3/SDL_hints.h"
 #include "SDL3/SDL_properties.h"
 
 #ifdef TRACY_ENABLE
@@ -37,6 +38,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
     _nb_xdg_data_dirname_search("newbase_demo");
+#endif
+
+#ifdef __EMSCRIPTEN__
+    // restrict keyboard capture to the canvas element only
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+    // use requestAnimationFrame (interval=0) for vsync-synced main loop
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "0");
 #endif
 
     _rtti_init_newbase();

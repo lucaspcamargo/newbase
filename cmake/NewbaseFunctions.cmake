@@ -158,6 +158,37 @@ function(newbase_prepare_executable)
             message(FATAL_ERROR "[newbase_prepare_executable] system '${system}' (target '${system_target}') is not available to link to executable target '${arg_TARGET}'. System is registered but its target was not found.")
         endif()
     endforeach()
+
+    # SBOM generation — output goes into the resource prefix folder so it is
+    # accessible at runtime alongside other engine resources.
+    set(sbom_output_dir "${CMAKE_CURRENT_BINARY_DIR}/${NEWBASE_NATIVE_RES_PREFIX}")
+    set(sbom_output     "${sbom_output_dir}/sbom.spdx")
+    set(sbom_args
+        "${NEWBASE_ROOT}/scripts/generate_sbom.py"
+        "--output" "${sbom_output}"
+    )
+    if(NEWBASE_IMPORTED)
+        # Include the calling project as the top-level SPDX package.
+        list(APPEND sbom_args
+            "--caller-name"       "${PROJECT_NAME}"
+            "--caller-version"    "${PROJECT_VERSION}"
+            "--caller-source-dir" "${PROJECT_SOURCE_DIR}"
+        )
+    endif()
+    set(sbom_target ${arg_TARGET}_sbom_gen)
+    add_custom_target(${sbom_target} ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
+        COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
+        BYPRODUCTS "${sbom_output}"
+        VERBATIM
+    )
+    add_dependencies(${arg_TARGET} ${sbom_target})
+    if(DEFINED EMSCRIPTEN)
+        # Embed the SBOM into the wasm bundle at the expected MEMFS path.
+        target_link_options(${arg_TARGET} PRIVATE
+            "--embed-file=${sbom_output}@${NEWBASE_DEFAULT_RES_PREFIX}/sbom.spdx"
+        )
+    endif()
 endfunction()
 
 function(newbase_add_system)
