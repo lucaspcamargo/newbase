@@ -6,7 +6,7 @@
 <!-- repo not yet public, may be in the future, then badge can be added : ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)-->
 
-A *new base* for making games and interactive stuff.
+A *new base* for making games and interactive stuff. Under heavy construction.
 
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom
@@ -106,7 +106,9 @@ The initial idea was to allow for different scripting engines to be implementabl
 
 This system implements 2D rigid-body physics, via the industry-standard Box2D library.
 
-(TODO more details when this is actually implemented)
+(TODO add more details)
+
+<!--ENGBR_TOGGLE-->
 
 ### sgdk
 
@@ -114,7 +116,9 @@ The "sgdk" system is a bit of a black sheep. It does not interoperate with the E
 
 Games are compiled to native code, and no CPUs from the original system are emulated. The VDP is emulated in software, but can support different output resolutions, and other goodies. Therefore, a game may use some additional features when using the compatibility layer, and mix-and-match code meant for the Mega Drive and for newbase. This allows for (possibly enhanced) ports to be published for whatever platform is supported by newbase, without much compromise.
 
-### spatial, (?)
+<!--ENGBR_TOGGLE-->
+
+### spatial, clock
 
 These are core systems of the engine, that implement standard data flows that other systems rely upon. The engine can run without them, but otherwise expected functionality may not work correctly.
 
@@ -139,6 +143,10 @@ It stands on the shoulder of giants by leveraging the following technologies:
 <!--- jolt physics ? -->
 
 These dependencies were carefully chosen for a good mix of power, flexibility, and portability. All of them are linked statically into the resulting binaries, optionally with LTO.
+
+### Optional Dependencies
+
+steamapi, sgdk, etc...
 
 ### Build-time dependencies
 
