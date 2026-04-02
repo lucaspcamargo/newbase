@@ -226,7 +226,7 @@ bool engine::event(SDL_Event *evt)
     log::debug("[engine] event");
     if(evt->type == SDL_EVENT_KEY_DOWN)
     {
-#ifndef EMSCRIPTEN
+#ifndef __EMSCRIPTEN__
         if(evt->key.key == SDLK_ESCAPE)
             return false;
         else

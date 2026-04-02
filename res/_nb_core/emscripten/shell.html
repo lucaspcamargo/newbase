@@ -51,6 +51,15 @@
       border-radius: 2px;
       transition: width 0.15s ease;
     }
+    @keyframes nb-progress-pulse {
+      0%   { margin-left: 0%;   width: 20%; }
+      50%  { margin-left: 40%;  width: 40%; }
+      100% { margin-left: 80%;  width: 20%; }
+    }
+    #progress-fill.indeterminate {
+      width: auto !important;
+      animation: nb-progress-pulse 1.4s ease-in-out infinite;
+    }
     #fullscreen-btn {
       position: fixed;
       bottom: 14px;
@@ -80,7 +89,7 @@
   </style>
 </head>
 <body>
-  <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+  <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
 
   <div id="loading-overlay">
     <div id="loading-status">Loading&hellip;</div>
@@ -114,7 +123,12 @@
 
       function hideOverlay() {
         overlay.classList.add('hidden');
+        document.getElementById('canvas').focus();
       }
+
+      // start indeterminate animation immediately — for now, files are embedded so
+      // there is no separate download; setStatus will not provide (n/total) numbers.
+      fillEl.classList.add('indeterminate');
 
       window.Module = {
         canvas: document.getElementById('canvas'),
@@ -133,6 +147,8 @@
           if (!text) { hideOverlay(); return; }
           var m = text.match(/([^(]+)\((\d+(?:\.\d+)?)\/(\d+)\)/);
           if (m) {
+            // deterministic progress available (e.g. preloaded files)
+            fillEl.classList.remove('indeterminate');
             fillEl.style.width = (parseFloat(m[2]) / parseFloat(m[3]) * 100) + '%';
             statusEl.textContent = m[1].trim();
           } else {
