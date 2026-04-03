@@ -119,14 +119,8 @@ namespace nb::rtti {
             return p ? *p : nullptr; \
             }, \
             .set_ptr = +[](entt::meta_any& a, std::shared_ptr<nb::resource> p) { \
-                auto target_type = a.type().info().name(); \
-                auto source_type = typeid(T).name(); \
-                log::warn("[res] resource pointer assignment: target='%s' source='%s' resource_type_id='%s'", \
-                      target_type.length() ? std::string{target_type}.c_str() : "<unknown>", \
-                      source_type ? source_type : "<unknown>", \
-                      name_str); \
             if(!a.assign(std::static_pointer_cast<T>(p))) { \
-                auto target_type = a.type().info().name(); \
+                auto target_type = a.type().info().name(); /*not sure if this is correct btw*/\
                 auto source_type = typeid(T).name(); \
                 log::warn("[res] resource pointer assignment failed: target='%s' source='%s' resource_type_id='%s'", \
                       target_type.length() ? std::string{target_type}.c_str() : "<unknown>", \

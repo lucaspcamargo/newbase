@@ -66,16 +66,12 @@ bool draw_resource_field(const char* label, entt::id_type res_type_id,
             const res_drag_payload* p = static_cast<const res_drag_payload*>(payload->Data);
             if (p->res_type_id == res_type_id)
             {
-                log::info("DRAGGED :D");
                 ptr = rman().get(res_type_id, p->asset_id);
                 changed = true;
             }
             else
             {
-                log::warn("Resource type mismatch: payload='%s' target='%s', %x!=%x",
-                      res_meta ? std::string{res_meta.info().name()}.c_str() : "<unknown>",
-                      entt::resolve(res_type_id) ? std::string{entt::resolve(res_type_id).info().name()}.c_str() : "<unknown>",
-                      p->res_type_id, res_type_id);
+                log::warn("Resource type mismatch: %x!=%x", p->res_type_id, res_type_id);
             }
         }
         ImGui::EndDragDropTarget();
