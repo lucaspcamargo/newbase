@@ -7,6 +7,11 @@
 
 namespace nb {
 
+static entt::id_type hash_string_view(std::string_view view)
+{
+    return entt::hashed_string(view.data(), view.size()).operator entt::id_type();
+}
+
 std::string dump_rtti_info()
 {
     std::ostringstream oss;
@@ -18,7 +23,9 @@ std::string dump_rtti_info()
         oss << "Name: " << (type.info().name().size() ? std::string{type.info().name()}.c_str() : "<unnamed>");
 
         if(type.info().name().size() != 0)
-            oss << std::hex << " (hashed: 0x" << entt::hashed_string(type.info().name().begin(), type.info().name().length()).operator entt::id_type() << ")\n";
+        {
+            oss << std::hex << " (hashed: 0x" << hash_string_view(type.info().name()) << ")\n";
+        }
         else 
             oss << "\n";
 
