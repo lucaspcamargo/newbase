@@ -1,11 +1,15 @@
 #include <newbase/editor/res_browser.hpp>
+#include <newbase/editor/resource_field_widget.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/services/ui_manager.hpp>
+#include <entt/entt.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <format>
 
 namespace nb {
 
@@ -44,30 +48,71 @@ const char* res_browser::_file_icon(std::string_view name)
     return (info && info->data.resource.editor_icon) ? info->data.resource.editor_icon : ICON_FK_FILE_O;
 }
 
+static void _try_begin_drag(std::string_view name, entt::id_type asset_id)
+{
+    auto type = _resolve_file_type(name);
+    if (!type) return;
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+    {
+        res_drag_payload payload { asset_id, type.id() };
+        ImGui::SetDragDropPayload(RES_DRAG_PAYLOAD_TYPE, &payload, sizeof(payload));
+        const rtti::type_info* info = type.custom();
+        const char* icon = (info && info->data.resource.editor_icon)
+            ? info->data.resource.editor_icon : ICON_FK_FILE_O;
+        ImGui::Text("%s %.*s", icon, (int)name.size(), name.data());
+        ImGui::EndDragDropSource();
+    }
+}
+
 void res_browser::_draw_tree_node(const entt::registry& reg, entt::entity e)
 {
     const auto& node = reg.get<vfs_node>(e);
     bool is_file = reg.all_of<res_storage::asset_handle>(e);
     const char* icon = is_file ? _file_icon(node.name) : ICON_FK_FOLDER;
 
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+
     if (is_file)
     {
         ImGui::TreeNodeEx((void*)(intptr_t)entt::to_integral(e),
-            ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth,
+            ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen,
             "%s %s", icon, node.name.c_str());
-        if (on_open_file && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
         {
             auto type = _resolve_file_type(node.name);
             if (type)
-                on_open_file(type.id(), reg.get<res_storage::asset_handle>(e).id, node.name);
+                entt::locator<ui_manager*>::value()->request_open_resource_editor(
+                    type.id(), reg.get<res_storage::asset_handle>(e).id, node.name);
+        }
+        _try_begin_drag(node.name, reg.get<res_storage::asset_handle>(e).id);
+
+        // Resource ID column
+        ImGui::TableNextColumn();
+        entt::id_type asset_id = reg.get<res_storage::asset_handle>(e).id;
+        ImGui::TextDisabled("0x%08x", asset_id);
+
+        // Resource type column
+        ImGui::TableNextColumn();
+        auto type = _resolve_file_type(node.name);
+        if (type)
+        {
+            const rtti::type_info* info = type.custom();
+            const char* type_name = (info && info->identifier._val) ? info->identifier.c_str() : "?";
+            ImGui::TextDisabled("%s", type_name);
         }
     }
     else
     {
-        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth;
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_None;
         if (node.name.empty()) flags |= ImGuiTreeNodeFlags_DefaultOpen;
         bool open = ImGui::TreeNodeEx((void*)(intptr_t)entt::to_integral(e), flags,
             "%s %s", icon, node.name.empty() ? "/" : node.name.c_str());
+
+        // Add empty columns for folders
+        ImGui::TableNextColumn();
+        ImGui::TableNextColumn();
+
         if (open)
         {
             for (auto child : node.children)
@@ -108,7 +153,7 @@ void res_browser::_draw_browser_grid(const entt::registry& reg, entt::entity nod
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     const ImU32 bg_color   = ImGui::GetColorU32(IM_COL32(35, 35, 35, 220));
     const ImU32 dir_color  = ImGui::GetColorU32(ImGuiCol_Text);
-    const ImU32 file_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+    const ImU32 file_color = ImGui::GetColorU32(ImGuiCol_Text);
 
     ImVec2 start_pos = ImGui::GetCursorScreenPos();
     start_pos = ImVec2(start_pos.x + outer_padding, start_pos.y + outer_padding);
@@ -130,6 +175,10 @@ void res_browser::_draw_browser_grid(const entt::registry& reg, entt::entity nod
                 const auto& cnode  = reg.get<vfs_node>(child_e);
                 bool is_file       = reg.all_of<res_storage::asset_handle>(child_e);
                 const char* icon   = is_file ? _file_icon(cnode.name) : ICON_FK_FOLDER;
+                entt::id_type asset_id = is_file? reg.get<res_storage::asset_handle>(child_e).id : entt::null;
+                char asset_id_str[16] = {};
+                if (is_file)                    
+                    std::snprintf(asset_id_str, sizeof(asset_id_str), "0x%08x", asset_id);
 
                 ImGui::PushID((int)entt::to_integral(child_e));
 
@@ -145,13 +194,16 @@ void res_browser::_draw_browser_grid(const entt::registry& reg, entt::entity nod
                         _nav_stack.push_back(node_e);
                         _node = child_e;
                     }
-                    else if (on_open_file)
+                    else
                     {
                         auto type = _resolve_file_type(cnode.name);
                         if (type)
-                            on_open_file(type.id(), reg.get<res_storage::asset_handle>(child_e).id, cnode.name);
+                            entt::locator<ui_manager*>::value()->request_open_resource_editor(
+                                type.id(), reg.get<res_storage::asset_handle>(child_e).id, cnode.name);
                     }
                 }
+                if (is_file)
+                    _try_begin_drag(cnode.name, reg.get<res_storage::asset_handle>(child_e).id);
 
                 if (ImGui::IsRectVisible(item_size))
                 {
@@ -166,6 +218,12 @@ void res_browser::_draw_browser_grid(const entt::registry& reg, entt::entity nod
                                pos.y + (icon_sz - icon_sz_vec.y) * 0.5f),
                         is_file ? file_color : dir_color,
                         icon);
+
+                    if(_show_details && is_file)
+                        draw_list->AddText(
+                            ImVec2(pos.x + 2, pos.y + 2),
+                            is_file ? file_color : dir_color,
+                            asset_id_str);
 
                     const char* name = cnode.name.c_str();
                     ImVec2 name_sz   = ImGui::CalcTextSize(name);
@@ -264,12 +322,29 @@ void res_browser::draw(const char* title, bool* p_open)
         }
     }
 
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    if (ImGui::Button(_show_details ? ICON_FK_EYE : ICON_FK_EYE_SLASH)) _show_details = !_show_details;
+
     ImGui::Separator();
 
     if (_mode == 0)
     {
         if (ImGui::BeginChild("##res_tree", ImVec2(-FLT_MIN, -FLT_MIN)))
-            _draw_tree_node(vfs_reg, vfs.root());
+        {
+            if (ImGui::BeginTable("##res_tree_table", 3, ImGuiTableFlags_RowBg))
+            {
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+                ImGui::TableHeadersRow();
+                
+                _draw_tree_node(vfs_reg, vfs.root());
+                
+                ImGui::EndTable();
+            }
+        }
         ImGui::EndChild();
     }
     else

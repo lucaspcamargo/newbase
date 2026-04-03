@@ -216,7 +216,7 @@ void audio::out_gain(float gain)
 
 bool audio::bgm_play(entt::id_type res_id)
 {
-    auto vorbis_res = rman().get_vorbis(res_id);
+    auto vorbis_res = rman().get<rvorbis>(res_id);
     if(!vorbis_res->valid)
     {
         log::error("[audio] bgm_play: invalid resource: %x", res_id);

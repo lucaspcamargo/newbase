@@ -11,7 +11,7 @@ void cscript::_ensure_rtti()
 {
     entt::meta_factory<cscript>{}
         .custom<rtti::type_info>(rtti::type_info{
-            .identifier = "script", 
+            .identifier = "script",
             .type_class = rtti::TYPE_CLASS_COMPONENT,
             .data {
                 .component = {
@@ -19,7 +19,9 @@ void cscript::_ensure_rtti()
                 }
             }
         })
-        .ctor<>();
+        .ctor<>()
+        .data<&cscript::script>("script"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"script"});
     log::info("[cscript] registered: id=%x");
 }
 

@@ -1,9 +1,15 @@
 #include <newbase/editor/res_editor_window.hpp>
 #include <newbase/editor/meta_any_editor.hpp>
 #include <newbase/editor/texture_editor_widget.hpp>
+#include <newbase/editor/audio_editor_widget.hpp>
+#include <newbase/editor/text_editor_widget.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/res/texture.hpp>
+#include <newbase/res/wav.hpp>
+#include <newbase/res/vorbis.hpp>
+#include <newbase/res/script.hpp>
+#include <newbase/res/yaml.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
 
@@ -23,6 +29,8 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
     _resource = rman().get(type_id, asset_id);
     _ref      = {};
     _tex_widget.reset();
+    _audio_widget.reset();
+    _text_widget.reset();
 
     // build a unique imgui window id: visible title + hidden id suffix
     _title = std::string(title) + "##resed_" + std::to_string(asset_id);
@@ -42,6 +50,53 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
                 _tex_widget->open(rt->surf);
             }
         }
+        // WAV
+        if (_resource->type_id() == "rwav"_hs.value())
+        {
+            auto* rw = static_cast<rwav*>(_resource.get());
+            if (rw->valid && rw->buf && rw->len > 0)
+            {
+                _audio_widget = std::make_unique<audio_editor_widget>();
+                _audio_widget->open(rw->buf, rw->len, rw->spec);
+            }
+        }
+
+        // Vorbis
+        if (_resource->type_id() == "rvorbis"_hs.value())
+        {
+            auto* rv = static_cast<rvorbis*>(_resource.get());
+            if (rv->decoded && !rv->frames.empty())
+            {
+                _audio_widget = std::make_unique<audio_editor_widget>();
+                _audio_widget->open(rv->frames.data(), rv->frames.size(), rv->spec);
+            }
+        }
+
+        // Lua script
+        if (_resource->type_id() == "rscript"_hs.value())
+        {
+            auto* rs = static_cast<rscript*>(_resource.get());
+            if (rs->valid && !rs->raw.empty())
+            {
+                _text_widget = std::make_unique<text_editor_widget>();
+                _text_widget->open(rs->raw.data(), rs->raw.size(), "Lua");
+            }
+        }
+
+        // YAML
+        if (_resource->type_id() == "ryaml"_hs.value())
+        {
+            auto* ry = static_cast<ryaml*>(_resource.get());
+            if (ry->yaml_valid && !ry->data.empty())
+            {
+                _text_widget = std::make_unique<text_editor_widget>();
+                // data is null-terminated; exclude the terminator from the length
+                size_t text_len = ry->data.size();
+                if (text_len > 0 && ry->data.back() == '\0') --text_len;
+                _text_widget->open(ry->data.data(), text_len, "YAML");
+            }
+        }
+
         // Always build a meta_any too (shown as fallback or alongside)
         auto meta_type = entt::resolve(type_id);
         if (meta_type)
@@ -73,8 +128,34 @@ void res_editor_window::draw(bool* p_open)
             _tex_widget->apply(_resource.get());
             rman().save_resource(_resource.get());
         }
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_FK_REFRESH " Reload"))
+        {
+            // load_nocache: fresh copy from disk, cache untouched
+            auto fresh = rman().load_nocache(_type_id, _asset_id);
+            if (fresh)
+            {
+                auto* rt = static_cast<rtexture*>(fresh.get());
+                if (!rt->surf && rt->reload_surface)
+                    rt->surf = rt->reload_surface(rt->id());
+                if (rt->surf)
+                {
+                    _tex_widget = std::make_unique<texture_editor_widget>();
+                    _tex_widget->open(rt->surf);
+                }
+            }
+            // fresh drops here — cache and existing holders are unaffected
+        }
         ImGui::Separator();
         _tex_widget->draw();
+    }
+    else if (_audio_widget)
+    {
+        _audio_widget->draw();
+    }
+    else if (_text_widget)
+    {
+        _text_widget->draw();
     }
     else if (_ref)
         draw_meta_any_editor(type_name, _ref);

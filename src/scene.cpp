@@ -39,7 +39,7 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
 {
     (void) parent; // TODO hirerarchy stuff
     auto &reg = _d->reg;
-    auto res = rman().get_etree(retree_id, false);
+    auto res = rman().get<retree>(retree_id, false);
     if(!res)
     {
         log::warn("[scene] build_etree: cannot load: %x", static_cast<uint32_t>(retree_id));

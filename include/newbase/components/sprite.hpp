@@ -1,11 +1,11 @@
 #pragma once
 
 #include <newbase/res/sprite.hpp>
-#include <entt/resource/resource.hpp>
+#include <memory>
 
 namespace nb {
     struct csprite {
-        entt::resource<rsprite> spr;
+        std::shared_ptr<rsprite> spr;
         
         static void _ensure_rtti();
     };

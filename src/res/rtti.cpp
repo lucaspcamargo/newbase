@@ -9,8 +9,10 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
+#include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include "IconsForkAwesome.h"
+#include <memory>
 
 using entt::operator""_hs;
 
@@ -50,7 +52,14 @@ namespace nb::rtti {
                 .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                     return rloader_sprite{}(id);
                 }
-            });
+            })
+            .ctor<>()
+            .data<&rsprite::anchor>("anchor"_hs)
+                .custom<rtti::data_info>(rtti::data_info{"anchor"})
+            .data<&rsprite::dims>("dims"_hs)
+                .custom<rtti::data_info>(rtti::data_info{"dims"})
+            .data<&rsprite::tex>("tex"_hs)
+                .custom<rtti::data_info>(rtti::data_info{"tex"});
 
         entt::meta_factory<rvorbis>{}
             .type("rvorbis"_hs)
@@ -95,6 +104,47 @@ namespace nb::rtti {
                     return rloader_etree{}(id);
                 }
             });
+
+        // shared_ptr<T> registrations — used by meta_any_editor to display resource fields
+#define NB_REG_RES_PTR(T, name_str) \
+    entt::meta_factory<std::shared_ptr<T>>{} \
+        .type(entt::hashed_string{name_str "_ptr"}.value()) \
+        .ctor<>() \
+        .custom<type_info>(type_info{ \
+        .type_class = TYPE_CLASS_RESOURCE_PTR, \
+        .data = {.resource_ptr = { \
+            .resource_type_id = entt::hashed_string{name_str}.value(), \
+            .get_ptr = +[](const entt::meta_any& a) -> std::shared_ptr<nb::resource> { \
+            auto* p = a.try_cast<std::shared_ptr<T>>(); \
+            return p ? *p : nullptr; \
+            }, \
+            .set_ptr = +[](entt::meta_any& a, std::shared_ptr<nb::resource> p) { \
+                auto target_type = a.type().info().name(); \
+                auto source_type = typeid(T).name(); \
+                log::warn("[res] resource pointer assignment: target='%s' source='%s' resource_type_id='%s'", \
+                      target_type.length() ? std::string{target_type}.c_str() : "<unknown>", \
+                      source_type ? source_type : "<unknown>", \
+                      name_str); \
+            if(!a.assign(std::static_pointer_cast<T>(p))) { \
+                auto target_type = a.type().info().name(); \
+                auto source_type = typeid(T).name(); \
+                log::warn("[res] resource pointer assignment failed: target='%s' source='%s' resource_type_id='%s'", \
+                      target_type.length() ? std::string{target_type}.c_str() : "<unknown>", \
+                      source_type ? source_type : "<unknown>", \
+                      name_str); \
+            } \
+            } \
+        }} \
+        });
+
+        NB_REG_RES_PTR(rtexture, "rtexture")
+        NB_REG_RES_PTR(rsprite,  "rsprite")
+        NB_REG_RES_PTR(rscript,  "rscript")
+        NB_REG_RES_PTR(rvorbis,  "rvorbis")
+        NB_REG_RES_PTR(rwav,     "rwav")
+        NB_REG_RES_PTR(ryaml,    "ryaml")
+        NB_REG_RES_PTR(retree,   "retree")
+#undef NB_REG_RES_PTR
     }
 
 }

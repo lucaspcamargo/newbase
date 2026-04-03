@@ -32,9 +32,10 @@
 namespace nb{
 
 struct rmanager_p {
-    // dynamic cache: resource_type_id -> { asset_id -> shared_ptr<resource> }
+    // weak cache: resource_type_id -> { asset_id -> weak_ptr<resource> }
+    // entries expire automatically when no live shared_ptr references remain
     std::unordered_map<entt::id_type,
-        std::unordered_map<entt::id_type, std::shared_ptr<nb::resource>>> caches;
+        std::unordered_map<entt::id_type, std::weak_ptr<nb::resource>>> caches;
 
     std::vector<std::unique_ptr<res_storage::storage_interface>> storage_interfaces;
     std::unordered_map<entt::id_type, res_storage::asset_handle> asset_handles;
@@ -119,6 +120,20 @@ bool rmanager::configure(const ryml::NodeRef &config)
     _d->vfs = build_vfs_tree();
 
     return true;
+}
+
+void rmanager::collect()
+{
+    for (auto& [type_id, type_cache] : _d->caches)
+    {
+        for (auto it = type_cache.begin(); it != type_cache.end(); )
+        {
+            if (it->second.expired())
+                it = type_cache.erase(it);
+            else
+                ++it;
+        }
+    }
 }
 
 bool rmanager::known(entt::id_type id)
@@ -209,7 +224,11 @@ std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type
     {
         auto it = type_cache.find(asset_id);
         if (it != type_cache.end())
-            return it->second;
+        {
+            if (auto locked = it->second.lock())
+                return locked;
+            // expired — fall through to reload
+        }
     }
 
     auto mtype = entt::resolve(type_id);
@@ -231,43 +250,24 @@ std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type
     return res;
 }
 
-// Backwards-compatible typed accessors
 
-entt::resource<retree> rmanager::get_etree(entt::id_type id, bool forceload)
+std::shared_ptr<nb::resource> rmanager::load_nocache(entt::id_type type_id, entt::id_type asset_id)
 {
-    return entt::resource<retree>{std::static_pointer_cast<retree>(
-        get(entt::resolve<retree>().id(), id, forceload))};
+    auto mtype = entt::resolve(type_id);
+    if (!mtype)
+    {
+        log::error("[rmanager] load_nocache: unregistered resource type: %x", type_id);
+        return nullptr;
+    }
+    const rtti::type_info *info = mtype.custom().operator rtti::type_info*();
+    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->loader_fn)
+    {
+        log::error("[rmanager] load_nocache: resource type has no loader: %x", type_id);
+        return nullptr;
+    }
+    return info->loader_fn(asset_id);
 }
 
-entt::resource<rsprite> rmanager::get_sprite(entt::id_type id, bool forceload)
-{
-    return entt::resource<rsprite>{std::static_pointer_cast<rsprite>(
-        get(entt::resolve<rsprite>().id(), id, forceload))};
-}
-
-entt::resource<rtexture> rmanager::get_texture(entt::id_type id, bool forceload)
-{
-    return entt::resource<rtexture>{std::static_pointer_cast<rtexture>(
-        get(entt::resolve<rtexture>().id(), id, forceload))};
-}
-
-entt::resource<rscript> rmanager::get_script(entt::id_type id, bool forceload)
-{
-    return entt::resource<rscript>{std::static_pointer_cast<rscript>(
-        get(entt::resolve<rscript>().id(), id, forceload))};
-}
-
-entt::resource<rvorbis> rmanager::get_vorbis(entt::id_type id, bool forceload)
-{
-    return entt::resource<rvorbis>{std::static_pointer_cast<rvorbis>(
-        get(entt::resolve<rvorbis>().id(), id, forceload))};
-}
-
-entt::resource<ryaml> rmanager::get_yaml(entt::id_type id, bool forceload)
-{
-    return entt::resource<ryaml>{std::static_pointer_cast<ryaml>(
-        get(entt::resolve<ryaml>().id(), id, forceload))};
-}
 
 vfs_tree rmanager::build_vfs_tree() const
 {

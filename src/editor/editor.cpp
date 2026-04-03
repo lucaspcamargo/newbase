@@ -1,5 +1,7 @@
 #include <newbase/editor/editor.hpp>
 #include <newbase/editor/about_window.hpp>
+#include <newbase/editor/rtti_window.hpp>
+#include <newbase/editor/hash_window.hpp>
 #include <newbase/editor/console.hpp>
 #include <newbase/editor/res_browser.hpp>
 #include <newbase/editor/res_editor_window.hpp>
@@ -9,6 +11,7 @@
 #include <newbase/scene.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <newbase/log.hpp>
 #include <newbase/sdl/logging_handler.hpp>
 #include <newbase/utility/glm.hpp>
@@ -24,12 +27,16 @@ using entt::operator""_hs;
 static bool _enabled = false;
 static bool _console_enabled = false;
 static bool _about_enabled = false;
+static bool _rtti_enabled = false;
+static bool _hash_enabled = false;
 static bool _show_demo = false;
 static int _log_observer = -1;
 static console c;
 static nb::res_browser _res_browser;
 static std::vector<nb::res_editor_window> _res_editors;
 static nb::about_window _about;
+static nb::rtti_window _rtti;
+static nb::hash_window _hash;
 
 static entt::entity _selected_entity = entt::null;
 
@@ -46,11 +53,19 @@ bool editor::init(ryml::ConstNodeRef cfg)
 
     engine::instance().debug_action_register("editor toggle", [](){
         _enabled = !_enabled;
+        engine::instance().set_paused(
+            
+            
+            
+            _enabled);
     });
 
-    _res_browser.on_open_file = [](entt::id_type type_id, entt::id_type asset_id, std::string_view name) {
+    auto open_res_editor = [](entt::id_type type_id, entt::id_type asset_id, std::string_view name) {
         _res_editors.emplace_back().open(type_id, asset_id, name);
     };
+
+    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+    ui_mgr->register_open_resource_editor_callback(open_res_editor);
 
     return true;
 }
@@ -173,6 +188,12 @@ bool editor::step(step_phase phase)
         if(_about_enabled)
             _about.draw(&_about_enabled);
 
+        if(_rtti_enabled)
+            _rtti.draw(&_rtti_enabled);
+
+        if(_hash_enabled)
+            _hash.draw(&_hash_enabled);
+
     }
     return true;
 }
@@ -216,6 +237,16 @@ void editor::_draw_main_menu()
                 _show_demo = !_show_demo;
             }
 
+            if(ImGui::MenuItem("RTTI Info"))
+            {
+                _rtti_enabled = true;
+            }
+
+            if(ImGui::MenuItem("Hash Calculator"))
+            {
+                _hash_enabled = true;
+            }
+
             if(ImGui::MenuItem("About"))
             {
                 _about_enabled = true;
@@ -223,7 +254,7 @@ void editor::_draw_main_menu()
             ImGui::EndMenu();
         }
 
-        // on the right edge of the menu bar, add a combo box for the currently selected scene
+            /* TABS IN MENU TEST
             ImGui::Separator();
             if (ImGui::BeginTabBar("##TabBar"))
             {
@@ -234,7 +265,21 @@ void editor::_draw_main_menu()
                 if (ImGui::BeginTabItem("Blou"))
                     ImGui::EndTabItem();
                 ImGui::EndTabBar();
-            }
+            }*/
+
+        // right-aligned play/pause button
+        float btn_w = ImGui::GetFrameHeight() * 2.0f;
+        ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - btn_w);
+        if (engine::instance().is_paused())
+        {
+            if (ImGui::Button(ICON_FK_PLAY " Play", {btn_w, 0}))
+                engine::instance().set_paused(false);
+        }
+        else
+        {
+            if (ImGui::Button(ICON_FK_PAUSE " Pause", {btn_w, 0}))
+                engine::instance().set_paused(true);
+        }
 
         ImGui::EndMainMenuBar();
     }

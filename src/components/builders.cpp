@@ -34,7 +34,7 @@ bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
     std::string respath;
     c4::from_chars(def["res"].val(), &respath);
     auto hash = entt::hashed_string(respath.c_str());
-    dst.spr = rman().get_sprite(hash.value());
+    dst.spr = rman().get<rsprite>(hash.value());
     return true;
 }
 
@@ -44,7 +44,7 @@ bool ::nb::build_script(ryml::ConstNodeRef def, cscript &dst)
     std::string respath;
     c4::from_chars(def["lua"].val(), &respath);
     auto hash = entt::hashed_string(respath.c_str());
-    dst.script = rman().get_script(hash.value());
+    dst.script = rman().get<rscript>(hash.value());
     return true;
 }
 

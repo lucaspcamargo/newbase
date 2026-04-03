@@ -78,6 +78,7 @@ enum type_class_t {
     TYPE_CLASS_SINGLETON = 4,
     TYPE_CLASS_RES_STORAGE = 5,
     TYPE_CLASS_SERVICE = 6,
+    TYPE_CLASS_RESOURCE_PTR = 7, // std::shared_ptr<T> where T : nb::resource
 };
 
 struct type_info
@@ -110,6 +111,15 @@ struct type_info
             const char *editor_icon; // icon glyph (e.g. from ForkAwesome) shown in the resource browser
             const char *extensions;  // space-separated list of handled file extensions (without dot, e.g. "png jpg jpeg")
         } resource;
+
+        struct {
+            // meta type id of the pointed-to resource (e.g. "rtexture"_hs.value())
+            entt::id_type resource_type_id;
+            // extracts the base shared_ptr<nb::resource> from a meta_any holding this type
+            std::shared_ptr<nb::resource> (*get_ptr)(const entt::meta_any&);
+            // writes a new base shared_ptr<nb::resource> back into the meta_any (casts to concrete type)
+            void (*set_ptr)(entt::meta_any&, std::shared_ptr<nb::resource>);
+        } resource_ptr;
     } data;
 
     void *uptr {nullptr};
@@ -130,6 +140,12 @@ struct func_info
 struct data_info
 {
     cstrn<32> identifier {};
+
+    // When true, this field holds a resource id (entt::id_type / hashed_string value).
+    // resource_type_id names the meta-type of the expected resource (e.g. "rtexture"_hs.value()).
+    // Leave resource_type_id at 0 to indicate "any resource type".
+    bool is_resource_id {false};
+    entt::id_type resource_type_id {0};
 };
 
 // this is used to define builder functions for non-copyable and/or non-movable types,

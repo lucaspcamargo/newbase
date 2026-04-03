@@ -40,6 +40,8 @@ public:
     //bool destroy_scene(entt::id_type id);
 
     void request_exit();
+    void set_paused(bool paused);
+    bool is_paused() const;
 
     std::shared_ptr<::nb::system> system_from_id(entt::id_type meta_id);
 

@@ -26,6 +26,9 @@ namespace nb
         void draw_perf() override;
 
         bool toggle_tool_window(const char *name) override;
+
+        void register_open_resource_editor_callback(open_resource_editor_fn fn) override;
+        void request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name) override;
     private:
         ui_manager_p *_d;
     };

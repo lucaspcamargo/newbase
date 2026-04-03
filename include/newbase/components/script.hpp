@@ -2,11 +2,11 @@
 
 #include <newbase/res/script.hpp>
 #include <newbase/script_lua/lua.hpp>
-#include <entt/resource/resource.hpp>
+#include <memory>
 
 namespace nb {
     struct cscript {
-        entt::resource<rscript> script {};
+        std::shared_ptr<rscript> script {};
         lua_State *state {nullptr};
         bool ready {false};
         bool skip {false};

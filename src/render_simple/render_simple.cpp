@@ -146,7 +146,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
 
     // attempt to load and set window icon
-    auto icon_tex = rman().get_texture("_nb_core/icon_192.png"_hs);
+    auto icon_tex = rman().get<rtexture>("_nb_core/icon_192.png"_hs);
     if(icon_tex && icon_tex->surf)
     {
         SDL_SetWindowIcon(_win, icon_tex->surf);
@@ -228,7 +228,9 @@ bool render_simple::step(nb::step_phase phase)
         view.use<const cspatial>();
         for(auto [id, spatial, sprite]: view.each()) {
             auto spr_res = sprite.spr;
-            auto tex = rman().get_texture(spr_res->id_tex);
+            if(!spr_res) continue; // null sprite
+            auto tex = spr_res->tex;
+            if(!tex) continue; // missing texture resource
             if(!tex->uploaded && tex->surf)
             {
                 tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);

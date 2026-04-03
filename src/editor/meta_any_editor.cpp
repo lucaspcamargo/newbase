@@ -1,8 +1,11 @@
 #include <newbase/editor/meta_any_editor.hpp>
+#include <newbase/editor/resource_field_widget.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/utility/glm.hpp>
+#include <newbase/res/resource.hpp>
 #include <imgui.h>
+#include <memory>
 
 namespace nb {
 
@@ -44,10 +47,25 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
             if (ImGui::InputText(label, buf, sizeof(buf))) { *v = buf; changed = true; }
         }
     } else {
+        // shared_ptr<resource> types
         auto type = ref.type();
+        const rtti::type_info* type_rtti = type.custom().operator const rtti::type_info*();
+        if (type_rtti && type_rtti->type_class == rtti::TYPE_CLASS_RESOURCE_PTR)
+        {
+            auto ptr = type_rtti->data.resource_ptr.get_ptr(ref);
+            if (draw_resource_field(label, type_rtti->data.resource_ptr.resource_type_id, ptr))
+            {
+                type_rtti->data.resource_ptr.set_ptr(ref, ptr);
+                return true;
+            }
+            return false;
+        }
+
         auto data_range = type.data();
         bool has_data = data_range.begin() != data_range.end();
-        if (has_data && (!recursing || ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen))) {
+        if (has_data && (!recursing
+            
+             || ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen))) {
             for (auto [did, d] : data_range) {
                 const rtti::data_info* di = d.custom().operator const rtti::data_info*();
                 const char* fname = di ? di->identifier.operator const char*() : "?";

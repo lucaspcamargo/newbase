@@ -10,9 +10,8 @@ using entt::operator""_hs;
 void csprite::_ensure_rtti()
 {
     entt::meta_factory<csprite>{}
-        
         .custom<rtti::type_info>(rtti::type_info{
-            .identifier = "sprite", 
+            .identifier = "sprite",
             .type_class = rtti::TYPE_CLASS_COMPONENT,
             .data {
                 .component = {
@@ -20,7 +19,9 @@ void csprite::_ensure_rtti()
                 }
             }
         })
-        .ctor<>();
+        .ctor<>()
+        .data<&csprite::spr>("spr"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"spr"});
     log::info("[csprite] registered: id=%x");
 }
 

@@ -52,6 +52,7 @@ struct nb::engine_p {
     scene default_scene;
 
     bool exit_requested {false};
+    bool paused {false};
 
     std::array<framecounter_data, nb::step_phase::_STEP_PHASE_COUNT+1> fc_data; // last one is for total
     size_t fc_end = 0;
@@ -194,6 +195,8 @@ bool engine::step()
         if(ret)
         {
             auto phase = static_cast<nb::step_phase>(i);
+            if(_d->paused && (phase == step_phase::PHYSICS_UPDATE || phase == step_phase::GENERAL_UPDATE))
+                continue;
             uint64_t start_time = SDL_GetTicksNS();
 
             for(auto s: _d->_systems)
@@ -269,6 +272,16 @@ void engine::request_exit()
 {
     log::info("[engine] exit requested");
     _d->exit_requested = true;
+}
+
+void engine::set_paused(bool paused)
+{
+    _d->paused = paused;
+}
+
+bool engine::is_paused() const
+{
+    return _d->paused;
 }
 
 void engine::_register_default_services()

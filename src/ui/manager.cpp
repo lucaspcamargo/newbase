@@ -31,6 +31,7 @@ struct nb::ui_manager_p
     std::unordered_map<std::string, tool_window_data> tool_windows;
     ImGuiID dockspace_id;
     std::string ini_path;
+    ui_manager::open_resource_editor_fn open_resource_editor_cb;
 };
 
 
@@ -162,6 +163,17 @@ bool ui_manager_simple::toggle_tool_window(const char *name)
         return true;
     }
     return false;
+}
+
+void ui_manager_simple::register_open_resource_editor_callback(open_resource_editor_fn fn)
+{
+    _d->open_resource_editor_cb = std::move(fn);
+}
+
+void ui_manager_simple::request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name)
+{
+    if (_d->open_resource_editor_cb)
+        _d->open_resource_editor_cb(type_id, asset_id, name);
 }
 
 static float get_frametime_point(void *data, int index)

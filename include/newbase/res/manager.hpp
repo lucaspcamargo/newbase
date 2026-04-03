@@ -4,8 +4,6 @@
 #include <newbase/res/resource.hpp>
 #include <newbase/res/storage/handle.hpp>
 #include <newbase/res/vfs.hpp>
-#include <entt/resource/resource.hpp>
-#include <entt/resource/cache.hpp>
 #include <ryml.hpp>
 #include <memory>
 #include <string_view>
@@ -28,6 +26,9 @@ public:
     void clear();
 
     bool known(entt::id_type id);
+
+    // Erase expired weak_ptr entries from the cache. Call periodically to keep memory tidy.
+    void collect();
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const;
     bool write_all_sync(entt::id_type id, const void *data, std::size_t size);
 
@@ -41,6 +42,9 @@ public:
     // Generic load: looks up the registered loader via RTTI
     std::shared_ptr<nb::resource> get(entt::id_type type_id, entt::id_type asset_id, bool forceload = false);
 
+    // Load fresh from storage without reading or updating the cache.
+    std::shared_ptr<nb::resource> load_nocache(entt::id_type type_id, entt::id_type asset_id);
+
     // Typed convenience wrapper
     template<typename T>
     std::shared_ptr<T> get(entt::id_type asset_id, bool forceload = false)
@@ -48,13 +52,6 @@ public:
         return std::static_pointer_cast<T>(get(entt::resolve<T>().id(), asset_id, forceload));
     }
 
-    // Backwards-compatible typed accessors
-    entt::resource<retree>   get_etree  (entt::id_type id, bool forceload = false);
-    entt::resource<rsprite>  get_sprite (entt::id_type id, bool forceload = false);
-    entt::resource<rtexture> get_texture(entt::id_type id, bool forceload = false);
-    entt::resource<rscript>  get_script (entt::id_type id, bool forceload = false);
-    entt::resource<rvorbis>  get_vorbis (entt::id_type id, bool forceload = false);
-    entt::resource<ryaml>    get_yaml   (entt::id_type id, bool forceload = false);
 
 private:
     rmanager_p *_d {nullptr};

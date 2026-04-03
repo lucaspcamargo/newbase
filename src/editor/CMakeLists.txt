@@ -3,10 +3,15 @@
 newbase_add_system(NAME editor SOURCES
     ./editor.cpp
     ./about_window.cpp
+    ./rtti_window.cpp
+    ./hash_window.cpp
     ./spdx_table.cpp
     ./res_browser.cpp
     ./res_editor_window.cpp
     ./meta_any_editor.cpp
     ./texture_editor_widget.cpp
+    ./audio_editor_widget.cpp
+    ./text_editor_widget.cpp
+    ./resource_field_widget.cpp
 )
 newbase_commit_systems()

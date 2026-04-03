@@ -44,10 +44,50 @@ namespace nb {
     rloader_sprite::result_type rloader_sprite::operator()(entt::id_type id) const
     {
         log::info("[rloader_sprite] loading: %x", id);
-        // TODO have sprite data file?
-        // for now just load texture
+
+        std::vector<char> data;
+        if (!rman().read_all_sync(id, data, true))
+        {
+            log::error("[rloader_sprite] cannot read: %x", id);
+            return nullptr;
+        }
+
+        auto tree = ryml::parse_in_place(c4::to_substr(data.data()));
+        auto root = tree.rootref();
+
+        std::string tex_path;
+        if (!root.has_child("texture"))
+        {
+            log::error("[rloader_sprite] missing 'texture' field: %x", id);
+            return nullptr;
+        }
+        c4::from_chars(root["texture"].val(), &tex_path);
+
         auto ret = std::make_shared<rsprite>(id);
-        ret->id_tex = id;
+
+        // resolve and cache the texture
+        auto tex_id = entt::hashed_string{tex_path.c_str()}.value();
+        ret->tex = rman().get<rtexture>(tex_id);
+        if (!ret->tex)
+        {
+            log::error("[rloader_sprite] cannot load texture '%s': %x", tex_path.c_str(), id);
+            return nullptr;
+        }
+
+        if (root.has_child("anchor"))
+        {
+            ryml::ConstNodeRef an = root["anchor"];
+            c4::from_chars(an[0].val(), &ret->anchor.x);
+            c4::from_chars(an[1].val(), &ret->anchor.y);
+        }
+
+        if (root.has_child("dims"))
+        {
+            ryml::ConstNodeRef dm = root["dims"];
+            c4::from_chars(dm[0].val(), &ret->dims.x);
+            c4::from_chars(dm[1].val(), &ret->dims.y);
+        }
+
         return ret;
     }
 

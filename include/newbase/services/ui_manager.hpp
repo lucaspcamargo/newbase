@@ -1,5 +1,7 @@
 #pragma once
 #include <functional>
+#include <entt/entt.hpp>
+#include <string_view>
 
 namespace nb
 {
@@ -26,5 +28,13 @@ namespace nb
         virtual void unregister_tool_window(const char* name) = 0;
 
         virtual bool toggle_tool_window(const char *name) = 0;
+
+        // Resource editor integration.
+        // A system that can display a resource editor (e.g. the editor system) registers a
+        // callback here. Callers (resource field widget, resource browser, etc.) invoke
+        // request_open_resource_editor without needing to know who handles it.
+        using open_resource_editor_fn = std::function<void(entt::id_type type_id, entt::id_type asset_id, std::string_view name)>;
+        virtual void register_open_resource_editor_callback(open_resource_editor_fn fn) = 0;
+        virtual void request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name) = 0;
     };
 }
