@@ -1,5 +1,6 @@
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <newbase/log.hpp>
 #ifdef __EMSCRIPTEN__
 #include <newbase/utility/emscripten.hpp>
@@ -272,28 +273,30 @@ static void draw_frametimes_bar_graph(const engine::framecounter_data& fc, int f
 
 void ui_manager_simple::draw_perf()
 {
+    const float PAD = ImGui::GetFontSize() * 0.75f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_size = viewport->WorkSize;
+
+    ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(static_cast<ImGuiID>(_d->dockspace_id)); 
+    if (central_node)
+    {
+        // if there is a window docked in the central node, abort drawing this overlay
+        if(central_node->Windows.Size > 0)
+            return;
+
+        // If there is a DockSpace, use its bounds instead of the entire viewport
+        work_pos = central_node->Pos;
+        work_size = central_node->Size;
+    }
+
+    // maybe draw perf window
+
     static int location = 1;
     ImGuiIO& io = ImGui::GetIO();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     if (location >= 0)
     {
-        const float PAD = 10.0f;
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
-        ImVec2 work_size = viewport->WorkSize;
-
-        ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(static_cast<ImGuiID>(_d->dockspace_id)); 
-        if (central_node)
-        {
-            // if there is a window docked in the central node, abort drawing this overlay
-            if(central_node->Windows.Size > 0)
-                return;
-
-            // If there is a DockSpace, use its bounds instead of the entire viewport
-            work_pos = central_node->Pos;
-            work_size = central_node->Size;
-        }
-
         ImVec2 window_pos, window_pos_pivot;
         window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
         window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
@@ -338,42 +341,60 @@ void ui_manager_simple::draw_perf()
         ImGui::Separator();
         ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
 #endif
-        ImGui::Separator();
+        ImGui::Separator();    }
+
+    // have a button to trigger another debug action menu (hamburger icon)
+    if(ImGui::Button(ICON_FK_PLAY_CIRCLE " Actions"))
+        ImGui::OpenPopup("DebugActionsPopup");
+    
+    ImGui::SameLine();
+
+    if(ImGui::Button(ICON_FK_ARROWS " Position"))
+        ImGui::OpenPopup("MovePopup");
+
+    if(ImGui::BeginPopup("DebugActionsPopup"))
+    {
         for(const auto& [idx, name]: engine::instance().debug_action_names())
         {
-            char c = idx == 0? '`' : '0' + idx;
-            ImGui::Text("[%c] %s", c, name.c_str());
-        }
-
-        if (ImGui::BeginPopupContextWindow(nullptr, 
-#ifdef ANDROID
-            ImGuiPopupFlags_MouseButtonLeft
-#else
-            ImGuiPopupFlags_MouseButtonRight
-#endif
-        ))
-        {
-            if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
-            if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
-            if (ImGui::MenuItem("Top-left",     NULL, location == 0)) location = 0;
-            if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
-            if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
-            if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
-            ImGui::Separator();
-            // have a submenu with every debug action registered, to be able to trigger them from the overlay
-            if (ImGui::BeginMenu("Debug Actions"))
+            if (ImGui::MenuItem(name.c_str(), NULL, false))
             {
-                for(const auto& [idx, name]: engine::instance().debug_action_names())
-                {
-                    if (ImGui::MenuItem(name.c_str(), NULL, false))
-                    {
-                        engine::instance().debug_action_trigger(idx);
-                    }
-                }
-                ImGui::EndMenu();
+                engine::instance().debug_action_trigger(idx);
             }
-            ImGui::EndPopup();
         }
+        ImGui::EndPopup();
     }
+
+    if(ImGui::BeginPopup("MovePopup"))
+    {
+        if(ImGui::Selectable("Top-Left", location ==0)) location = 0;
+        if(ImGui::MenuItem("Top-Right")) location = 1;
+        if(ImGui::MenuItem("Bottom-Left")) location = 2;
+        if(ImGui::MenuItem("Bottom-Right")) location = 3;
+        if(ImGui::MenuItem("Center")) location = -2;
+        if(ImGui::MenuItem("Free")) location = -1;
+        ImGui::EndPopup();
+    }
+
     ImGui::End();
+
+
+    // bottom hints
+
+    std::string bottom_text {};
+
+    for(const auto& [idx, name]: engine::instance().debug_action_names())
+    {
+        char c = idx == 0? '`' : '0' + idx;
+        bottom_text += idx == 0 ? "[" + std::string(1, c) + "]  " + name : "[F" + std::string(1, c) + "] " + name;
+        bottom_text += "      ";
+    }
+
+    // write text to background draw list
+    // align to bottom left of work area, with some padding
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    auto col_text = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    auto bottom_text_pos = ImVec2(work_pos.x + PAD, work_pos.y + work_size.y - PAD - ImGui::GetTextLineHeight());
+    col_text.w *= 0.5f; // make text more transparent
+    dl->AddText(bottom_text_pos, ImGui::ColorConvertFloat4ToU32(col_text),
+        bottom_text.c_str());
 }

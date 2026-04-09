@@ -245,6 +245,16 @@ bool engine::event(SDL_Event *evt)
                 it->second();
             }
         }
+        // check for grave scancode, and do debug action 0
+        else if(evt->key.scancode == SDL_SCANCODE_GRAVE)
+        {
+            auto it = _d->dbg_action_callbacks.find(0);
+            if(it != _d->dbg_action_callbacks.end())
+            {
+                log::info("[engine] debug action triggered: (%d) '%s'", it->first, _d->dbg_action_names[0].c_str());
+                it->second();
+            }
+        }
     }
     
     if(evt->type == SDL_EVENT_QUIT)

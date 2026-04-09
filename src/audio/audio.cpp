@@ -428,7 +428,7 @@ bool audio::init(ryml::ConstNodeRef cfg)
         });
     }
 
-    engine::instance().debug_action_register("audio debug toggle", [](){
+    engine::instance().debug_action_register("Audio Tools", [](){
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
         if(ui_mgr)
             ui_mgr->toggle_tool_window("audio");

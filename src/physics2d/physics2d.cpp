@@ -104,7 +104,7 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
         });
     }
 
-    engine::instance().debug_action_register("toggle physics2d tools", [](){
+    engine::instance().debug_action_register("Physics2D Tools", [](){
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
         if(ui_mgr)
             ui_mgr->toggle_tool_window("physics2d");

@@ -48,11 +48,11 @@ bool editor::init(ryml::ConstNodeRef cfg)
         c.AddLog("[%s] [%s] %s", log::priority_str(static_cast<log::priority>(prio)), log::category_str(static_cast<log::category>(category)), msg);
     });
 
-    engine::instance().debug_action_register("console toggle", [](){
+    engine::instance().debug_action_register("Console", [](){
         _console_enabled = !_console_enabled;
     });
 
-    engine::instance().debug_action_register("editor toggle", [](){
+    engine::instance().debug_action_register("Editor", [](){
         _enabled = !_enabled;
         engine::instance().set_paused(_enabled);
     });
