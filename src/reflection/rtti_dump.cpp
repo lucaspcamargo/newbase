@@ -22,6 +22,8 @@ std::string dump_rtti_info()
         oss << "Type ID: 0x" << std::hex << id << std::dec << "\n";
         oss << "Name: " << (type.info().name().size() ? std::string{type.info().name()}.c_str() : "<unnamed>");
 
+
+        
         if(type.info().name().size() != 0)
         {
             oss << std::hex << " (hashed: 0x" << hash_string_view(type.info().name()) << ")\n";

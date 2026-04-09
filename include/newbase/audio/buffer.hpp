@@ -87,7 +87,12 @@ public:
             assert(end_frame >= start_frame);
         }
 
-        span(span&&) = delete;
+        span(span&& other):
+            m_buf(other.m_buf),
+            m_frame_start(other.m_frame_start),
+            m_frame_len(other.m_frame_len)
+        {
+        }
 
         ~span() = default;
 

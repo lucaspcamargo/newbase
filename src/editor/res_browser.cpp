@@ -48,6 +48,32 @@ const char* res_browser::_file_icon(std::string_view name)
     return (info && info->data.resource.editor_icon) ? info->data.resource.editor_icon : ICON_FK_FILE_O;
 }
 
+static void _draw_file_context_menu(std::string_view name, entt::id_type asset_id)
+{
+    if (!ImGui::BeginPopupContextItem())
+        return;
+
+    auto type = _resolve_file_type(name);
+
+    if (ImGui::MenuItem(ICON_FK_PENCIL " Edit..."))
+    {
+        if (type)
+            entt::locator<ui_manager*>::value()->request_open_resource_editor(
+                type.id(), asset_id, name);
+    }
+
+    if (!type) ImGui::BeginDisabled();
+    if (ImGui::MenuItem(ICON_FK_CLIPBOARD " Copy ID"))
+    {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "0x%08x", asset_id);
+        ImGui::SetClipboardText(buf);
+    }
+    if (!type) ImGui::EndDisabled();
+
+    ImGui::EndPopup();
+}
+
 static void _try_begin_drag(std::string_view name, entt::id_type asset_id)
 {
     auto type = _resolve_file_type(name);
@@ -86,6 +112,7 @@ void res_browser::_draw_tree_node(const entt::registry& reg, entt::entity e)
                     type.id(), reg.get<res_storage::asset_handle>(e).id, node.name);
         }
         _try_begin_drag(node.name, reg.get<res_storage::asset_handle>(e).id);
+        _draw_file_context_menu(node.name, reg.get<res_storage::asset_handle>(e).id);
 
         // Resource ID column
         ImGui::TableNextColumn();
@@ -203,7 +230,10 @@ void res_browser::_draw_browser_grid(const entt::registry& reg, entt::entity nod
                     }
                 }
                 if (is_file)
-                    _try_begin_drag(cnode.name, reg.get<res_storage::asset_handle>(child_e).id);
+                {
+                    _try_begin_drag(cnode.name, asset_id);
+                    _draw_file_context_menu(cnode.name, asset_id);
+                }
 
                 if (ImGui::IsRectVisible(item_size))
                 {

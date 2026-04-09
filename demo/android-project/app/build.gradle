@@ -12,7 +12,7 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                arguments /*"--trace",*/ "-DNEWBASE_SDL_STATIC=OFF", "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments /*"--trace",*/ "-DNEWBASE_SDL_STATIC=OFF", "-DNEWBASE_ANDROID_MAIN=newbase_demo", "-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DNEWBASE_SGDK=OFF"
                 // abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
                 abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
                 targets "main"

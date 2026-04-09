@@ -234,11 +234,9 @@ bool engine::event(SDL_Event *evt)
             return false;
         else
 #endif
-        if((evt->key.key >= SDLK_0 && evt->key.key <= SDLK_9) || evt->key.scancode == SDL_SCANCODE_GRAVE)
+        if(evt->key.key >= SDLK_F1 && evt->key.key <= SDLK_F12)
         {
-            int idx = evt->key.key - SDLK_0;
-            if(evt->key.scancode == SDL_SCANCODE_GRAVE)
-                idx = 0;
+            int idx = evt->key.key - SDLK_F1 + 1;
 
             auto it = _d->dbg_action_callbacks.find(idx);
             if(it != _d->dbg_action_callbacks.end())

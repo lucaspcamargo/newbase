@@ -12,7 +12,8 @@ namespace nb::graphplan {
         editor(plan &plan);
         ~editor();
 
-        void draw();
+        // Returns true if any structural change was made to the plan this frame.
+        bool draw();
 
     private:
         editor_p *_d;

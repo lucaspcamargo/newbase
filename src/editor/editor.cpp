@@ -15,6 +15,7 @@
 #include <newbase/log.hpp>
 #include <newbase/sdl/logging_handler.hpp>
 #include <newbase/utility/glm.hpp>
+#include <newbase/ui/imgui_style.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
@@ -53,11 +54,7 @@ bool editor::init(ryml::ConstNodeRef cfg)
 
     engine::instance().debug_action_register("editor toggle", [](){
         _enabled = !_enabled;
-        engine::instance().set_paused(
-            
-            
-            
-            _enabled);
+        engine::instance().set_paused(_enabled);
     });
 
     auto open_res_editor = [](entt::id_type type_id, entt::id_type asset_id, std::string_view name) {
@@ -227,6 +224,22 @@ void editor::_draw_main_menu()
             {
                 _enabled = !_enabled;
             }
+
+            ImGui::Separator();
+
+            if(ImGui::BeginMenu("Theme"))
+            {
+                if(ImGui::MenuItem("Default"))
+                    imgui_style_setup();
+                if(ImGui::MenuItem("Dark"))
+                    ImGui::StyleColorsDark();
+                if(ImGui::MenuItem("Light"))
+                    ImGui::StyleColorsLight();
+                if(ImGui::MenuItem("Classic"))
+                    ImGui::StyleColorsClassic();
+                ImGui::EndMenu();
+            }
+
             ImGui::EndMenu();
         }
 

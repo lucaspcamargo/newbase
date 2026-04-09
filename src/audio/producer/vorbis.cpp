@@ -10,8 +10,7 @@ using namespace nb;
 
 struct nb::audio_producer_vorbis_p
 {
-    const std::byte *buf {nullptr};
-    size_t len {0};
+    std::shared_ptr<nb::rvorbis> res; // keeps the data alive
 
     stb_vorbis *v {nullptr};
     stb_vorbis_info info {};
@@ -20,12 +19,14 @@ struct nb::audio_producer_vorbis_p
     audio_spec spec {};
 };
 
-audio_producer_vorbis::audio_producer_vorbis(const std::byte *buf, size_t len)
+audio_producer_vorbis::audio_producer_vorbis(std::shared_ptr<rvorbis> res)
 {
     _d = new audio_producer_vorbis_p();
-    _d->buf = buf;
-    _d->len = len;
+    _d->res = std::move(res);
     _d->v = nullptr;
+
+    const std::byte* buf = reinterpret_cast<const std::byte*>(_d->res->data.data());
+    size_t len = _d->res->data.size();
 
     // try to init vorbis decoder from buffer
     int err;
@@ -112,12 +113,19 @@ size_t audio_producer_vorbis::frames_left()
 size_t audio_producer_vorbis::frames_pull(audio_buffer::span dst, size_t max_frames)
 {
     assert(dst.buffer_ref().spec() == _d->spec);
-    size_t try_frames = std::min(max_frames, frames_left());
+    size_t left = frames_left();
+    size_t try_frames = std::min(max_frames, left);
+    log::info("[vorbis] pull: max=%zu left=%zu try=%zu curr=%zu",
+              max_frames, left, try_frames, _d->curr);
     if(!try_frames)
+    {
+        log::info("[vorbis] pull: nothing to produce");
         return 0;
-    
-    size_t produced_frames = stb_vorbis_get_samples_short_interleaved(_d->v, dst.buffer_ref().channels(), 
+    }
+
+    size_t produced_frames = stb_vorbis_get_samples_short_interleaved(_d->v, dst.buffer_ref().channels(),
         reinterpret_cast<short*>(dst.begin()), try_frames*dst.buffer_ref().channels());
     _d->curr += produced_frames;
+    log::info("[vorbis] pull: produced=%zu", produced_frames);
     return produced_frames;
 }

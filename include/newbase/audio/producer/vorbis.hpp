@@ -1,22 +1,25 @@
 #pragma once
 
 #include <newbase/audio/producer.hpp>
+#include <newbase/res/vorbis.hpp>
+#include <memory>
 
 namespace nb
 {
 
 struct audio_producer_vorbis_p;
 
-// An audio producer that gets data from a vorbis stream in memory
+// An audio producer that gets data from a vorbis stream in memory.
+// Holds a shared_ptr to the rvorbis resource to keep its data alive.
 class audio_producer_vorbis : public audio_producer
 {
 public:
-    audio_producer_vorbis(const std::byte *buf, size_t len);
+    explicit audio_producer_vorbis(std::shared_ptr<rvorbis> res);
     ~audio_producer_vorbis() override;
 
     bool is_valid() const;
 
-    bool is_seekable() override; 
+    bool is_seekable() override;
     bool is_complete() override;
     bool is_resetable() override;
     audio_spec spec() override;

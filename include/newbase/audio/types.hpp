@@ -32,6 +32,8 @@ struct audio_spec
             && frequency == other.frequency;
     }
 
+    bool operator !=(const audio_spec &other) const { return !(*this == other); }
+
     audio_spec with_format(audio_format fmt)
     {
         return audio_spec {fmt, channels, frequency};

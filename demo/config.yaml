@@ -4,8 +4,8 @@ systems:
     w: 1280
     h: 720
   audio:
-    bgm_gain: 0.8
-    sfx_gain: 1.0
+    bgm_gain: -0.2
+    sfx_gain: 0.0
   script_lua: {}
   editor: {}
   input:

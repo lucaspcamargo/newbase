@@ -28,7 +28,8 @@ public:
     bool bgm_play(entt::id_type res_id);
     bool bgm_playing();
     bool bgm_stop();
-    void bgm_gain(float gain);
+    void bgm_gain(float db);
+    void sfx_gain(float db);
 
     // sound effects 
     bool sfx_play(entt::id_type res_id, float gain);
@@ -36,6 +37,7 @@ public:
 private:
     void _draw_tool_window(bool *);
     void _init_graphplan();
+    void _rebuild_graph_from_plan();
 };
 
 }

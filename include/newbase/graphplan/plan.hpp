@@ -22,6 +22,12 @@ namespace nb::graphplan {
         plan(const domain &dom);
         ~plan();
 
+        const domain& dom() const { return dom_; }
+
+        // Create a node of the given type at (x, y), allocating typed pins from the domain.
+        // Returns the new node's unique id.
+        uint64_t add_node_from_type(int type_id, float x = 0.f, float y = 0.f);
+
         // ensure our next id is unique
         // always ascending
         // kind of a dirty HACK :)
@@ -49,6 +55,9 @@ namespace nb::graphplan {
         std::unordered_map<uint64_t, node_data> nodes;
         std::unordered_map<uint64_t, pin_data> pins;
         std::unordered_map<uint64_t, link_data> links;
+
+    private:
+        const domain& dom_;
     };
 
 } 

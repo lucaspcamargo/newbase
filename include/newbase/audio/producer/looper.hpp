@@ -12,21 +12,34 @@ namespace nb
 class audio_producer_looper : public audio_producer
 {
 public:
-    audio_producer_looper(std::shared_ptr<audio_producer> prod, size_t loop_frame = 0) :
+    // loop_count: 0 = infinite, N = play exactly N times.
+    audio_producer_looper(std::shared_ptr<audio_producer> prod, size_t loop_frame = 0, size_t loop_count = 0) :
         m_prod(prod),
         m_loop_frame(loop_frame),
+        m_loop_count(loop_count),
+        m_play_count(0),
         m_curr(0)
     {
         assert(m_prod.operator bool());
         // inner producer must be seekable, or at least resetable if loop frame is zero
         assert(m_prod->is_seekable() || (m_prod->is_resetable() && !loop_frame));
-        // inner producer must be complete, so that we can tell when it is done
+    }
+
+    void set_loop_count(size_t loop_count)
+    {
+        m_loop_count = loop_count;
     }
 
     ~audio_producer_looper() override = default;
 
     bool is_seekable() override {return m_prod->is_seekable();} 
-    bool is_complete() override {return false;} // if we loop, we are not complete
+    bool is_complete() override
+    {
+        // Infinite loop (loop_count==0) never completes.
+        // Finite loop completes once play_count reaches loop_count and inner is done.
+        if (m_loop_count == 0) return false;
+        return m_play_count >= m_loop_count && m_prod->frames_left() == 0;
+    }
     bool is_resetable() override {return m_prod->is_resetable() || m_prod->is_seekable();}
     audio_spec spec() override {return m_prod->spec();}
 
@@ -74,8 +87,6 @@ public:
 
     size_t frames_pull(audio_buffer::span dst, size_t max_frames) override
     {
-        assert(0);  // TODO see below
-
         size_t produced = 0;
         while(produced < max_frames)
         {
@@ -102,6 +113,8 @@ public:
 private:
     std::shared_ptr<audio_producer> m_prod;
     size_t m_loop_frame;
+    size_t m_loop_count; // 0 = infinite
+    size_t m_play_count;
     size_t m_curr;
 };
 
