@@ -304,10 +304,13 @@ void audio::_draw_tool_window(bool* close)
     if (ImGui::TreeNodeEx("Graphplan", ImGuiTreeNodeFlags_DefaultOpen))
     {
         static bool auto_rebuild = true;
-        ImGui::SameLine();
         ImGui::Checkbox("Auto-rebuild", &auto_rebuild);
-        if (ImGui::Button("Rebuild Graph"))
-            _d->gm.rebuild(_d->graph, _d->graph_mtx);
+        if(!auto_rebuild)
+        {
+            ImGui::SameLine();
+            if (ImGui::Button("Rebuild Graph"))
+                _d->gm.rebuild(_d->graph, _d->graph_mtx);
+        }
         if (_d->gm.draw_editor() && auto_rebuild)
             _d->gm.rebuild(_d->graph, _d->graph_mtx);
         ImGui::TreePop();

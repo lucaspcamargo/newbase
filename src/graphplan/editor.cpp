@@ -9,6 +9,7 @@
 #include <newbase/ui/layout.hpp>
 #include <newbase/ui/meta_any_editor.hpp>
 #include <newbase/ui/resource_field_widget.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 
 #include <string.h>
 #include <algorithm>
@@ -217,7 +218,12 @@ bool editor::draw()
     assert(_d);
 
     bool changed = false;
-    bool reframe = ImGui::Button("Reframe");
+    bool reframe = ImGui::Button(ICON_FK_ARROWS_ALT " Reframe");
+    ImGui::SameLine();
+    bool reset_zoom = ImGui::Button(ICON_FK_BULLSEYE " Reset Zoom");
+    ImGui::SameLine();
+    bool show_flow = ImGui::Button(ICON_FK_FORWARD " Show Flow");
+
 
     ed::SetCurrentEditor(_d->ctx);
     ed::Begin("graphplan_editor");
@@ -406,6 +412,8 @@ bool editor::draw()
     {
         ed::Link(linkInfo.second.id, linkInfo.second.input_pin, linkInfo.second.output_pin,
         ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        if(show_flow)
+            ed::Flow(linkInfo.second.id, ed::FlowDirection::Backward);
     }
 
     //
@@ -458,6 +466,17 @@ bool editor::draw()
                                && dst_it != _d->pl.pins.end()
                                && _d->pl.dom().can_connect(src_it->second.type_id,
                                                            dst_it->second.type_id);
+
+                // check if connection between these pins already exists
+                for (const auto& lnk : _d->pl.links)
+                {
+                    if ((lnk.second.input_pin == dst_pin && lnk.second.output_pin == src_pin) ||
+                        (lnk.second.input_pin == src_pin && lnk.second.output_pin == dst_pin))
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
 
                 if (compatible)
                 {

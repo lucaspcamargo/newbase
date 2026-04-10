@@ -14,6 +14,7 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/log.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <entt/locator/locator.hpp>
 #include <entt/meta/meta.hpp>
 
@@ -210,7 +211,7 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
             if (ImGui::IsItemHovered() && total > 0)
                 ImGui::SetTooltip("frame %zu / %zu", curr, total);
 
-            if (ImGui::Button("Rewind"))
+            if (ImGui::Button(ICON_FK_FAST_BACKWARD " Rewind"))
                 fb->cmd_rewind.store(true, std::memory_order_release);
 
             ImGui::Text("curr_frame:   %zu", curr);
