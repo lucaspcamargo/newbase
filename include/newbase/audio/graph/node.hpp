@@ -28,6 +28,9 @@ enum class node_type
     BITCRUSHER   = 13, // reduces bit depth and/or sample rate
     DELAY        = 14, // delay line with feedback
     RING_MOD     = 15, // ring modulator (multiply by sine carrier)
+    CHORUS       = 16, // multi-voice LFO-modulated delay for lush/spatial effects
+    WAVESHAPER   = 17, // non-linear distortion via drive + shape curve
+    PHASER       = 18, // all-pass cascade swept by an LFO
 };
 
 class node

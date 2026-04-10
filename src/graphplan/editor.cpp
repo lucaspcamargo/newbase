@@ -158,6 +158,26 @@ static float_drag_params infer_float_drag(const char* name)
     if (str_ends_with(name, "_freq"))
         return {0.f, 1.f, 24000.f, "%.0f Hz", ImGuiSliderFlags_Logarithmic};
 
+    // Chorus/phaser depth [0,1]
+    if (strcmp(name, "depth") == 0)
+        return {0.01f, 0.f, 1.f, "%.2f"};
+
+    // Chorus voices [1,4]
+    if (strcmp(name, "voices") == 0)
+        return {0.05f, 1.f, 4.f, "%.1f"};
+
+    // Waveshaper drive [1,100]
+    if (strcmp(name, "drive") == 0)
+        return {0.5f, 1.f, 100.f, "%.1f"};
+
+    // Waveshaper shape mode [0,2]
+    if (strcmp(name, "shape") == 0)
+        return {0.05f, 0.f, 2.f, "%.2f"};
+
+    // Phaser stages [2,8]
+    if (strcmp(name, "stages") == 0)
+        return {0.1f, 2.f, 8.f, "%.0f"};
+
     return {}; // generic fallback
 }
 

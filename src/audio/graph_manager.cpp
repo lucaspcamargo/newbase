@@ -151,6 +151,27 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                       { prop_def{"carrier_hz", entt::meta_any{200.f}},
                         prop_def{"mix",        entt::meta_any{1.f}} },
                       true, CAT_FX},
+        node_type_def{static_cast<int>(audio_graph::node_type::CHORUS), "Chorus",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"rate_hz",  entt::meta_any{0.5f}},
+                        prop_def{"depth_ms", entt::meta_any{8.f}},
+                        prop_def{"voices",   entt::meta_any{2.f}},
+                        prop_def{"mix",      entt::meta_any{0.5f}} },
+                      true, CAT_FX},
+        node_type_def{static_cast<int>(audio_graph::node_type::WAVESHAPER), "Waveshaper",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"drive", entt::meta_any{5.f}},
+                        prop_def{"shape", entt::meta_any{0.f}},
+                        prop_def{"mix",   entt::meta_any{1.f}} },
+                      true, CAT_FX},
+        node_type_def{static_cast<int>(audio_graph::node_type::PHASER), "Phaser",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"rate_hz",  entt::meta_any{0.5f}},
+                        prop_def{"depth",    entt::meta_any{0.8f}},
+                        prop_def{"stages",   entt::meta_any{4.f}},
+                        prop_def{"feedback", entt::meta_any{0.5f}},
+                        prop_def{"mix",      entt::meta_any{0.5f}} },
+                      true, CAT_FX},
     };
 
     auto set_color = [&](audio_graph::node_type nt, ImVec4 color) {
@@ -185,6 +206,9 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     set_color(audio_graph::node_type::BITCRUSHER,    FX_COLOR);
     set_color(audio_graph::node_type::DELAY,         FX_COLOR);
     set_color(audio_graph::node_type::RING_MOD,      FX_COLOR);
+    set_color(audio_graph::node_type::CHORUS,        FX_COLOR);
+    set_color(audio_graph::node_type::WAVESHAPER,    FX_COLOR);
+    set_color(audio_graph::node_type::PHASER,        FX_COLOR);
 
     // Vorbis custom draw.
     auto vbr_it = std::find_if(d.node_types.begin(), d.node_types.end(),
@@ -424,7 +448,10 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     const int VISUALIZER_TYPE= static_cast<int>(audio_graph::node_type::VISUALIZER);
     const int BITCRUSHER_TYPE= static_cast<int>(audio_graph::node_type::BITCRUSHER);
     const int DELAY_TYPE     = static_cast<int>(audio_graph::node_type::DELAY);
-    const int RING_MOD_TYPE  = static_cast<int>(audio_graph::node_type::RING_MOD);
+    const int RING_MOD_TYPE    = static_cast<int>(audio_graph::node_type::RING_MOD);
+    const int CHORUS_TYPE      = static_cast<int>(audio_graph::node_type::CHORUS);
+    const int WAVESHAPER_TYPE  = static_cast<int>(audio_graph::node_type::WAVESHAPER);
+    const int PHASER_TYPE      = static_cast<int>(audio_graph::node_type::PHASER);
 
     auto prop_f = [](const graphplan::node_data& nd, const char* key, float def) -> float {
         auto it = nd.properties.find(key);
@@ -551,6 +578,12 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 type_matches = dynamic_cast<audio_graph::delay_node*>(cache_it->second.get()) != nullptr;
             else if (nd.type == RING_MOD_TYPE)
                 type_matches = dynamic_cast<audio_graph::ring_mod_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == CHORUS_TYPE)
+                type_matches = dynamic_cast<audio_graph::chorus_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == WAVESHAPER_TYPE)
+                type_matches = dynamic_cast<audio_graph::waveshaper_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == PHASER_TYPE)
+                type_matches = dynamic_cast<audio_graph::phaser_node*>(cache_it->second.get()) != nullptr;
             else
                 type_matches = dynamic_cast<audio_graph::source_node*>(cache_it->second.get()) != nullptr;
         }
@@ -660,6 +693,25 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 static_cast<audio_graph::ring_mod_node*>(node_ptr.get())
                     ->set_params(prop_f(nd, "carrier_hz", 200.f), prop_f(nd, "mix", 1.f));
             }
+            else if (nd.type == CHORUS_TYPE)
+            {
+                static_cast<audio_graph::chorus_node*>(node_ptr.get())
+                    ->set_params(prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth_ms", 8.f),
+                                 prop_f(nd, "voices", 2.f),   prop_f(nd, "mix", 0.5f));
+            }
+            else if (nd.type == WAVESHAPER_TYPE)
+            {
+                static_cast<audio_graph::waveshaper_node*>(node_ptr.get())
+                    ->set_params(prop_f(nd, "drive", 5.f), prop_f(nd, "shape", 0.f),
+                                 prop_f(nd, "mix", 1.f));
+            }
+            else if (nd.type == PHASER_TYPE)
+            {
+                static_cast<audio_graph::phaser_node*>(node_ptr.get())
+                    ->set_params(prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth", 0.8f),
+                                 prop_f(nd, "stages", 4.f),   prop_f(nd, "feedback", 0.5f),
+                                 prop_f(nd, "mix", 0.5f));
+            }
 
             new_graph.add_node(node_ptr);
             log::info("[audio] reused node gp=%llu ag=%d", gp_id, node_ptr->id());
@@ -756,6 +808,24 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             {
                 node_ptr = std::make_shared<audio_graph::ring_mod_node>(ag_id,
                     prop_f(nd, "carrier_hz", 200.f), prop_f(nd, "mix", 1.f));
+            }
+            else if (nd.type == CHORUS_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::chorus_node>(ag_id,
+                    prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth_ms", 8.f),
+                    prop_f(nd, "voices", 2.f),   prop_f(nd, "mix", 0.5f));
+            }
+            else if (nd.type == WAVESHAPER_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::waveshaper_node>(ag_id,
+                    prop_f(nd, "drive", 5.f), prop_f(nd, "shape", 0.f), prop_f(nd, "mix", 1.f));
+            }
+            else if (nd.type == PHASER_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::phaser_node>(ag_id,
+                    prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth", 0.8f),
+                    prop_f(nd, "stages", 4.f),   prop_f(nd, "feedback", 0.5f),
+                    prop_f(nd, "mix", 0.5f));
             }
             else
             {
