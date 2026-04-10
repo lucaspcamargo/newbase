@@ -116,4 +116,102 @@ bool draw_resource_field(const char* label, entt::id_type res_type_id,
     return changed;
 }
 
+bool draw_resource_id_field(const char* label, entt::id_type res_type_id,
+                            entt::id_type& id)
+{
+    bool changed = false;
+
+    const char* icon = "";
+    auto res_meta = entt::resolve(res_type_id);
+    if (res_meta)
+    {
+        const rtti::type_info* res_rtti = res_meta.custom().operator const rtti::type_info*();
+        if (res_rtti && res_rtti->type_class == rtti::TYPE_CLASS_RESOURCE
+                     && res_rtti->data.resource.editor_icon)
+            icon = res_rtti->data.resource.editor_icon;
+    }
+
+    char buf[256];
+    if (id != 0)
+    {
+        const char* name = nullptr;
+        auto& handles = rman().handles();
+        auto it = handles.find(id);
+        if (it != handles.end() && !it->second.name.empty())
+            name = it->second.name.c_str();
+
+        if (name)
+            snprintf(buf, sizeof(buf), "%s %s  [%x]", icon, name, id);
+        else
+            snprintf(buf, sizeof(buf), "%s [%x]", icon, id);
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%s (none)", icon);
+    }
+
+    float btn_w  = ImGui::GetFrameHeight();
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetNextItemWidth(ImGui::CalcItemWidth() - (btn_w + spacing) * 2);
+
+    ImGui::PushID(label);
+
+    ImGui::InputText("##v", buf, sizeof(buf), ImGuiInputTextFlags_ReadOnly);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Drag a resource here, or double-click to open editor");
+    bool open_editor = (id != 0) && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0);
+
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(RES_DRAG_PAYLOAD_TYPE))
+        {
+            const res_drag_payload* p = static_cast<const res_drag_payload*>(payload->Data);
+            if (p->res_type_id == res_type_id)
+            {
+                id = p->asset_id;
+                changed = true;
+            }
+            else
+            {
+                log::warn("Resource type mismatch: %x!=%x", p->res_type_id, res_type_id);
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    ImGui::SameLine(0, spacing);
+    ImGui::BeginDisabled(id == 0);
+    if (ImGui::Button(ICON_FK_PENCIL, {btn_w, 0}))
+        open_editor = true;
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("Edit resource");
+
+    if (open_editor)
+    {
+        const char* name = "";
+        auto& handles = rman().handles();
+        auto it = handles.find(id);
+        if (it != handles.end() && !it->second.name.empty())
+            name = it->second.name.c_str();
+        entt::locator<ui_manager*>::value()->request_open_resource_editor(res_type_id, id, name);
+    }
+
+    ImGui::SameLine(0, spacing);
+    if (ImGui::Button("x", {btn_w, 0}) && id != 0)
+    {
+        id = 0;
+        changed = true;
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Clear reference");
+
+    ImGui::PopID();
+
+    ImGui::SameLine(0, spacing);
+    ImGui::TextUnformatted(label);
+
+    return changed;
+}
+
 } // namespace nb

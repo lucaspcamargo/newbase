@@ -25,4 +25,10 @@ inline constexpr const char* RES_DRAG_PAYLOAD_TYPE = "NB_RESOURCE";
 bool draw_resource_field(const char* label, entt::id_type res_type_id,
                          std::shared_ptr<nb::resource>& ptr);
 
+// Variant that stores only the asset id (no resource load needed).
+// id == 0 means no resource selected.
+// Returns true if id was modified.
+bool draw_resource_id_field(const char* label, entt::id_type res_type_id,
+                            entt::id_type& id);
+
 } // namespace nb

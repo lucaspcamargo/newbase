@@ -30,6 +30,7 @@ namespace nb::graphplan {
         const char*     name;
         entt::meta_any  default_value {};
         bool            hide_when_custom_ui {false}; // suppress from standard property list when draw_fn is set
+        entt::id_type   res_type_id {0}; // non-zero: property is an entt::id_type resource reference of this type
     };
 
     struct node_data; // forward declaration for draw_fn signature

@@ -8,6 +8,7 @@
 
 #include <newbase/ui/layout.hpp>
 #include <newbase/ui/meta_any_editor.hpp>
+#include <newbase/ui/resource_field_widget.hpp>
 
 #include <string.h>
 #include <algorithm>
@@ -281,7 +282,14 @@ bool editor::draw()
                     continue;
                 auto& val = node_p.second.properties[pdef.name];
                 ImGui::SetNextItemWidth(160.f);
-                if (auto* v = val.try_cast<float>())
+                if (pdef.res_type_id != 0)
+                {
+                    entt::id_type id = val.try_cast<entt::id_type>()
+                        ? *val.try_cast<entt::id_type>() : 0;
+                    if (nb::draw_resource_id_field(pdef.name, pdef.res_type_id, id))
+                        { val = entt::meta_any{id}; changed = true; }
+                }
+                else if (auto* v = val.try_cast<float>())
                 {
                     float f = *v;
                     const auto p = infer_float_drag(pdef.name);

@@ -4,6 +4,8 @@
 
 namespace nb {
 
+struct audio_p;
+
 class audio : public system {
 public:
     audio();
@@ -18,7 +20,7 @@ public:
 
     // we want to have a simple API for music and sfx,
     // that is easy to invoke via reflection
-    // no need for fancy features, this should be good enough for simple games 
+    // no need for fancy features, this should be good enough for simple games
 
     // top-level control
     void out_mute(bool muted);
@@ -31,14 +33,12 @@ public:
     void bgm_gain(float db);
     void sfx_gain(float db);
 
-    // sound effects 
+    // sound effects
     bool sfx_play(entt::id_type res_id, float gain);
 
 private:
     void _draw_tool_window(bool *);
-    void _init_graphplan();
-    void _rebuild_graph_from_plan();
+    audio_p* _d {nullptr};
 };
 
 }
-
