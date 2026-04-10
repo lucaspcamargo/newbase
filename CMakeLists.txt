@@ -51,6 +51,19 @@ add_subdirectory(vendored/box2d EXCLUDE_FROM_ALL)
 if(NOT WIN32 AND NOT NEWBASE_EMSCRIPTEN)
     target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
 endif()
+message("[newbase] adding tinygettext")
+file(GLOB TINYGETTEXT_SOURCES vendored/tinygettext/src/*.cpp)
+add_library(tinygettext STATIC ${TINYGETTEXT_SOURCES})
+set_target_properties(tinygettext PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+target_include_directories(tinygettext PUBLIC vendored/tinygettext/include)
+# tinygettext SDL mode uses #include "SDL.h" (SDL2 style); shim it to SDL3
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/tinygettext_sdl_shim/SDL.h" "#include <SDL3/SDL.h>\n")
+target_include_directories(tinygettext PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tinygettext_sdl_shim")
+target_compile_definitions(tinygettext PUBLIC TINYGETTEXT_WITH_SDL)
+target_link_libraries(tinygettext PUBLIC SDL3::SDL3)
+if(WIN32)
+    target_compile_definitions(tinygettext PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 
 
 add_library(newbase STATIC
@@ -99,6 +112,9 @@ add_library(newbase STATIC
     src/ui/manager.cpp
     src/ui/overlay.cpp
     src/ui/imgui_style.cpp
+    src/ui/layout.cpp
+    src/ui/meta_any_editor.cpp
+    src/ui/resource_field_widget.cpp
 
     # dependencies
     src/stb_impl.c
@@ -135,7 +151,7 @@ set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
 target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_compile_options(newbase PUBLIC -fno-exceptions )
-target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d -lm)
+target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d tinygettext -lm)
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
@@ -162,6 +178,7 @@ endif()
 # let games use newbase and dependencies straight from the build folder
 export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
+export(TARGETS tinygettext NAMESPACE nb:: FILE newbase-tinygettext-export.cmake) # same for tinygettext
 # iterate over all systems in NEWBASE_ALL_SYSTEMS list and export them
 foreach(system IN LISTS NEWBASE_ALL_SYSTEMS)
     set(system_target newbase_sys_${system})

@@ -237,6 +237,8 @@ void editor::_draw_main_menu()
                     ImGui::StyleColorsLight();
                 if(ImGui::MenuItem("Classic"))
                     ImGui::StyleColorsClassic();
+                if(ImGui::MenuItem("Enemymouse"))
+                    imgui_style_extra_enemymouse();
                 ImGui::EndMenu();
             }
 

@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <entt/meta/meta.hpp>
 
 namespace nb::graphplan {
@@ -119,6 +120,10 @@ namespace nb::graphplan {
         float pos_y;
 
         std::unordered_map<std::string, entt::meta_any> properties;
+
+        // Optional per-node user data (e.g. feedback structs for draw_fn).
+        // Set by the domain owner, read by draw_fn. Thread-safety is the owner's concern.
+        std::shared_ptr<void> user_data;
     };
 
     // a pure virtual class that represents the interface for a node

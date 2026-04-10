@@ -28,6 +28,9 @@ public:
     bool reset() override;
     size_t frames_left() override;
 
+    size_t curr_frame() const;
+    size_t total_frames() const;
+
     size_t frames_pull(audio_buffer::span dst, size_t max_frames) override;
 
 private:

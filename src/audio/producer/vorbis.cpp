@@ -94,8 +94,13 @@ bool audio_producer_vorbis::seek(size_t frame_index)
 {
     if(!_d->v)
         return false;
-    int err = stb_vorbis_seek_frame(_d->v, static_cast<unsigned int>(frame_index));
-    return err == VORBIS__no_error;
+    // stb_vorbis_seek_frame returns 1 on success, 0 on failure.
+    if (stb_vorbis_seek_frame(_d->v, static_cast<unsigned int>(frame_index)))
+    {
+        _d->curr = frame_index;
+        return true;
+    }
+    return false;
 }
 
 bool audio_producer_vorbis::reset()
@@ -108,6 +113,18 @@ size_t audio_producer_vorbis::frames_left()
     if(!_d->v)
         return 0;
     return static_cast<size_t>(stb_vorbis_stream_length_in_samples(_d->v)) - _d->curr;
+}
+
+size_t audio_producer_vorbis::curr_frame() const
+{
+    return _d->curr;
+}
+
+size_t audio_producer_vorbis::total_frames() const
+{
+    if(!_d->v)
+        return 0;
+    return static_cast<size_t>(stb_vorbis_stream_length_in_samples(_d->v));
 }
 
 size_t audio_producer_vorbis::frames_pull(audio_buffer::span dst, size_t max_frames)

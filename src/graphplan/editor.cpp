@@ -5,8 +5,13 @@
 #include "imgui_node_editor.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+
+#include <newbase/ui/layout.hpp>
+#include <newbase/ui/meta_any_editor.hpp>
+
 #include <string.h>
 #include <algorithm>
+#include <unordered_map>
 
 using namespace nb::graphplan;
 namespace ed = ax::NodeEditor;
@@ -44,12 +49,15 @@ struct nb::graphplan::editor_p
         colors[ed::StyleColor_GroupBg] = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
         colors[ed::StyleColor_GroupBorder] = ImGui::GetStyleColorVec4(ImGuiCol_Border);
 
-    }   
+    }
 
     // Pending source pin when a new-node popup was triggered by dragging from a pin.
     // 0 means no pending pin (popup opened via background right-click).
     uint64_t new_node_from_pin {0};
     ImVec2   open_popup_canvas_pos {}; // canvas-space position where the popup was opened
+
+    // Per-node cached width (from previous frame), used to right-align output pins.
+    std::unordered_map<uint64_t, float> node_width_cache;
 };
 
 editor::editor(plan &pl)
@@ -85,6 +93,119 @@ void ImGuiEx_NextColumn()
 void ImGuiEx_EndColumn()
 {
     ImGui::EndGroup();
+}
+
+// PROPERTY DRAG INFERENCE
+// Infers DragFloat parameters from the property name.
+
+struct float_drag_params
+{
+    float       speed  {0.1f};
+    float       v_min  {0.f};
+    float       v_max  {0.f};   // 0 == unclamped
+    const char* fmt    {"%.3f"};
+    ImGuiSliderFlags flags {0};
+};
+
+static bool str_ends_with(const char* s, const char* suffix)
+{
+    size_t sl = strlen(s), fl = strlen(suffix);
+    return sl >= fl && strcmp(s + sl - fl, suffix) == 0;
+}
+
+static float_drag_params infer_float_drag(const char* name)
+{
+    // dB — gain/threshold/makeup: [-60, 24], 0.5 dB/px
+    if (str_ends_with(name, "_db"))
+        return {0.5f, -60.f, 24.f, "%.1f dB"};
+
+    // Milliseconds — non-negative, up to 10 s
+    if (str_ends_with(name, "_ms"))
+        return {1.f, 0.f, 10000.f, "%.0f ms"};
+
+    // Hz — logarithmic, 1..24000
+    if (str_ends_with(name, "_hz") || strcmp(name, "frequency") == 0)
+        return {0.f, 1.f, 24000.f, "%.0f Hz", ImGuiSliderFlags_Logarithmic};
+
+    // Biquad Q factor
+    if (str_ends_with(name, "_q"))
+        return {0.01f, 0.1f, 10.f, "%.3f Q"};
+
+    // Normalised [0,1] quantities
+    if (strcmp(name, "feedback")  == 0 ||
+        strcmp(name, "mix")       == 0 ||
+        strcmp(name, "wet")       == 0 ||
+        strcmp(name, "amplitude") == 0 ||
+        strcmp(name, "room_size") == 0 ||
+        strcmp(name, "damping")   == 0)
+        return {0.01f, 0.f, 1.f, "%.2f"};
+
+    // Compressor ratio
+    if (strcmp(name, "ratio") == 0)
+        return {0.1f, 1.f, 20.f, "%.1f:1"};
+
+    // Bit depth
+    if (strcmp(name, "bits") == 0)
+        return {0.1f, 1.f, 32.f, "%.1f bit"};
+
+    // Sample-rate reduction factor
+    if (strcmp(name, "downsample") == 0)
+        return {0.1f, 1.f, 32.f, "%.1f x"};
+
+    // Frequency without _hz suffix (e.g. EQ band0_freq)
+    if (str_ends_with(name, "_freq"))
+        return {0.f, 1.f, 24000.f, "%.0f Hz", ImGuiSliderFlags_Logarithmic};
+
+    return {}; // generic fallback
+}
+
+// PIN WIDGET
+// Draws a pin with a circle connector and a text label.
+// Circle is on the left for inputs, right for outputs.
+// PinPivotRect is set to the circle so links attach to its center.
+
+static void draw_pin(uint64_t pin_id, ed::PinKind kind, const char* label)
+{
+    static constexpr float RADIUS  = 5.f;
+    static constexpr float SPACING = 5.f;
+
+    const float text_w = ImGui::CalcTextSize(label).x;
+    const float text_h = ImGui::GetTextLineHeight();
+    const float total_w = RADIUS * 2.f + SPACING + text_w;
+
+    ed::BeginPin(pin_id, kind);
+
+    ImVec2 p  = ImGui::GetCursorScreenPos();
+    float  cy = p.y + text_h * 0.5f;
+
+    // Reserve space for the whole widget.
+    ImGui::Dummy({total_w, text_h});
+
+    ImDrawList* dl       = ImGui::GetWindowDrawList();
+    ImU32       text_col = ImGui::GetColorU32(ImGuiCol_Text);
+    ImU32       fill_col = ImGui::GetColorU32(ImGuiCol_FrameBg);
+    ImU32       rim_col  = text_col;
+
+    if (kind == ed::PinKind::Input)
+    {
+        ImVec2 cc = {p.x + RADIUS, cy};
+        dl->AddCircleFilled(cc, RADIUS, fill_col);
+        dl->AddCircle(cc, RADIUS, rim_col, 12, 1.5f);
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                    {p.x + RADIUS * 2.f + SPACING, p.y}, text_col, label);
+        ed::PinPivotRect({cc.x, cc.y}, {cc.x, cc.y});
+    }
+    else
+    {
+        ImVec2 cc = {p.x + text_w + SPACING + RADIUS, cy};
+        dl->AddCircleFilled(cc, RADIUS, fill_col);
+        dl->AddCircle(cc, RADIUS, rim_col, 12, 1.5f);
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                    {p.x, p.y}, text_col, label);
+        ed::PinPivotRect({cc.x, cc.y}, {cc.x, cc.y});
+    }
+
+    ed::EndPin();
 }
 
 
@@ -134,7 +255,7 @@ bool editor::draw()
         float  header_bottom = ImGui::GetItemRectMax().y + ImGui::GetStyle().ItemSpacing.y;
         ImGui::Spacing();
 
-        // --- Custom draw_fn (above pins) ---
+        // --- Custom draw_fn ---
         if (type_def && type_def->draw_fn)
         {
             if (type_def->draw_fn(node_p.second))
@@ -145,11 +266,9 @@ bool editor::draw()
         // --- Input pins ---
         for (auto in_pin : node.input_pins)
         {
-            ed::BeginPin(in_pin, ed::PinKind::Input);
-            const auto* pin_it = _d->pl.pins.count(in_pin) ? &_d->pl.pins.at(in_pin) : nullptr;
-            const auto* ptd = pin_it ? _d->pl.dom().find_pin_type(pin_it->type_id) : nullptr;
-            ImGui::Text("-> %s", ptd ? ptd->name : "?");
-            ed::EndPin();
+            const auto* pi  = _d->pl.pins.count(in_pin) ? &_d->pl.pins.at(in_pin) : nullptr;
+            const auto* ptd = pi ? _d->pl.dom().find_pin_type(pi->type_id) : nullptr;
+            draw_pin(in_pin, ed::PinKind::Input, ptd ? ptd->name : "?");
         }
 
         // --- Properties ---
@@ -165,7 +284,8 @@ bool editor::draw()
                 if (auto* v = val.try_cast<float>())
                 {
                     float f = *v;
-                    if (ImGui::InputFloat(pdef.name, &f, 0.f, 0.f, "%.3f"))
+                    const auto p = infer_float_drag(pdef.name);
+                    if (ImGui::DragFloat(pdef.name, &f, p.speed, p.v_min, p.v_max, p.fmt, p.flags))
                         { val = entt::meta_any{f}; changed = true; }
                 }
                 else if (auto* v = val.try_cast<bool>())
@@ -177,7 +297,7 @@ bool editor::draw()
                 else if (auto* v = val.try_cast<int>())
                 {
                     int i = *v;
-                    if (ImGui::InputInt(pdef.name, &i))
+                    if (ImGui::DragInt(pdef.name, &i))
                         { val = entt::meta_any{i}; changed = true; }
                 }
                 else if (auto* v = val.try_cast<std::string>())
@@ -187,23 +307,59 @@ bool editor::draw()
                     if (ImGui::InputText(pdef.name, buf, sizeof(buf)))
                         { val = entt::meta_any{std::string{buf}}; changed = true; }
                 }
+                else
+                {
+                    if (nb::draw_meta_any_editor(pdef.name, val))
+                        changed = true;
+                }
             }
             ImGui::Spacing();
         }
 
-        // --- Output pins ---
-        for (auto out_pin : node.output_pins)
+        // --- Output pins (right-aligned using cached node width) ---
+        if (!node.output_pins.empty())
         {
-            ed::BeginPin(out_pin, ed::PinKind::Output);
-            const auto* pin_it = _d->pl.pins.count(out_pin) ? &_d->pl.pins.at(out_pin) : nullptr;
-            const auto* ptd = pin_it ? _d->pl.dom().find_pin_type(pin_it->type_id) : nullptr;
-            ImGui::Text("%s ->", ptd ? ptd->name : "?");
-            ed::EndPin();
+            // Measure output column width.
+            static constexpr float PIN_RADIUS  = 5.f;
+            static constexpr float PIN_SPACING = 5.f;
+            float out_col_w = 0.f;
+            for (auto out_pin : node.output_pins)
+            {
+                const auto* pi  = _d->pl.pins.count(out_pin) ? &_d->pl.pins.at(out_pin) : nullptr;
+                const auto* ptd = pi ? _d->pl.dom().find_pin_type(pi->type_id) : nullptr;
+                const char* lbl = ptd ? ptd->name : "?";
+                out_col_w = std::max(out_col_w,
+                    PIN_RADIUS * 2.f + PIN_SPACING + ImGui::CalcTextSize(lbl).x);
+            }
+
+            // Use cached node width from the previous frame to compute the shift.
+            // cursor_x is the natural left position of the output pins (screen space).
+            // node_right = cursor_x + node_width - 2*padding (right edge of content area).
+            // shift = node_right - out_col_w - cursor_x = node_width - 2*padding - out_col_w.
+            const float pad = 8.f; // NodePadding right
+            auto it = _d->node_width_cache.find(node.id);
+            if (it != _d->node_width_cache.end())
+            {
+                float shift = it->second - 2.f * pad - out_col_w;
+                if (shift > 0.f)
+                    ImGui::SetCursorScreenPos({ImGui::GetCursorScreenPos().x + shift,
+                                              ImGui::GetCursorScreenPos().y});
+            }
+
+            for (auto out_pin : node.output_pins)
+            {
+                const auto* pi  = _d->pl.pins.count(out_pin) ? &_d->pl.pins.at(out_pin) : nullptr;
+                const auto* ptd = pi ? _d->pl.dom().find_pin_type(pi->type_id) : nullptr;
+                draw_pin(out_pin, ed::PinKind::Output, ptd ? ptd->name : "?");
+            }
         }
 
         ImGui::PopID();
         ed::EndNode();
         ed::PopStyleVar(); // NodePadding
+
+        // Cache node width for next frame's output-pin alignment.
+        _d->node_width_cache[node.id] = ImGui::GetItemRectSize().x;
 
         // --- Draw header background ---
         // After EndNode, GetItemRect gives the full node bounds in screen space.

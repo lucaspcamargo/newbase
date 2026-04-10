@@ -1,5 +1,9 @@
 #include <newbase/audio/audio.hpp>
+#include <newbase/audio/vorbis_feedback.hpp>
+#include <newbase/audio/visualizer_feedback.hpp>
+#include <newbase/services/renderer_service.hpp>
 #include <algorithm>
+#include <cstddef>
 #include <newbase/audio/producer/buffer.hpp>
 #include <newbase/audio/producer/looper.hpp>
 #include <newbase/audio/producer/vorbis.hpp>
@@ -68,6 +72,12 @@ static audio_graph::node_id _next_ag_id {1}; // 0 is always output
 
 // Pin type IDs for the audio domain (opaque — the graphplan treats them as identifiers).
 static constexpr int AUDIO_PIN_STREAM = 1; // an audio stream connection
+
+// Per-graphplan-node vorbis feedback, kept alive across rebuilds.
+static std::unordered_map<uint64_t, std::shared_ptr<vorbis_feedback>> _vorbis_feedback_cache;
+
+// Per-graphplan-node visualizer feedback.
+static std::unordered_map<uint64_t, std::shared_ptr<visualizer_feedback>> _visualizer_feedback_cache;
 
 // Audio graph domain — defines the node types available in the graphplan editor.
 // Node type_ids match audio_graph::node_type enum values.
@@ -146,6 +156,25 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                       {}, {AUDIO_PIN_STREAM},
                       { prop_def{"bus_id", entt::meta_any{std::string{}}} },
                       true, CAT_BUS},
+        node_type_def{static_cast<int>(audio_graph::node_type::VISUALIZER), "Visualizer",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      {}, true, CAT_ROUTING},
+        node_type_def{static_cast<int>(audio_graph::node_type::BITCRUSHER), "Bitcrusher",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"bits",       entt::meta_any{8.f}},
+                        prop_def{"downsample", entt::meta_any{1.f}} },
+                      true, CAT_FX},
+        node_type_def{static_cast<int>(audio_graph::node_type::DELAY), "Delay",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"delay_ms",  entt::meta_any{250.f}},
+                        prop_def{"feedback",  entt::meta_any{0.4f}},
+                        prop_def{"mix",       entt::meta_any{0.5f}} },
+                      true, CAT_FX},
+        node_type_def{static_cast<int>(audio_graph::node_type::RING_MOD), "Ring Mod",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"carrier_hz", entt::meta_any{200.f}},
+                        prop_def{"mix",        entt::meta_any{1.f}} },
+                      true, CAT_FX},
     };
 
     // Per-type header colors.
@@ -178,6 +207,63 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     set_color(audio_graph::node_type::GAIN,          FX_COLOR);
     set_color(audio_graph::node_type::COMPRESSOR,    FX_COLOR);
     set_color(audio_graph::node_type::EQ5,           FX_COLOR);
+    set_color(audio_graph::node_type::VISUALIZER,    CORE_COLOR);
+    set_color(audio_graph::node_type::BITCRUSHER,    FX_COLOR);
+    set_color(audio_graph::node_type::DELAY,         FX_COLOR);
+    set_color(audio_graph::node_type::RING_MOD,      FX_COLOR);
+
+    // Vorbis custom draw: playback state + rewind/seek controls.
+    auto vbr_it = std::find_if(d.node_types.begin(), d.node_types.end(),
+        [](const graphplan::node_type_def& t){ return t.type_id == static_cast<int>(audio_graph::node_type::VORBIS_SOURCE); });
+    if (vbr_it != d.node_types.end())
+    {
+        vbr_it->draw_fn = [](graphplan::node_data& nd) -> bool {
+            auto* fb = static_cast<vorbis_feedback*>(nd.user_data.get());
+            if (!fb) {
+                ImGui::TextDisabled("(no file)");
+                return false;
+            }
+
+            const size_t curr  = fb->curr_frame  .load(std::memory_order_relaxed);
+            const size_t total = fb->total_frames .load(std::memory_order_relaxed);
+            const size_t plays = fb->play_count   .load(std::memory_order_relaxed);
+            const size_t loops = fb->loop_count   .load(std::memory_order_relaxed);
+
+            // Progress bar / seek slider.
+            float pos = (total > 0) ? static_cast<float>(curr) / static_cast<float>(total) : 0.f;
+            ImGui::SetNextItemWidth(160.f);
+            if (ImGui::SliderFloat("##pos", &pos, 0.f, 1.f, ""))
+            {
+                fb->cmd_seek_frame.store(static_cast<size_t>(pos * static_cast<float>(total)),
+                                         std::memory_order_relaxed);
+                fb->cmd_seek.store(true, std::memory_order_release);
+            }
+            if (ImGui::IsItemHovered() && total > 0)
+            {
+                // Use total_frames as a proxy for sample rate — we don't have it here,
+                // but vorbis is commonly 44100. Show raw frames too so it's always useful.
+                ImGui::SetTooltip("frame %zu / %zu", curr, total);
+            }
+
+            // Rewind button.
+            if (ImGui::Button("Rewind"))
+                fb->cmd_rewind.store(true, std::memory_order_release);
+
+                
+            // Debug info.
+            {
+                ImGui::Text("curr_frame:   %zu", curr);
+                ImGui::Text("total_frames: %zu", total);
+                ImGui::Text("play_count:   %zu", plays);
+                if (loops == 0)
+                    ImGui::Text("loop_count:   inf (0)");
+                else
+                    ImGui::Text("loop_count:   %zu", loops);
+            }
+
+            return false;
+        };
+    }
 
     // EQ5 custom draw: 5 vertical gain sliders with frequency input below each.
     auto eq5_it = std::find_if(d.node_types.begin(), d.node_types.end(),
@@ -225,6 +311,86 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                 ImGui::PopID();
             }
             return changed;
+        };
+    }
+
+    // Visualizer custom draw: waveform rendered to SDL_Surface → GPU texture → ImGui::Image.
+    auto vis_it = std::find_if(d.node_types.begin(), d.node_types.end(),
+        [](const graphplan::node_type_def& t){ return t.type_id == static_cast<int>(audio_graph::node_type::VISUALIZER); });
+    if (vis_it != d.node_types.end())
+    {
+        vis_it->draw_fn = [](graphplan::node_data& nd) -> bool {
+            auto* fb = static_cast<visualizer_feedback*>(nd.user_data.get());
+            if (!fb) { ImGui::TextDisabled("(no signal)"); return false; }
+
+            auto* rs = entt::locator<renderer_service*>::has_value()
+                       ? entt::locator<renderer_service*>::value() : nullptr;
+            if (!rs) { ImGui::TextDisabled("(no renderer)"); return false; }
+
+            // Create surface + texture on first use.
+            if (!fb->surface)
+            {
+                fb->surface = SDL_CreateSurface(fb->tex_w, fb->tex_h, SDL_PIXELFORMAT_RGBA32);
+                if (!fb->surface) return false;
+                SDL_ClearSurface(fb->surface, 0.f, 0.f, 0.f, 1.f);
+            }
+            if (!fb->texture)
+            {
+                fb->texture = rs->create_texture(fb->tex_w, fb->tex_h);
+                if (!fb->texture) return false;
+            }
+
+            // Snapshot samples from audio thread.
+            size_t n = fb->snapshot();
+            if (n > 0)
+            {
+                const int W = fb->tex_w;
+                const int H = fb->tex_h;
+                const float mid_y = H * 0.5f;
+
+                // Clear surface to dark background.
+                SDL_ClearSurface(fb->surface, 0.05f, 0.05f, 0.05f, 1.f);
+
+                // Draw waveform: one pixel column per sample (or decimated).
+                Uint32* pixels = static_cast<Uint32*>(fb->surface->pixels);
+                const int pitch_px = fb->surface->pitch / 4;
+
+                // Waveform colour (green).
+                const Uint32 wave_col = SDL_MapRGBA(SDL_GetPixelFormatDetails(fb->surface->format),
+                                                    nullptr, 60, 220, 80, 255);
+                const Uint32 center_col = SDL_MapRGBA(SDL_GetPixelFormatDetails(fb->surface->format),
+                                                      nullptr, 40, 80, 40, 255);
+
+                // Draw center line.
+                const int cy = static_cast<int>(mid_y);
+                for (int x = 0; x < W; ++x)
+                    pixels[cy * pitch_px + x] = center_col;
+
+                // Draw waveform columns.
+                const size_t start = n >= static_cast<size_t>(W) ? n - static_cast<size_t>(W) : 0;
+                const size_t count = n - start;
+                for (size_t i = 0; i < count; ++i)
+                {
+                    float s = fb->read_buf[start + i];
+                    s = s < -1.f ? -1.f : (s > 1.f ? 1.f : s); // clamp
+                    int y = static_cast<int>(mid_y - s * mid_y);
+                    y = y < 0 ? 0 : (y >= H ? H - 1 : y);
+                    int x = static_cast<int>(i);
+                    pixels[y * pitch_px + x] = wave_col;
+                    // Draw vertical line from center to sample.
+                    int y0 = cy, y1 = y;
+                    if (y1 < y0) { int tmp = y0; y0 = y1; y1 = tmp; }
+                    for (int yy = y0; yy <= y1; ++yy)
+                        pixels[yy * pitch_px + x] = wave_col;
+                }
+
+                rs->update_texture(fb->texture, fb->surface->pixels, fb->surface->pitch);
+            }
+
+            // Display texture.
+            ImGui::Image((ImTextureID)fb->texture,
+                         ImVec2(static_cast<float>(fb->tex_w), static_cast<float>(fb->tex_h)));
+            return false;
         };
     }
 
@@ -325,6 +491,15 @@ audio::~audio()
     // clear the node cache
     _node_cache.clear();
     _vorbis_res_cache.clear();
+    _vorbis_feedback_cache.clear();
+    // Destroy GPU textures before clearing feedback (renderer is still live here).
+    if (auto* rs = entt::locator<renderer_service*>::has_value()
+                    ? entt::locator<renderer_service*>::value() : nullptr)
+    {
+        for (auto& [id, fb] : _visualizer_feedback_cache)
+            if (fb && fb->texture) { rs->destroy_texture(fb->texture); fb->texture = nullptr; }
+    }
+    _visualizer_feedback_cache.clear();
     _bus_cache.clear();
 
     if(_graphplan_editor)
@@ -633,6 +808,10 @@ void audio::_rebuild_graph_from_plan()
     const int BUS_OUTPUT_TYPE = static_cast<int>(audio_graph::node_type::BUS_OUTPUT);
     const int COMPRESSOR_TYPE = static_cast<int>(audio_graph::node_type::COMPRESSOR);
     const int EQ5_TYPE        = static_cast<int>(audio_graph::node_type::EQ5);
+    const int VISUALIZER_TYPE  = static_cast<int>(audio_graph::node_type::VISUALIZER);
+    const int BITCRUSHER_TYPE  = static_cast<int>(audio_graph::node_type::BITCRUSHER);
+    const int DELAY_TYPE       = static_cast<int>(audio_graph::node_type::DELAY);
+    const int RING_MOD_TYPE    = static_cast<int>(audio_graph::node_type::RING_MOD);
 
     auto prop_f = [](const graphplan::node_data& nd, const char* key, float def) -> float {
         auto it = nd.properties.find(key);
@@ -762,6 +941,14 @@ void audio::_rebuild_graph_from_plan()
                 type_matches = dynamic_cast<audio_graph::compressor_node*>(cache_it->second.get()) != nullptr;
             else if (nd.type == EQ5_TYPE)
                 type_matches = dynamic_cast<audio_graph::eq5_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == VISUALIZER_TYPE)
+                type_matches = dynamic_cast<audio_graph::visualizer_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == BITCRUSHER_TYPE)
+                type_matches = dynamic_cast<audio_graph::bitcrusher_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == DELAY_TYPE)
+                type_matches = dynamic_cast<audio_graph::delay_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == RING_MOD_TYPE)
+                type_matches = dynamic_cast<audio_graph::ring_mod_node*>(cache_it->second.get()) != nullptr;
             else // all source variants
                 type_matches = dynamic_cast<audio_graph::source_node*>(cache_it->second.get()) != nullptr;
         }
@@ -787,17 +974,32 @@ void audio::_rebuild_graph_from_plan()
                 auto* sn = static_cast<audio_graph::source_node*>(node_ptr.get());
                 const std::string* res_ptr = prop_s(nd, "res_id");
                 const std::string  new_res = res_ptr ? *res_ptr : std::string{};
+
+                // Ensure feedback exists and is on the graphplan node.
+                auto& fb_ptr = _vorbis_feedback_cache[gp_id];
+                if (!fb_ptr) fb_ptr = std::make_shared<nb::vorbis_feedback>();
+                _graphplan->nodes.at(gp_id).user_data = fb_ptr;
+
                 if (new_res != _vorbis_res_cache[gp_id])
                 {
-                    // res_id changed — rebuild the whole producer chain.
-                    sn->set_producer(make_vorbis_producer(nd, gp_id));
+                    // res_id changed — rebuild producer chain and re-attach feedback.
+                    auto new_prod = make_vorbis_producer(nd, gp_id);
+                    if (new_prod)
+                    {
+                        auto* lp = static_cast<audio_producer_looper*>(new_prod.get());
+                        lp->set_feedback(fb_ptr);
+                    }
+                    sn->set_producer(std::move(new_prod));
                 }
                 else
                 {
                     // Only loop flag may have changed — update looper in-place.
                     const size_t loop_count = prop_b(nd, "loop", false) ? 0 : 1;
                     if (auto* lp = dynamic_cast<audio_producer_looper*>(sn->producer()))
+                    {
                         lp->set_loop_count(loop_count);
+                        lp->set_feedback(fb_ptr); // ensure feedback is wired (idempotent)
+                    }
                 }
             }
             else if (nd.type == SINE_TYPE)
@@ -841,6 +1043,31 @@ void audio::_rebuild_graph_from_plan()
                     en->set_band(static_cast<size_t>(b), freq, gain, q);
                 }
             }
+            else if (nd.type == VISUALIZER_TYPE)
+            {
+                auto& fb_ptr = _visualizer_feedback_cache[gp_id];
+                if (!fb_ptr) fb_ptr = std::make_shared<visualizer_feedback>();
+                _graphplan->nodes.at(gp_id).user_data = fb_ptr;
+                auto* vn = static_cast<audio_graph::visualizer_node*>(node_ptr.get());
+                vn->set_feedback(fb_ptr);
+            }
+            else if (nd.type == BITCRUSHER_TYPE)
+            {
+                auto* bn = static_cast<audio_graph::bitcrusher_node*>(node_ptr.get());
+                bn->set_params(prop_f(nd, "bits", 8.f), prop_f(nd, "downsample", 1.f));
+            }
+            else if (nd.type == DELAY_TYPE)
+            {
+                auto* dn = static_cast<audio_graph::delay_node*>(node_ptr.get());
+                dn->set_params(prop_f(nd, "delay_ms", 250.f),
+                               prop_f(nd, "feedback", 0.4f),
+                               prop_f(nd, "mix",      0.5f));
+            }
+            else if (nd.type == RING_MOD_TYPE)
+            {
+                auto* rn = static_cast<audio_graph::ring_mod_node*>(node_ptr.get());
+                rn->set_params(prop_f(nd, "carrier_hz", 200.f), prop_f(nd, "mix", 1.f));
+            }
 
             new_graph.add_node(node_ptr);
             log::info("[audio] reused node gp=%llu ag=%d", gp_id, node_ptr->id());
@@ -860,7 +1087,21 @@ void audio::_rebuild_graph_from_plan()
             }
             else if (nd.type == VORBIS_TYPE)
             {
-                node_ptr = std::make_shared<audio_graph::source_node>(ag_id, make_vorbis_producer(nd, gp_id));
+                auto raw_prod = make_vorbis_producer(nd, gp_id);
+                if (raw_prod)
+                {
+                    // Attach feedback to the looper so it updates state each frame.
+                    auto& fb_ptr = _vorbis_feedback_cache[gp_id];
+                    if (!fb_ptr) fb_ptr = std::make_shared<nb::vorbis_feedback>();
+                    _graphplan->nodes.at(gp_id).user_data = fb_ptr;
+                    auto* looper = static_cast<audio_producer_looper*>(raw_prod.get());
+                    looper->set_feedback(fb_ptr);
+                    node_ptr = std::make_shared<audio_graph::source_node>(ag_id, std::move(raw_prod));
+                }
+                else
+                {
+                    node_ptr = std::make_shared<audio_graph::source_node>(ag_id);
+                }
             }
             else if (nd.type == SINE_TYPE)
             {
@@ -908,6 +1149,32 @@ void audio::_rebuild_graph_from_plan()
                 }
                 node_ptr = std::move(en);
             }
+            else if (nd.type == VISUALIZER_TYPE)
+            {
+                auto& fb_ptr = _visualizer_feedback_cache[gp_id];
+                if (!fb_ptr) fb_ptr = std::make_shared<visualizer_feedback>();
+                _graphplan->nodes.at(gp_id).user_data = fb_ptr;
+                auto vn = std::make_shared<audio_graph::visualizer_node>(ag_id);
+                vn->set_feedback(fb_ptr);
+                node_ptr = std::move(vn);
+            }
+            else if (nd.type == BITCRUSHER_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::bitcrusher_node>(ag_id,
+                    prop_f(nd, "bits", 8.f), prop_f(nd, "downsample", 1.f));
+            }
+            else if (nd.type == DELAY_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::delay_node>(ag_id,
+                    prop_f(nd, "delay_ms", 250.f),
+                    prop_f(nd, "feedback", 0.4f),
+                    prop_f(nd, "mix",      0.5f));
+            }
+            else if (nd.type == RING_MOD_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::ring_mod_node>(ag_id,
+                    prop_f(nd, "carrier_hz", 200.f), prop_f(nd, "mix", 1.f));
+            }
             else
             {
                 log::warn("[audio] graphplan node %llu has unknown type %d — skipped", gp_id, nd.type);
@@ -928,6 +1195,18 @@ void audio::_rebuild_graph_from_plan()
         if (!_graphplan->nodes.count(it->first))
         {
             _vorbis_res_cache.erase(it->first);
+            _vorbis_feedback_cache.erase(it->first);
+            {
+                auto vit = _visualizer_feedback_cache.find(it->first);
+                if (vit != _visualizer_feedback_cache.end())
+                {
+                    auto* rs = entt::locator<renderer_service*>::has_value()
+                               ? entt::locator<renderer_service*>::value() : nullptr;
+                    if (rs && vit->second && vit->second->texture)
+                        rs->destroy_texture(vit->second->texture);
+                    _visualizer_feedback_cache.erase(vit);
+                }
+            }
             it = _node_cache.erase(it);
         }
         else

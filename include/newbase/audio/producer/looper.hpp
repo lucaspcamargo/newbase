@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/audio/producer.hpp>
+#include <newbase/audio/vorbis_feedback.hpp>
 #include <memory>
 #include <cassert>
 
@@ -29,6 +30,12 @@ public:
     {
         m_loop_count = loop_count;
     }
+
+    size_t loop_count() const { return m_loop_count; }
+    size_t play_count() const { return m_play_count; }
+    audio_producer* inner_producer() { return m_prod.get(); }
+
+    void set_feedback(std::shared_ptr<vorbis_feedback> fb) { m_fb = std::move(fb); }
 
     ~audio_producer_looper() override = default;
 
@@ -87,12 +94,22 @@ public:
 
     size_t frames_pull(audio_buffer::span dst, size_t max_frames) override
     {
+        // Consume commands from main thread.
+        if (m_fb)
+        {
+            if (m_fb->cmd_rewind.exchange(false, std::memory_order_acq_rel))
+                reset();
+            if (m_fb->cmd_seek.exchange(false, std::memory_order_acq_rel))
+                seek(m_fb->cmd_seek_frame.load(std::memory_order_relaxed));
+        }
+
         size_t produced = 0;
         while(produced < max_frames)
         {
             // if we are at the end
             if(m_prod->frames_left() == 0)
             {
+                m_play_count++;
                 if(m_loop_frame)
                     seek(m_loop_frame);
                 else
@@ -107,15 +124,26 @@ public:
             m_curr += produced_now;
             produced += produced_now;
         }
+
+        // Push state to main thread.
+        if (m_fb)
+        {
+            m_fb->curr_frame  .store(m_prod->curr_frame(),   std::memory_order_relaxed);
+            m_fb->total_frames.store(m_prod->total_frames(), std::memory_order_relaxed);
+            m_fb->play_count.store(m_play_count, std::memory_order_relaxed);
+            m_fb->loop_count.store(m_loop_count, std::memory_order_relaxed);
+        }
+
         return produced;
     }
 
 private:
-    std::shared_ptr<audio_producer> m_prod;
+    std::shared_ptr<audio_producer>  m_prod;
     size_t m_loop_frame;
     size_t m_loop_count; // 0 = infinite
     size_t m_play_count;
     size_t m_curr;
+    std::shared_ptr<vorbis_feedback> m_fb; // optional; null when unused
 };
 
 }

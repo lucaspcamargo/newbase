@@ -24,6 +24,10 @@ enum class node_type
     GAIN         = 9, // simple gain (props: gain_db)
     BUS_INPUT    = 10, // sends audio into a named bus
     BUS_OUTPUT   = 11, // receives audio from a named bus
+    VISUALIZER   = 12, // 1-in 1-out pass-through that captures samples for visualisation
+    BITCRUSHER   = 13, // reduces bit depth and/or sample rate
+    DELAY        = 14, // delay line with feedback
+    RING_MOD     = 15, // ring modulator (multiply by sine carrier)
 };
 
 class node
