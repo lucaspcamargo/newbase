@@ -15,7 +15,7 @@ namespace lua {
 // Copyable (shared ownership); registry ref is released when the last copy dies.
 struct lua_function {
     struct _ref {
-        _ref(lua_State *_L, int _iref) : L(_L), ref(_iref)
+        _ref(lua_State *lua_state, int _iref) : L(lua_state), ref(_iref)
         {
         }
         lua_State *L;

@@ -62,7 +62,7 @@ namespace log {
             {priority::INVALID, "INVALID"},
             {priority::TRACE, "TRACE"},
             {priority::VERBOSE, "VERBOSE"},
-            {priority::DEBUG, "DEBUG"},
+            {priority::DBG, "DEBUG"},
             {priority::INFO, "INFO"},
             {priority::WARN, "WARN"},
             {priority::ERROR, "ERROR"},

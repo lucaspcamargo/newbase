@@ -8,16 +8,16 @@ namespace nb {
 
         class stack_guard {
         public:
-            stack_guard(lua_State *L) : _L(L), _top(lua_gettop(L)) {}
+            stack_guard(lua_State *L) : _lua(L), _top(lua_gettop(L)) {}
             ~stack_guard() {
-                if(lua_gettop(_L) != _top)
+                if(lua_gettop(_lua) != _top)
                 {
-                    log::error("[script_lua] Lua stack imbalance detected: before=%d, after=%d", _top, lua_gettop(_L));
-                    lua_settop(_L, _top);
+                    log::error("[script_lua] Lua stack imbalance detected: before=%d, after=%d", _top, lua_gettop(_lua));
+                    lua_settop(_lua, _top);
                 }
             }
         private:
-            lua_State *_L;
+            lua_State *_lua;
             int _top;
         };
 

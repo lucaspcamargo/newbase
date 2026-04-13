@@ -8,6 +8,7 @@
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
 #include <newbase/log.hpp>
+#include <ryml_std.hpp>
 
 #include <SDL3/SDL.h>
 #include <stb_image.h>

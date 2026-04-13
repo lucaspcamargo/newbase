@@ -2,6 +2,12 @@
 set(NEWBASE_EMSCRIPTEN_RES_PREFIX "/nb" CACHE STRING "Where on the emscripten MEMFS to install resources")
 set(NEWBASE_NATIVE_RES_PREFIX "nb" CACHE STRING "Path prefix for installing and searching for resources")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "NintendoWii")
+    set(NEWBASE_WII ON)
+else()
+    set(NEWBASE_WII OFF)
+endif()
+
 if(DEFINED ANDROID_NDK)
     # clang is very annoying
     add_compile_options(

@@ -106,8 +106,8 @@ bool sdl_storage::_search_index()
     
     if (SDL_GetStorageFileSize(_storage, idx_path.c_str(), &idx_len) && idx_len > 0)
     {
-        buf.resize(static_cast<size_t>(idx_len+1));
-        buf.back() = '\0';
+        buf.resize(static_cast<size_t>(idx_len) + 1u);
+        buf[static_cast<size_t>(idx_len)] = '\0';
         if (SDL_ReadStorageFile(_storage, idx_path.c_str(), buf.data(), idx_len))
         {
             auto tree = ryml::parse_in_place(buf.data());

@@ -24,7 +24,7 @@ namespace log {
         INVALID,
         TRACE,
         VERBOSE,
-        DEBUG,
+        DBG,
         INFO,
         WARN,
         ERROR,

@@ -15,6 +15,9 @@
 #cmakedefine NEWBASE_SGDK
 #cmakedefine NEWBASE_USE_XDG_DATA_DIRS
 #cmakedefine NEWBASE_STEAM
+#ifndef NEWBASE_WII
+#cmakedefine NEWBASE_WII
+#endif
 #define NEWBASE_STATIC_LOG_LEVEL "@NEWBASE_LOG_LEVEL@"
 #ifdef __cplusplus
 static constexpr int NB_STATIC_LOG_LEVEL_INT = @NEWBASE_LOG_LEVEL_INT@;

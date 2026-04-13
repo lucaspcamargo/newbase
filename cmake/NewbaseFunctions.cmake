@@ -189,6 +189,14 @@ function(newbase_prepare_executable)
             "--embed-file=${sbom_output}@${NEWBASE_DEFAULT_RES_PREFIX}/sbom.spdx"
         )
     endif()
+
+    if(NEWBASE_WII AND ELF2DOL_EXE)
+        add_custom_command(TARGET ${arg_TARGET} POST_BUILD
+            COMMAND ${ELF2DOL_EXE} "$<TARGET_FILE:${arg_TARGET}>" "$<TARGET_FILE:${arg_TARGET}>.dol"
+            COMMENT "Converting ${arg_TARGET} to DOL"
+            VERBATIM
+        )
+    endif()
 endfunction()
 
 function(newbase_add_system)

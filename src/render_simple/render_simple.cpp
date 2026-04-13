@@ -119,9 +119,15 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     log::info("[render_simple] available drivers: %s", driver_names.c_str());
     */
 
-    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE 
+#ifdef NEWBASE_WII
+    Uint32 window_flags = SDL_WINDOW_FULLSCREEN;
+    int window_w = 640, window_h = 480;
+#else
+    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
                         | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_MAXIMIZED;
-    _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), 1024, 768, window_flags);
+    int window_w = 1024, window_h = 768;
+#endif
+    _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), window_w, window_h, window_flags);
     if (_win == nullptr)
     {
         log::error("[render_simple] SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -141,7 +147,11 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     }
     else
         log::info("[render_simple] created renderer: %s", SDL_GetRendererName(_render));
+
+#ifndef NEWBASE_WII
     SDL_SetWindowPosition(_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+#endif
+
     SDL_ShowWindow(_win);
     SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
 

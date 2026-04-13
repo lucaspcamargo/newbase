@@ -18,6 +18,7 @@ option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during 
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
+set(NEWBASE_WII_SDL_PATH "" CACHE PATH "Path to SDL source tree for Wii builds (overrides vendored/SDL when set)")
 
 # further options and logging
 include(cmake/NewbaseOptions.cmake)
@@ -37,8 +38,20 @@ include(cmake/NewbaseSGDK.cmake)
 include(cmake/NewbaseFunctions.cmake)
 
 message("[newbase] adding SDL")
-add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
+if(NEWBASE_WII AND NEWBASE_WII_SDL_PATH)
+    message("[newbase] Wii: using SDL fork from ${NEWBASE_WII_SDL_PATH}")
+    # The Wii SDL fork checks SDL_OPENGL and tries to find opengx via pkg-config.
+    # We don't use OpenGL (only the 2D renderer), so disable it upfront.
+    set(SDL_OPENGL OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${NEWBASE_WII_SDL_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/vendored/SDL_wii" EXCLUDE_FROM_ALL)
+else()
+    add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
+endif()
 message("[newbase] adding rapidyaml")
+if(NEWBASE_WII)
+    # c4core's install-export step doesn't know about NintendoWii; skip it.
+    set(RYML_INSTALL OFF)
+endif()
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
 message("[newbase] adding glm")
 set(GLM_BUILD_INSTALL ON CACHE BOOL "GLM forced to add install target for export") # needed for export
@@ -152,6 +165,9 @@ target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-fon
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_compile_options(newbase PUBLIC -fno-exceptions )
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d tinygettext -lm)
+if(NEWBASE_WII)
+    target_compile_definitions(newbase PUBLIC NEWBASE_WII IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
+endif()
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)
@@ -164,6 +180,9 @@ add_subdirectory(runner)  # an application made to run games that don't need add
 add_executable(dpi_test src/etc/imgui_dpi_test.cpp ${IMGUI_SOURCES})
 target_link_libraries(dpi_test SDL3::SDL3)
 target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
+if(NEWBASE_WII)
+    target_compile_definitions(dpi_test PRIVATE IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
+endif()
 
 # if we are building on android ndk, adjust SDL linking
 
@@ -176,6 +195,8 @@ endif()
 
 # EXPORTS
 # let games use newbase and dependencies straight from the build folder
+# (skip for embedded targets that don't support the full install/export machinery)
+if(NOT NEWBASE_WII) # -- may be needed in the future, but we can leave it for now
 export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
 export(TARGETS tinygettext NAMESPACE nb:: FILE newbase-tinygettext-export.cmake) # same for tinygettext
@@ -190,4 +211,5 @@ foreach(system IN LISTS NEWBASE_ALL_SYSTEMS)
 endforeach()
 set_target_properties(newbase PROPERTIES ALL_SYSTEMS "${NEWBASE_ALL_SYSTEMS}")
 export(TARGETS newbase ${export_targets} NAMESPACE nb:: FILE newbase-export.cmake )
+endif() # NOT NEWBASE_WII
 
