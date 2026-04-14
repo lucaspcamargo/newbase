@@ -440,14 +440,20 @@ extern "C" void _rtti_init_render_simple()
     entt::meta_factory<nb::render_simple>{}
         .type("render_simple"_hs)
         .custom<rtti::type_info>(rtti::type_info{"render_simple", rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&nb::render_simple::cam_2d_setup>("cam_2d_setup"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"cam_2d_setup"})
+        .func<&nb::render_simple::cam_2d_scale>("cam_2d_scale"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"cam_2d_scale"})
+        .func<&nb::render_simple::window_width>("window_width"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"window_width"})
+        .func<&nb::render_simple::window_height>("window_height"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"window_height"});
     entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
         .type("render_simple_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
         .conv<std::shared_ptr<nb::system>>();
 
-    // register related components
-    // TODO add component registration mechanism similar to the one used by systems
     cspatial::_ensure_rtti();
     csprite::_ensure_rtti();
 }

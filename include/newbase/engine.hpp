@@ -45,6 +45,10 @@ public:
 
     std::shared_ptr<::nb::system> system_from_id(entt::id_type meta_id);
 
+    // Register a system that was instantiated directly (not from config).
+    // SDL is already initialised at this point. Calls sys->init() with an empty config.
+    void register_system(std::shared_ptr<::nb::system> sys);
+
     // global debug actions
     // allows registering of simple callbacks that are invoked using function/number keys
     int debug_action_register(std::string name, std::function<void(void)> callback, int idx = -1);

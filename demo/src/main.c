@@ -1,6 +1,8 @@
 #include <newbase/sdl/engine_hooks.h>
 #include <newbase/nb_config.h>
 #include <newbase/reflection/init.h>
+
+void _nb_demo_register_systems(void);
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
 #endif
@@ -58,7 +60,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 #endif
 
 	(*appstate) = NULL;
-	return bool_to_app_result(_nb_engine_init(appstate, argc, argv));
+	if (!_nb_engine_init(appstate, argc, argv))
+		return SDL_APP_FAILURE;
+	_nb_demo_register_systems();
+	return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate)

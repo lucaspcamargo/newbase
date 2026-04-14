@@ -1,8 +1,9 @@
 newbase_add_executable(
-    TARGET 
-        newbase_demo 
-    SOURCES 
+    TARGET
+        newbase_demo
+    SOURCES
         src/main.c
+        src/demo_system.cpp
 )
 newbase_prepare_executable(TARGET newbase_demo SYSTEMS AUTO)
 #if(NOT WIN32)

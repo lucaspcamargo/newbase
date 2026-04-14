@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <memory>
 
@@ -36,6 +37,11 @@ using entt::operator""_hs;
 struct nb::audio_graph_manager::impl {
     graphplan::plan*   gplan  {nullptr};
     graphplan::editor* editor {nullptr};
+
+    // graphplan node id of the main OUTPUT node (always present after init).
+    uint64_t out_node_id {0};
+    // Number of managed buses added so far (used for vertical layout).
+    int bus_count {0};
 
     // Persistent node cache: graphplan node id → live audio_graph node instance.
     std::unordered_map<uint64_t, std::shared_ptr<audio_graph::node>> node_cache;
@@ -357,40 +363,110 @@ audio_graph_manager::~audio_graph_manager() { shutdown(); delete _d; }
 
 graphplan::plan* audio_graph_manager::plan() const { return _d->gplan; }
 
-void audio_graph_manager::init(audio_spec spec, float bgm_gain_db, float sfx_gain_db)
+void audio_graph_manager::init(audio_spec spec)
 {
-    log::info("[audio] creating graphplan");
+    log::verb("[audio] creating graphplan");
     _d->gplan = new graphplan::plan(AUDIO_DOMAIN);
 
     using NT = audio_graph::node_type;
-    auto add = [&](NT t, float x, float y) {
-        return _d->gplan->add_node_from_type(static_cast<int>(t), x, y);
-    };
-    auto link = [&](uint64_t out_node, uint64_t in_node) {
-        uint64_t lid    = _d->gplan->get_next_unique_id();
-        uint64_t out_pin = _d->gplan->nodes.at(out_node).output_pins[0];
-        uint64_t in_pin  = _d->gplan->nodes.at(in_node).input_pins[0];
-        _d->gplan->links.insert({lid, graphplan::link_data{lid, in_pin, out_pin}});
-    };
+    _d->out_node_id = _d->gplan->add_node_from_type(static_cast<int>(NT::OUTPUT), 650.f, 200.f);
 
-    uint64_t out_id = add(NT::OUTPUT, 650.f, 200.f);
-
-    _bgm_gain_node_id = add(NT::GAIN,       400.f,  80.f);
-    uint64_t bgm_bus_id = add(NT::BUS_OUTPUT, 150.f,  80.f);
-    _d->gplan->nodes.at(bgm_bus_id).properties["bus_id"]  = entt::meta_any{std::string{"bgm"}};
-    _d->gplan->nodes.at(_bgm_gain_node_id).properties["gain_db"] = entt::meta_any{bgm_gain_db};
-    link(bgm_bus_id, _bgm_gain_node_id);
-    link(_bgm_gain_node_id, out_id);
-
-    _sfx_gain_node_id = add(NT::GAIN,       400.f, 320.f);
-    uint64_t sfx_bus_id = add(NT::BUS_OUTPUT, 150.f, 320.f);
-    _d->gplan->nodes.at(sfx_bus_id).properties["bus_id"]  = entt::meta_any{std::string{"sfx"}};
-    _d->gplan->nodes.at(_sfx_gain_node_id).properties["gain_db"] = entt::meta_any{sfx_gain_db};
-    link(sfx_bus_id, _sfx_gain_node_id);
-    link(_sfx_gain_node_id, out_id);
-
-    // spec is unused here: rebuild() sets it on the new graph from the live graph's spec.
     (void)spec;
+}
+
+void audio_graph_manager::_link(uint64_t from_node, uint64_t to_node)
+{
+    uint64_t lid     = _d->gplan->get_next_unique_id();
+    uint64_t out_pin = _d->gplan->nodes.at(from_node).output_pins[0];
+    uint64_t in_pin  = _d->gplan->nodes.at(to_node).input_pins[0];
+    _d->gplan->links.insert({lid, graphplan::link_data{lid, in_pin, out_pin}});
+}
+
+uint64_t audio_graph_manager::add_managed_bus(const std::string& name, float gain_db)
+{
+    assert(_d->gplan);
+    using NT = audio_graph::node_type;
+
+    float y = 80.f + static_cast<float>(_d->bus_count) * 240.f;
+    ++_d->bus_count;
+
+    uint64_t bus_out_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_OUTPUT), 150.f, y);
+    uint64_t gain_id    = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),       400.f, y);
+    _d->gplan->nodes.at(bus_out_id).properties["bus_id"]  = entt::meta_any{name};
+    _d->gplan->nodes.at(gain_id).properties["gain_db"]    = entt::meta_any{gain_db};
+    _link(bus_out_id, gain_id);
+    _link(gain_id, _d->out_node_id);
+
+    log::verb("[audio] added managed bus '%s' gain_node=%llu", name.c_str(), gain_id);
+    return gain_id;
+}
+
+audio_graph_manager::player_nodes audio_graph_manager::add_player(
+    const std::string& bus_name, entt::id_type res_id, bool loop)
+{
+    assert(_d->gplan);
+    using NT = audio_graph::node_type;
+
+    // Find the y position of the matching BUS_OUTPUT node for alignment.
+    float y = 80.f;
+    for (const auto& [id, nd] : _d->gplan->nodes)
+    {
+        if (nd.type != static_cast<int>(NT::BUS_OUTPUT)) continue;
+        auto it = nd.properties.find("bus_id");
+        if (it == nd.properties.end()) continue;
+        if (const std::string* s = it->second.try_cast<std::string>(); s && *s == bus_name)
+            { y = nd.pos_y; break; }
+    }
+
+    // VORBIS(-200) → GAIN(-75) → BUS_INPUT(50)
+    uint64_t vorbis_id = _d->gplan->add_node_from_type(static_cast<int>(NT::VORBIS_SOURCE), -200.f, y);
+    uint64_t gain_id   = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),            -75.f, y);
+    uint64_t bus_in_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_INPUT),        50.f, y);
+    _d->gplan->nodes.at(vorbis_id).properties["res_id"]  = entt::meta_any{res_id};
+    _d->gplan->nodes.at(vorbis_id).properties["loop"]    = entt::meta_any{loop};
+    _d->gplan->nodes.at(gain_id).properties["gain_db"]   = entt::meta_any{0.f};
+    _d->gplan->nodes.at(bus_in_id).properties["bus_id"]  = entt::meta_any{bus_name};
+    _link(vorbis_id, gain_id);
+    _link(gain_id,   bus_in_id);
+
+    log::verb("[audio] added player on bus '%s' vorbis=%llu gain=%llu bus_in=%llu",
+              bus_name.c_str(), vorbis_id, gain_id, bus_in_id);
+    return {vorbis_id, gain_id, bus_in_id};
+}
+
+void audio_graph_manager::remove_player(const player_nodes& pn)
+{
+    if (!_d->gplan) return;
+
+    for (uint64_t node_id : {pn.vorbis_node_id, pn.gain_node_id, pn.bus_input_node_id})
+    {
+        auto nit = _d->gplan->nodes.find(node_id);
+        if (nit == _d->gplan->nodes.end()) continue;
+
+        const auto& nd = nit->second;
+        std::unordered_set<uint64_t> pins;
+        pins.insert(nd.input_pins.begin(),  nd.input_pins.end());
+        pins.insert(nd.output_pins.begin(), nd.output_pins.end());
+
+        for (auto lit = _d->gplan->links.begin(); lit != _d->gplan->links.end(); )
+        {
+            if (pins.count(lit->second.input_pin) || pins.count(lit->second.output_pin))
+                lit = _d->gplan->links.erase(lit);
+            else
+                ++lit;
+        }
+        for (uint64_t pid : pins) _d->gplan->pins.erase(pid);
+        _d->gplan->nodes.erase(nit);
+    }
+
+    _d->node_cache.erase(pn.vorbis_node_id);
+    _d->vorbis_res_cache.erase(pn.vorbis_node_id);
+    _d->vorbis_fb_cache.erase(pn.vorbis_node_id);
+    _d->node_cache.erase(pn.gain_node_id);
+    _d->node_cache.erase(pn.bus_input_node_id);
+
+    log::verb("[audio] removed player vorbis=%llu gain=%llu bus_in=%llu",
+              pn.vorbis_node_id, pn.gain_node_id, pn.bus_input_node_id);
 }
 
 void audio_graph_manager::shutdown()
@@ -520,14 +596,14 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
         if (cache_it != _d->bus_cache.end())
         {
             bus_mixer = cache_it->second;
-            log::info("[audio] reused bus mixer '%s' ag=%d", bus_id.c_str(), bus_mixer->id());
+            log::verb("[audio] reused bus mixer '%s' ag=%d", bus_id.c_str(), bus_mixer->id());
         }
         else
         {
             audio_graph::node_id ag_id = _d->next_ag_id++;
             bus_mixer = std::make_shared<audio_graph::mixer_node>(ag_id);
             _d->bus_cache[bus_id] = bus_mixer;
-            log::info("[audio] created bus mixer '%s' ag=%d", bus_id.c_str(), ag_id);
+            log::verb("[audio] created bus mixer '%s' ag=%d", bus_id.c_str(), ag_id);
         }
         new_graph.add_node(bus_mixer);
         active_buses[bus_id] = bus_mixer;
@@ -714,7 +790,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             }
 
             new_graph.add_node(node_ptr);
-            log::info("[audio] reused node gp=%llu ag=%d", gp_id, node_ptr->id());
+            log::verb("[audio] reused node gp=%llu ag=%d", gp_id, node_ptr->id());
         }
         else
         {
@@ -835,7 +911,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
 
             new_graph.add_node(node_ptr);
             _d->node_cache[gp_id] = node_ptr;
-            log::info("[audio] created node gp=%llu ag=%d type=%d", gp_id, ag_id, nd.type);
+            log::verb("[audio] created node gp=%llu ag=%d type=%d", gp_id, ag_id, nd.type);
         }
 
         id_map[gp_id] = node_ptr->id();
@@ -887,7 +963,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     {
         const auto& nodes = new_graph.nodes();
         const auto& edges = new_graph.edges();
-        log::info("[audio] --- graph rebuilt: %zu nodes, %zu edges ---", nodes.size(), edges.size());
+        log::verb("[audio] --- graph rebuilt: %zu nodes, %zu edges ---", nodes.size(), edges.size());
         auto order = new_graph.topological_sort(nullptr);
         for (auto ag_id : order)
         {
@@ -910,7 +986,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 else if (t == NOISE_TYPE)  type_name = "Noise";
                 else if (t == REVERB_TYPE) type_name = "Reverb";
             }
-            log::info("[audio]   node ag=%d (gp=%llu) type=%s out_edges=%zu",
+            log::verb("[audio]   node ag=%d (gp=%llu) type=%s out_edges=%zu",
                       ag_id, gp_id_display, type_name, out_edges);
             if (gp_nd && gp_nd->type == VORBIS_TYPE)
             {
@@ -921,15 +997,15 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 }();
                 const char* loop_str = loop_ptr ? (*loop_ptr ? "1" : "0") : "(none)";
                 auto* sn = dynamic_cast<audio_graph::source_node*>(n);
-                log::info("[audio]     res_id=%x loop=%s producer=%s",
+                log::verb("[audio]     res_id=%x loop=%s producer=%s",
                           res_id, loop_str, (sn && sn->producer()) ? "ok" : "NULL");
             }
             for (const auto& [src, dsts] : edges)
                 for (auto dst : dsts)
                     if (dst == ag_id)
-                        log::info("[audio]     <- from ag=%d", src);
+                        log::verb("[audio]     <- from ag=%d", src);
         }
-        log::info("[audio] --- end graph ---");
+        log::verb("[audio] --- end graph ---");
     }
 
     SDL_LockMutex(mtx);

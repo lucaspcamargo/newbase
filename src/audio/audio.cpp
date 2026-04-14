@@ -44,11 +44,20 @@ struct nb::audio_p {
     bool  out_mute {false};
     float out_gain {1.0f};
 
-    // BGM stream (legacy path, kept for future use)
-    SDL_AudioStream*  bgm      {nullptr};
-    audio_producer*   bgm_prod {nullptr};
-    float bgm_gain_db {0.f};
-    float sfx_gain_db {0.f};
+    // Managed buses: each has a display name and a graphplan gain node id.
+    struct managed_bus {
+        std::string name;
+        float       gain_db      {0.f};
+        uint64_t    gain_node_id {0};
+    };
+    // Managed players: each maps to two graphplan nodes (vorbis source + bus input).
+    struct managed_player {
+        std::string bus_name;
+        audio_graph_manager::player_nodes nodes {};
+    };
+
+    std::vector<managed_bus>    buses;
+    std::vector<managed_player> players;
 
     // Audio-thread → main-thread visualisation buffer
     float      vis_buf[VIS_FRAMES] {};
@@ -125,14 +134,22 @@ audio::~audio()
 {
     nb::log::info("[audio] destroying");
 
+    // Stop the audio callback before touching shared state.
+    // 1. Clear the callback so no new invocations can start.
+    if (_d->out_stream)
+        SDL_SetAudioStreamGetCallback(_d->out_stream, nullptr, nullptr);
+    // 2. Destroy the stream — SDL3 waits for any in-flight callback to finish
+    //    before returning, so the mutexes are safe to destroy afterwards.
+    if (_d->out_stream) { SDL_DestroyAudioStream(_d->out_stream); _d->out_stream = nullptr; }
+    if (_d->dev_out)    { SDL_CloseAudioDevice(_d->dev_out);       _d->dev_out    = 0;       }
+
+    // No callback can run past this point — safe to swap graph and tear down.
     SDL_LockMutex(_d->graph_mtx);
     _d->graph = audio_graph::graph{};
     SDL_UnlockMutex(_d->graph_mtx);
 
-    _d->gm.shutdown(); // destroy caches and GPU textures before device close
+    _d->gm.shutdown(); // destroy caches and feedback resources
 
-    if (_d->bgm)       { SDL_DestroyAudioStream(_d->bgm); _d->bgm = nullptr; }
-    if (_d->dev_out)   { SDL_CloseAudioDevice(_d->dev_out); _d->dev_out = 0; }
     if (_d->graph_mtx) { SDL_DestroyMutex(_d->graph_mtx); _d->graph_mtx = nullptr; }
     if (_d->vis_mtx)   { SDL_DestroyMutex(_d->vis_mtx);   _d->vis_mtx   = nullptr; }
 
@@ -194,9 +211,6 @@ bool audio::init(ryml::ConstNodeRef cfg)
     else
         nb::log::error("[audio] could not create output stream!");
 
-    if (cfg.has_child("bgm_gain_db")) cfg["bgm_gain_db"] >> _d->bgm_gain_db;
-    if (cfg.has_child("sfx_gain_db")) cfg["sfx_gain_db"] >> _d->sfx_gain_db;
-
     if (auto* ui_mgr = entt::locator<ui_manager*>::value())
         ui_mgr->register_tool_window("audio", [this](bool* open){ _draw_tool_window(open); });
 
@@ -205,7 +219,24 @@ bool audio::init(ryml::ConstNodeRef cfg)
             ui_mgr->toggle_tool_window("audio");
     }, 9);
 
-    _d->gm.init(_d->graph.spec(), _d->bgm_gain_db, _d->sfx_gain_db);
+    _d->gm.init(_d->graph.spec());
+
+    // Add default managed buses, reading initial gain values from config.
+    auto add_bus = [&](const char* name) {
+        float db = 0.f;
+        if (cfg.has_child(name)) {
+            std::string key = std::string{name} + "_gain_db";
+            if (cfg.has_child(key.c_str())) cfg[key.c_str()] >> db;
+        }
+        // Also try the direct key form used in config (bgm_gain_db / sfx_gain_db).
+        std::string cfg_key = std::string{name} + "_gain_db";
+        if (cfg.has_child(cfg_key.c_str())) cfg[cfg_key.c_str()] >> db;
+        uint64_t gain_id = _d->gm.add_managed_bus(name, db);
+        _d->buses.push_back({name, db, gain_id});
+    };
+    add_bus("bgm");
+    add_bus("sfx");
+
     _d->gm.rebuild(_d->graph, _d->graph_mtx);
 
     log::info("[audio] initialized");
@@ -227,34 +258,87 @@ void audio::out_gain(float gain)
     SDL_SetAudioDeviceGain(_d->dev_out, _d->out_mute ? 0.0f : _d->out_gain);
 }
 
+// Helper: find a managed_bus entry by name. Returns nullptr if not found.
+static audio_p::managed_bus* find_bus(audio_p* d, const std::string& name)
+{
+    for (auto& b : d->buses)
+        if (b.name == name) return &b;
+    return nullptr;
+}
+
+// Helper: remove all players on the given bus, then rebuild.
+static void stop_bus_players(audio_p* d, audio_graph_manager& gm,
+                              const std::string& bus_name)
+{
+    for (auto it = d->players.begin(); it != d->players.end(); )
+    {
+        if (it->bus_name == bus_name)
+        {
+            gm.remove_player(it->nodes);
+            it = d->players.erase(it);
+        }
+        else ++it;
+    }
+}
+
 bool audio::bgm_play(entt::id_type res_id)
 {
     auto vorbis_res = rman().get<rvorbis>(res_id);
-    if (!vorbis_res->valid)
+    if (!vorbis_res || !vorbis_res->valid)
     {
         log::error("[audio] bgm_play: invalid resource: %x", res_id);
         return false;
     }
+    stop_bus_players(_d, _d->gm, "bgm");
+    _d->players.push_back({"bgm", _d->gm.add_player("bgm", res_id, /*loop=*/true)});
+    _d->gm.rebuild(_d->graph, _d->graph_mtx);
     log::info("[audio] bgm_play: %x", res_id);
+    return true;
+}
+
+bool audio::bgm_playing()
+{
+    for (const auto& p : _d->players)
+        if (p.bus_name == "bgm") return true;
     return false;
 }
 
-bool audio::bgm_playing() { return static_cast<bool>(_d->bgm); }
-bool audio::bgm_stop()    { return false; }
+bool audio::bgm_stop()
+{
+    stop_bus_players(_d, _d->gm, "bgm");
+    _d->gm.rebuild(_d->graph, _d->graph_mtx);
+    return true;
+}
 
 void audio::bgm_gain(float db)
 {
-    _d->bgm_gain_db = db;
-    _d->gm.apply_gain_db(_d->gm.bgm_gain_node_id(), db);
+    if (auto* b = find_bus(_d, "bgm")) {
+        b->gain_db = db;
+        _d->gm.apply_gain_db(b->gain_node_id, db);
+    }
 }
 
 void audio::sfx_gain(float db)
 {
-    _d->sfx_gain_db = db;
-    _d->gm.apply_gain_db(_d->gm.sfx_gain_node_id(), db);
+    if (auto* b = find_bus(_d, "sfx")) {
+        b->gain_db = db;
+        _d->gm.apply_gain_db(b->gain_node_id, db);
+    }
 }
 
-bool audio::sfx_play(entt::id_type, float) { return false; }
+bool audio::sfx_play(entt::id_type res_id, float /*gain*/)
+{
+    auto vorbis_res = rman().get<rvorbis>(res_id);
+    if (!vorbis_res || !vorbis_res->valid)
+    {
+        log::error("[audio] sfx_play: invalid resource: %x", res_id);
+        return false;
+    }
+    _d->players.push_back({"sfx", _d->gm.add_player("sfx", res_id, /*loop=*/false)});
+    _d->gm.rebuild(_d->graph, _d->graph_mtx);
+    log::info("[audio] sfx_play: %x", res_id);
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 // Tool window
@@ -271,12 +355,14 @@ void audio::_draw_tool_window(bool* close)
             out_mute(_d->out_mute);
         if (ImGui::VSliderFloat("OUT", slider_size, &_d->out_gain, 0.f, 1.f, "%.1f"))
             out_gain(_d->out_gain);
-        ImGui::SameLine();
-        if (ImGui::VSliderFloat("BGM", slider_size, &_d->bgm_gain_db, -60.f, 6.f, "%.0f"))
-            bgm_gain(_d->bgm_gain_db);
-        ImGui::SameLine();
-        if (ImGui::VSliderFloat("SFX", slider_size, &_d->sfx_gain_db, -60.f, 6.f, "%.0f"))
-            sfx_gain(_d->sfx_gain_db);
+        for (auto& bus : _d->buses)
+        {
+            ImGui::SameLine();
+            ImGui::PushID(bus.name.c_str());
+            if (ImGui::VSliderFloat(bus.name.c_str(), slider_size, &bus.gain_db, -60.f, 6.f, "%.0f"))
+                _d->gm.apply_gain_db(bus.gain_node_id, bus.gain_db);
+            ImGui::PopID();
+        }
         ImGui::TreePop();
     }
 

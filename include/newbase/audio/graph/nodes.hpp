@@ -36,7 +36,7 @@ public:
     void process(audio_spec spec, size_t frames,
                  const std::vector<audio_buffer*>& inputs) override
     {
-        log::info("[output_node %d] processing NUM_INPUTS=%zu frames=%zu", id(), inputs.size(), frames);
+        log::verb("[output_node %d] processing NUM_INPUTS=%zu frames=%zu", id(), inputs.size(), frames);
         ensure_buf(spec, frames);
         std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
         for (auto* input : inputs)
@@ -83,7 +83,7 @@ public:
 
         if (prod_spec == graph_spec)
         {
-            log::info("[source_node %d] direct pull, frames=%zu", id(), frames);
+            log::verb("[source_node %d] direct pull, frames=%zu", id(), frames);
             auto sp = out_buf_->as_span();
             producer_->frames_pull(std::move(sp), frames);
         }

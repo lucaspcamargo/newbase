@@ -306,6 +306,16 @@ std::shared_ptr<::nb::system> engine::system_from_id(entt::id_type meta_id)
     return it != _d->_systems_meta.end()? it->second : nullptr;
 }
 
+void engine::register_system(std::shared_ptr<::nb::system> sys)
+{
+    static const ryml::Tree empty_tree = ryml::parse_in_arena("{}");
+    if (sys->init(empty_tree.rootref()))
+    {
+        _d->_systems.push_back(sys);
+        _d->_systems_meta[sys->metatype_id()] = sys;
+    }
+}
+
 int engine::debug_action_register(std::string name, std::function<void(void)> callback,  int idx)
 {
     if(idx == -1)
