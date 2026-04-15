@@ -181,7 +181,7 @@ add_subdirectory(demo)    # our demo game/app
 add_subdirectory(runner)  # an application made to run games that don't need additional code
 add_executable(dpi_test src/etc/imgui_dpi_test.cpp ${IMGUI_SOURCES})
 target_link_libraries(dpi_test SDL3::SDL3)
-target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES})
+target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES} src/ui)
 if(NEWBASE_WII)
     target_compile_definitions(dpi_test PRIVATE IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
 endif()

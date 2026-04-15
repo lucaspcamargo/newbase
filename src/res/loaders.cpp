@@ -111,7 +111,7 @@ namespace nb {
             return nullptr;
         }
         log::info("[load_texture_surface] loaded: %dx%d, %dchs", w, h, chs);
-        SDL_Surface* tmp  = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_ABGR8888, ptr, w * 4);
+        SDL_Surface* tmp  = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, ptr, w * 4);
         SDL_Surface* surf = SDL_DuplicateSurface(tmp);
         SDL_DestroySurface(tmp);
         stbi_image_free(ptr);

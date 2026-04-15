@@ -47,10 +47,12 @@ The engine supports the following platforms:
 - Linux (native and Flatpak builds)
 - Emscripten (WASM)
 - Windows (amd64)
-- Android (arm64)
+- Android (aarch64)
+- Nintendo Wii
+    + preliminary version using [this SDL3 port](https://github.com/lucaspcamargo/SDL3-libogc2), atop devkitPPC and libogc2.
 
-macOS should be doable and easy to add, once I actually have the necessary hardware and environment.
-An attempt at a hackintosh VM did not work out. At this point, I'd rather have a native Arm
+macOS should be relatively easy to add, once I actually have the necessary hardware and environment.
+An attempt at a hackintosh VM did not work out. At this point, I'd rather have a native macOS
 build machine when time and money allow.
 
 It should be possible to build for other platforms and architectures, but this it is neither tested nor supported.
