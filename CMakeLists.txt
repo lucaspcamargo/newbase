@@ -50,7 +50,9 @@ endif()
 message("[newbase] adding rapidyaml")
 if(NEWBASE_WII)
     # c4core's install-export step doesn't know about NintendoWii; skip it.
-    set(RYML_INSTALL OFF)
+    # FORCE ensures these are in the cache before rapidyaml's cmake reads them.
+    set(RYML_INSTALL OFF CACHE BOOL "" FORCE)
+    set(C4CORE_INSTALL OFF CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(vendored/rapidyaml EXCLUDE_FROM_ALL)
 message("[newbase] adding glm")

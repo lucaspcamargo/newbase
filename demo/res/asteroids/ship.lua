@@ -49,8 +49,7 @@ clock_update_add(function (delta)
         end
     
     else
-        print("COULD NOT GET VIEWPORT SERVICE")
-
+        print("[ship.lua] no renderer service? skip viewport wrapping")
     end
 
 

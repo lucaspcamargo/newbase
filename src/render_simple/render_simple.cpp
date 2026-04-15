@@ -120,7 +120,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     */
 
 #ifdef NEWBASE_WII
-    Uint32 window_flags = SDL_WINDOW_FULLSCREEN;
+    Uint32 window_flags = 0;
     int window_w = 640, window_h = 480;
 #else
     Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE

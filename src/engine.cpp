@@ -75,6 +75,27 @@ engine::engine()
 
     log::info("[engine] logging ready");
 
+#ifdef NEWBASE_WII
+    // A/B test: bypass SDL_LoadFile before SDL_Init on Wii.
+    // Use embedded config so we can test whether early file I/O disrupts video init.
+    // TODO: remove once root cause is identified.
+    static const char wii_embedded_config[] =
+        "systems:\n"
+        "  render_simple:\n"
+        "    w: 640\n"
+        "    h: 480\n"
+        "  audio:\n"
+        "    bgm_gain: -0.2\n"
+        "    sfx_gain: 0.0\n"
+        "  input:\n"
+        "    default_actions: true\n"
+        "  clock: {}\n"
+        "resources:\n"
+        "  scanners:\n"
+        "    - type: \"fs_raw\"\n"
+        "      path: \"./res/\"\n";
+    _d->cfile = std::string{wii_embedded_config};
+#else
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
     if(_nb_xdg_data_dir_found())
@@ -90,6 +111,7 @@ engine::engine()
     }
     _d->cfile = std::string{reinterpret_cast<const char *>(data)};
     SDL_free(data);
+#endif
 
     _d->cfg = ryml::parse_in_place(_d->cfile.data());
 
