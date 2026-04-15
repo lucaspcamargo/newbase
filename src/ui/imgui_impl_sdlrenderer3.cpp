@@ -280,6 +280,10 @@ void ImGui_ImplSDLRenderer3_UpdateTexture(ImTextureData* tex)
 
         // Create texture
         // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
+
+        // For some reason, ARGB32 makes colors look wrong in our only big-endian platform (Wii)
+        // There may be something wrong with ImGui's RGBA32 format or SDL's ABGR8888 format, but using ARGB8888 for now
+
         SDL_Texture* sdl_texture = SDL_CreateTexture(bd->Renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, tex->Width, tex->Height);
         IM_ASSERT(sdl_texture != nullptr && "Backend failed to create texture!");
         SDL_UpdateTexture(sdl_texture, nullptr, tex->GetPixels(), tex->GetPitch());
