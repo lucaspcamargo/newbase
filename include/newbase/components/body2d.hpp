@@ -37,6 +37,7 @@ namespace nb {
 
         bool sensor {false};
         bool sensor_events {false};
+        bool contact_events {true};
     };
 
     struct cbody2d {

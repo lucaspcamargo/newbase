@@ -73,6 +73,7 @@ namespace nb
 
         def.isSensor = shape.sensor;
         def.enableSensorEvents = shape.sensor_events;
+        def.enableContactEvents = shape.contact_events;
 
         switch(shape.shape_type)
         {

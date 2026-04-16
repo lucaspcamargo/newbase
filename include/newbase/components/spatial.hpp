@@ -19,6 +19,9 @@ namespace nb {
             world = glm::mat4x4{1.0f};
         }
 
+        inline void set_pos(glm::vec3 v) { pos = v; apply(); }
+        inline void set_rot(glm::vec3 v) { rot = v; apply(); }
+
         // TODO move to spatial subsystem? With dirty flag or something?
         inline void apply(const glm::mat4x4 parent = glm::mat4x4{1.0f})
         {

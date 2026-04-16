@@ -317,7 +317,10 @@ void script_lua::bind_component_getters()
             auto *stor = reg.storage(cid);
             if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
             auto ctype = entt::resolve(cid);
-            auto any   = ctype.from_void(stor->value(eid));
+            auto *ci   = ctype.custom().operator rtti::type_info*();
+            entt::meta_any any = (ci && ci->make_ref_any)
+                ? ci->make_ref_any(stor->value(eid))
+                : ctype.from_void(stor->value(eid));
             if (!any) { lua_pushnil(L); return 1; }
             lua::push_meta_any(L, std::move(any));
             return 1;
@@ -470,7 +473,10 @@ bool script_lua::step(step_phase phase)
                             auto *stor  = engine::instance().default_scene().registry().storage(cid);
                             if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
                             auto ctype  = entt::resolve(cid);
-                            auto any    = ctype.from_void(stor->value(eid));
+                            auto *ci    = ctype.custom().operator rtti::type_info*();
+                            entt::meta_any any = (ci && ci->make_ref_any)
+                                ? ci->make_ref_any(stor->value(eid))
+                                : ctype.from_void(stor->value(eid));
                             if (!any) { lua_pushnil(L); return 1; }
                             lua::push_meta_any(L, std::move(any));
                             return 1;

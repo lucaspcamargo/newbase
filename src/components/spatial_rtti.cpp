@@ -20,12 +20,13 @@ void cspatial::_ensure_rtti()
                         if(comp) static_cast<cspatial*>(comp)->apply();
                     }
                 }
-            }
+            },
+            .make_ref_any = &rtti::make_component_ref_any<cspatial>
         })
         .ctor<>()
-        .data<&cspatial::pos>("pos"_hs)
+        .data<&cspatial::set_pos, &cspatial::pos>("pos"_hs)
             .custom<rtti::data_info>(rtti::data_info{ "pos" })
-        .data<&cspatial::rot>("rot"_hs)
+        .data<&cspatial::set_rot, &cspatial::rot>("rot"_hs)
             .custom<rtti::data_info>(rtti::data_info{ "rot" })
         .func<&cspatial::clear>("clear"_hs)
             .custom<rtti::func_info>(rtti::func_info{"clear"})
