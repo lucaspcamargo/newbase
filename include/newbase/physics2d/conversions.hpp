@@ -38,6 +38,7 @@ namespace nb
         def.motionLocks.angularZ = comp.fix_rotation;
         def.isBullet = comp.bullet;
 
+        def.linearVelocity = {comp.initial_linear_velocity.x, comp.initial_linear_velocity.y};
         def.gravityScale = comp.gravity_scale;
         if(comp.angular_damping >= 0.0f)
             def.angularDamping = comp.angular_damping;

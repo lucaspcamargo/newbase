@@ -30,6 +30,7 @@ public:
     // Erase expired weak_ptr entries from the cache. Call periodically to keep memory tidy.
     void collect();
     bool read_all_sync(entt::id_type id, std::vector<char> &dst, bool zero_terminate = false) const;
+    bool read_partial_sync(entt::id_type id, std::size_t offset, std::size_t size, std::vector<char> &dst) const;
     bool write_all_sync(entt::id_type id, const void *data, std::size_t size);
 
     // Serialize a resource back to its underlying storage using the type's registered saver.

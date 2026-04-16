@@ -2,6 +2,7 @@
 #include <newbase/audio/types.hpp>
 #include <entt/core/fwd.hpp>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 struct SDL_Mutex;
@@ -52,6 +53,9 @@ public:
 
     // Remove a previously added player from the plan (all three nodes + links).
     void remove_player(const player_nodes& nodes);
+
+    // Return the vorbis_feedback for a player (nullptr if not yet built or already removed).
+    std::shared_ptr<struct vorbis_feedback> get_player_feedback(const player_nodes& nodes) const;
 
     graphplan::plan* plan() const;
 

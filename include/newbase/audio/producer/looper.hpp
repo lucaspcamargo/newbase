@@ -106,10 +106,13 @@ public:
         size_t produced = 0;
         while(produced < max_frames)
         {
-            // if we are at the end
+            // if we are at the end of the inner producer
             if(m_prod->frames_left() == 0)
             {
                 m_play_count++;
+                // stop if we have exhausted the requested play count
+                if(m_loop_count != 0 && m_play_count >= m_loop_count)
+                    break;
                 if(m_loop_frame)
                     seek(m_loop_frame);
                 else

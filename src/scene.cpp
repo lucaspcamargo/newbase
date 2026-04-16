@@ -15,6 +15,7 @@
 struct nb::scene_p {
     entt::id_type id;
     entt::registry reg;
+    std::vector<entt::entity> pending_destroy;
 };
 
 
@@ -35,32 +36,34 @@ entt::registry& nb::scene::registry()
     return _d->reg;
 }
 
-entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type parent)
+entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type parent)
 {
-    (void) parent; // TODO hirerarchy stuff
+    (void) parent; // TODO hierarchy stuff
     auto &reg = _d->reg;
     auto res = rman().get<retree>(retree_id, false);
     if(!res)
     {
         log::warn("[scene] build_etree: cannot load: %x", static_cast<uint32_t>(retree_id));
-        return entt::tombstone;
+        return entt::null;
     }
 
     if(!res->etree_valid)
     {
         log::warn("[scene] build_etree: invalid etree: %x", static_cast<uint32_t>(retree_id));
-        return entt::tombstone;
+        return entt::null;
     }
 
     log::info("[scene] build_etree: %x", static_cast<uint32_t>(retree_id));
 
+    entt::entity first = entt::null;
     for(auto ent: res->tree.rootref())
     {
         std::string entname;
         c4::from_chars(ent["name"].val(), &entname);
         auto eid = reg.create();
+        if(first == entt::null) first = eid;
 
-        log::info("[scene] build_etree: ent %s", entname.c_str());
+        log::info("[scene] build_etree: ent %s (%x)", entname.c_str(), static_cast<uint32_t>(eid));
         for(auto comp: ent["comps"])
         {
             std::string compname;
@@ -86,9 +89,26 @@ entt::id_type nb::scene::build_etree(entt::id_type retree_id, entt::id_type pare
                 auto &s = reg.emplace<nb::cbody2d>(eid);
                 nb::build_body2d(comp, s);
             }
-            else assert(0);
+            else
+            {
+                log::warn("[scene] build_etree: unknown component '%s' on entity '%s'", compname.c_str(), entname.c_str());
+            }
         }
     }
-    // TODO
-    return entt::tombstone;
+    return first;
+}
+
+void nb::scene::queue_destroy(entt::entity e)
+{
+    _d->pending_destroy.push_back(e);
+}
+
+void nb::scene::flush_destroy_queue()
+{
+    for(auto e : _d->pending_destroy)
+    {
+        if(_d->reg.valid(e))
+            _d->reg.destroy(e);
+    }
+    _d->pending_destroy.clear();
 }

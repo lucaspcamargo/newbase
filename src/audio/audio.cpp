@@ -1,5 +1,6 @@
 #include <newbase/audio/audio.hpp>
 #include <newbase/audio/graph_manager.hpp>
+#include <newbase/audio/vorbis_feedback.hpp>
 #include <newbase/audio/graph/graph.hpp>
 #include <newbase/audio/types.hpp>
 #include <newbase/engine.hpp>
@@ -243,7 +244,34 @@ bool audio::init(ryml::ConstNodeRef cfg)
     return true;
 }
 
-bool audio::step(step_phase) { return true; }
+bool audio::step(step_phase phase)
+{
+    if (phase == GENERAL_UPDATE)
+    {
+        bool any_removed = false;
+        for (auto it = _d->players.begin(); it != _d->players.end(); )
+        {
+            auto fb = _d->gm.get_player_feedback(it->nodes);
+            if (fb)
+            {
+                size_t lc = fb->loop_count.load(std::memory_order_relaxed);
+                size_t pc = fb->play_count.load(std::memory_order_relaxed);
+                if (lc > 0 && pc >= lc)
+                {
+                    log::verb("[audio] player finished (bus=%s), removing", it->bus_name.c_str());
+                    _d->gm.remove_player(it->nodes);
+                    it = _d->players.erase(it);
+                    any_removed = true;
+                    continue;
+                }
+            }
+            ++it;
+        }
+        if (any_removed)
+            _d->gm.rebuild(_d->graph, _d->graph_mtx);
+    }
+    return true;
+}
 bool audio::event(SDL_Event*) { return true; }
 
 void audio::out_mute(bool muted)
@@ -326,7 +354,7 @@ void audio::sfx_gain(float db)
     }
 }
 
-bool audio::sfx_play(entt::id_type res_id, float /*gain*/)
+bool audio::sfx_play(entt::id_type res_id, float gain_db)
 {
     auto vorbis_res = rman().get<rvorbis>(res_id);
     if (!vorbis_res || !vorbis_res->valid)
@@ -334,9 +362,12 @@ bool audio::sfx_play(entt::id_type res_id, float /*gain*/)
         log::error("[audio] sfx_play: invalid resource: %x", res_id);
         return false;
     }
-    _d->players.push_back({"sfx", _d->gm.add_player("sfx", res_id, /*loop=*/false)});
+    auto nodes = _d->gm.add_player("sfx", res_id, /*loop=*/false);
+    if (gain_db != 0.f)
+        _d->gm.apply_gain_db(nodes.gain_node_id, gain_db);
+    _d->players.push_back({"sfx", nodes});
     _d->gm.rebuild(_d->graph, _d->graph_mtx);
-    log::info("[audio] sfx_play: %x", res_id);
+    log::info("[audio] sfx_play: %x (gain_db=%.1f)", res_id, gain_db);
     return true;
 }
 
@@ -420,9 +451,9 @@ extern "C" void _rtti_init_audio()
         .custom<rtti::func_info>(rtti::func_info{"bgm_playing"})
         .func<&audio::bgm_stop>("bgm_stop"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_stop"})
-        .func<&audio::bgm_stop>("bgm_gain"_hs)
+        .func<&audio::bgm_gain>("bgm_gain"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_gain"})
-        .func<&audio::bgm_stop>("sfx_play"_hs)
+        .func<&audio::sfx_play>("sfx_play"_hs)
         .custom<rtti::func_info>(rtti::func_info{"sfx_play"});
 
     entt::meta_factory<std::shared_ptr<nb::audio>>{rtti::ctx_systems()}

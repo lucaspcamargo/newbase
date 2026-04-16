@@ -14,6 +14,7 @@
 #include <string.h>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 using namespace nb::graphplan;
 namespace ed = ax::NodeEditor;
@@ -24,6 +25,7 @@ struct nb::graphplan::editor_p
     ed::Config *config {nullptr};
     ed::EditorContext *ctx {nullptr};
     bool first_frame {true};
+    std::unordered_set<uint64_t> positioned_nodes; // nodes already given a position
 
     // setup node_editor theme colors to match ImGui's current theme
     void apply_theme()    {
@@ -245,6 +247,15 @@ bool editor::draw()
     bool show_flow = ImGui::Button(ICON_FK_FORWARD " Show Flow");
 
 
+    // Purge stale positioned_nodes entries for nodes that no longer exist in the plan.
+    for (auto it = _d->positioned_nodes.begin(); it != _d->positioned_nodes.end(); )
+    {
+        if (_d->pl.nodes.find(*it) == _d->pl.nodes.end())
+            it = _d->positioned_nodes.erase(it);
+        else
+            ++it;
+    }
+
     ed::SetCurrentEditor(_d->ctx);
     ed::Begin("graphplan_editor");
 
@@ -258,8 +269,11 @@ bool editor::draw()
     for(auto &node_p : _d->pl.nodes)
     {
         const auto &node = node_p.second;
-        if(_d->first_frame)
+        if(_d->positioned_nodes.find(node.id) == _d->positioned_nodes.end())
+        {
             ed::SetNodePosition(node.id, ImVec2{node.pos_x, node.pos_y});
+            _d->positioned_nodes.insert(node.id);
+        }
 
         const auto* type_def = _d->pl.dom().find_type(node.type);
 

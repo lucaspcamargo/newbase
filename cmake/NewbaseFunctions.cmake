@@ -130,16 +130,17 @@ function(newbase_prepare_executable)
     set(rtti_entry_file_output ${CMAKE_CURRENT_BINARY_DIR}/include/newbase/reflection/init.h)
     message("[newbase_prepare_executable] RTTI entry points: from '${rtti_entry_file_template}'")
     message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
-    add_custom_target( ${rtti_entry_target}
+    add_custom_command(
+        OUTPUT "${rtti_entry_file_output}"
         COMMAND ${PYTHON_INTERPRETER}
             ${NEWBASE_ROOT}/scripts/codegen_rtti_entry_points.py
-            "${rtti_entry_file_template}" 
-            "${rtti_entry_file_output}" 
+            "${rtti_entry_file_template}"
+            "${rtti_entry_file_output}"
             "${filtered_systems}"
-        BYPRODUCTS "${rtti_entry_file_output}"
         DEPENDS "${rtti_entry_file_template}" ${rtti_extra_depends}
         VERBATIM
     )
+    add_custom_target(${rtti_entry_target} DEPENDS "${rtti_entry_file_output}")
     add_dependencies(${arg_TARGET} ${rtti_entry_target})
     target_include_directories(${arg_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 
@@ -175,14 +176,25 @@ function(newbase_prepare_executable)
             "--caller-source-dir" "${PROJECT_SOURCE_DIR}"
         )
     endif()
-    set(sbom_target ${arg_TARGET}_sbom_gen)
-    add_custom_target(${sbom_target} ALL
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
-        COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
-        BYPRODUCTS "${sbom_output}"
-        VERBATIM
-    )
-    add_dependencies(${arg_TARGET} ${sbom_target})
+    if(DEFINED EMSCRIPTEN)
+        # Emscripten embeds the SBOM at link time via --embed-file, so the file
+        # must exist before the link step — keep the always-run pre-build target.
+        set(sbom_target ${arg_TARGET}_sbom_gen)
+        add_custom_target(${sbom_target} ALL
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
+            COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
+            BYPRODUCTS "${sbom_output}"
+            VERBATIM
+        )
+        add_dependencies(${arg_TARGET} ${sbom_target})
+    else()
+        # All other platforms: generate only when the executable is (re)linked.
+        add_custom_command(TARGET ${arg_TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
+            COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
+            VERBATIM
+        )
+    endif()
     if(DEFINED EMSCRIPTEN)
         # Embed the SBOM into the wasm bundle at the expected MEMFS path.
         target_link_options(${arg_TARGET} PRIVATE

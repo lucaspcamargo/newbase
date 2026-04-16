@@ -23,6 +23,7 @@ private:
     void bind_meta_types();
     void bind_systems();
     void bind_services();
+    void bind_component_getters();
     void bind_global_api();
 
     // our own allocator provided to lua

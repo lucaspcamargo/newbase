@@ -32,6 +32,14 @@ public:
     // warp body to a given position, keeping other dynamics unchanged
     bool body_warp(entt::entity ent, glm::vec2 position);
 
+    // set linear velocity directly (or as initial velocity before first physics step)
+    bool body_set_velocity(entt::entity ent, glm::vec2 vel);
+
+    // contact events collected during the last PHYSICS_UPDATE step
+    unsigned int contact_begins_count() const;
+    entt::entity contact_begin_a(unsigned int idx) const;
+    entt::entity contact_begin_b(unsigned int idx) const;
+
 private:
     void _draw_tool_window(bool *close);
 

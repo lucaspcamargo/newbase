@@ -34,7 +34,7 @@ public:
     void sfx_gain(float db);
 
     // sound effects
-    bool sfx_play(entt::id_type res_id, float gain);
+    bool sfx_play(entt::id_type res_id, float gain_db);
 
 private:
     void _draw_tool_window(bool *);

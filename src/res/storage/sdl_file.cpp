@@ -167,6 +167,28 @@ bool sdl_file::write_all_sync(const asset_handle &hnd, const void *data, std::si
 #endif
 }
 
+bool sdl_file::read_partial_sync(const asset_handle &hnd, std::size_t offset, std::size_t size, std::vector<char> &dst)
+{
+    std::string full_path = _base_path + "/" + hnd.path;
+    SDL_IOStream *io = SDL_IOFromFile(full_path.c_str(), "rb");
+    if(!io)
+    {
+        log::error("[sdl_file] read_partial_sync: cannot open: %s", full_path.c_str());
+        return false;
+    }
+    if(SDL_SeekIO(io, static_cast<Sint64>(offset), SDL_IO_SEEK_SET) < 0)
+    {
+        log::error("[sdl_file] read_partial_sync: seek failed: %s", full_path.c_str());
+        SDL_CloseIO(io);
+        return false;
+    }
+    dst.resize(size);
+    std::size_t read = SDL_ReadIO(io, dst.data(), size);
+    dst.resize(read);
+    SDL_CloseIO(io);
+    return read > 0;
+}
+
 bool sdl_file::read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate)
 {
     std::string full_path = _base_path + "/" + hnd.path;

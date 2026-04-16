@@ -153,6 +153,24 @@ bool sdl_storage::_index_add(std::string path, size_t sz)
 }
 
 
+bool sdl_storage::read_partial_sync(const asset_handle &hnd, std::size_t offset, std::size_t size, std::vector<char> &dst)
+{
+    // SDL_Storage has no native partial-read API; read all and slice.
+    std::vector<char> all;
+    if(!read_all_sync(hnd, all))
+        return false;
+    if(offset >= all.size())
+    {
+        dst.clear();
+        return false;
+    }
+    std::size_t avail = all.size() - offset;
+    std::size_t to_copy = std::min(size, avail);
+    dst.resize(to_copy);
+    memcpy(dst.data(), all.data() + offset, to_copy);
+    return true;
+}
+
 bool sdl_storage::write_all_sync(const asset_handle &hnd, const void *data, std::size_t size)
 {
     if (!_storage || !_writable)

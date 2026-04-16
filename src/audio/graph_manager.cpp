@@ -54,6 +54,20 @@ struct nb::audio_graph_manager::impl {
 
     std::unordered_map<uint64_t, std::shared_ptr<vorbis_feedback>>      vorbis_fb_cache;
     std::unordered_map<uint64_t, std::shared_ptr<visualizer_feedback>>   vis_fb_cache;
+
+    // Slot layout: each player occupies a row index.
+    // vorbis_node_id → slot index.
+    std::unordered_map<uint64_t, int> player_slots;
+
+    // Find the lowest non-negative slot index not currently occupied.
+    int alloc_slot() const {
+        for (int s = 0; ; ++s) {
+            bool taken = false;
+            for (const auto& [_, used] : player_slots)
+                if (used == s) { taken = true; break; }
+            if (!taken) return s;
+        }
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -407,21 +421,19 @@ audio_graph_manager::player_nodes audio_graph_manager::add_player(
     assert(_d->gplan);
     using NT = audio_graph::node_type;
 
-    // Find the y position of the matching BUS_OUTPUT node for alignment.
-    float y = 80.f;
-    for (const auto& [id, nd] : _d->gplan->nodes)
-    {
-        if (nd.type != static_cast<int>(NT::BUS_OUTPUT)) continue;
-        auto it = nd.properties.find("bus_id");
-        if (it == nd.properties.end()) continue;
-        if (const std::string* s = it->second.try_cast<std::string>(); s && *s == bus_name)
-            { y = nd.pos_y; break; }
-    }
+    // Slot-based layout: players are arranged in rows to the right of the OUTPUT node.
+    static constexpr float ROW_BASE_Y  =   80.f;
+    static constexpr float ROW_STEP_Y  =  275.f;  // 110 * 2.5
+    static constexpr float VORBIS_X    =  900.f;
+    static constexpr float GAIN_X      = 1250.f;  // 900 + (1075-900)*2 = 900 + 350
+    static constexpr float BUS_INPUT_X = 1600.f;  // 900 + (1250-900)*2 = 900 + 700
 
-    // VORBIS(-200) → GAIN(-75) → BUS_INPUT(50)
-    uint64_t vorbis_id = _d->gplan->add_node_from_type(static_cast<int>(NT::VORBIS_SOURCE), -200.f, y);
-    uint64_t gain_id   = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),            -75.f, y);
-    uint64_t bus_in_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_INPUT),        50.f, y);
+    int   slot = _d->alloc_slot();
+    float y    = ROW_BASE_Y + static_cast<float>(slot) * ROW_STEP_Y;
+
+    uint64_t vorbis_id = _d->gplan->add_node_from_type(static_cast<int>(NT::VORBIS_SOURCE), VORBIS_X,    y);
+    uint64_t gain_id   = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),           GAIN_X,     y);
+    uint64_t bus_in_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_INPUT),      BUS_INPUT_X, y);
     _d->gplan->nodes.at(vorbis_id).properties["res_id"]  = entt::meta_any{res_id};
     _d->gplan->nodes.at(vorbis_id).properties["loop"]    = entt::meta_any{loop};
     _d->gplan->nodes.at(gain_id).properties["gain_db"]   = entt::meta_any{0.f};
@@ -429,9 +441,18 @@ audio_graph_manager::player_nodes audio_graph_manager::add_player(
     _link(vorbis_id, gain_id);
     _link(gain_id,   bus_in_id);
 
-    log::verb("[audio] added player on bus '%s' vorbis=%llu gain=%llu bus_in=%llu",
-              bus_name.c_str(), vorbis_id, gain_id, bus_in_id);
+    _d->player_slots[vorbis_id] = slot;
+
+    log::verb("[audio] added player slot=%d bus='%s' vorbis=%llu gain=%llu bus_in=%llu",
+              slot, bus_name.c_str(), vorbis_id, gain_id, bus_in_id);
     return {vorbis_id, gain_id, bus_in_id};
+}
+
+std::shared_ptr<vorbis_feedback> audio_graph_manager::get_player_feedback(const player_nodes& pn) const
+{
+    auto it = _d->vorbis_fb_cache.find(pn.vorbis_node_id);
+    if (it != _d->vorbis_fb_cache.end()) return it->second;
+    return nullptr;
 }
 
 void audio_graph_manager::remove_player(const player_nodes& pn)
@@ -462,6 +483,7 @@ void audio_graph_manager::remove_player(const player_nodes& pn)
     _d->node_cache.erase(pn.vorbis_node_id);
     _d->vorbis_res_cache.erase(pn.vorbis_node_id);
     _d->vorbis_fb_cache.erase(pn.vorbis_node_id);
+    _d->player_slots.erase(pn.vorbis_node_id);
     _d->node_cache.erase(pn.gain_node_id);
     _d->node_cache.erase(pn.bus_input_node_id);
 

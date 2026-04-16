@@ -23,8 +23,11 @@ public:
     /** @brief Invoked by the resource manager after initialization */
     std::vector<asset_handle> get_handles(bool try_scan, bool use_index) override;
 
-    /** @brief Read all bytes of a resource into a buffer. May change in the future. */
+    /** @brief Read all bytes of a resource into a buffer. */
     bool read_all_sync(const asset_handle &hnd, std::vector<char> &dst, bool zero_terminate = false) override;
+
+    /** @brief Read a byte range from a resource. Falls back to read_all_sync + slice. */
+    bool read_partial_sync(const asset_handle &hnd, std::size_t offset, std::size_t size, std::vector<char> &dst) override;
 
     /** @brief Write data over an existing asset. Not supported (title storage is read-only). */
     bool write_all_sync(const asset_handle &hnd, const void *data, std::size_t size) override;

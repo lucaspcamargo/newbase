@@ -182,6 +182,24 @@ bool rmanager::save_resource(nb::resource* res)
     return info->saver_fn(res);
 }
 
+bool rmanager::read_partial_sync(entt::id_type id, std::size_t offset, std::size_t size, std::vector<char> &dst) const
+{
+    auto it = _d->asset_handles.find(id);
+    if(it == _d->asset_handles.end())
+    {
+        log::error("[rmanager] read_partial_sync: unknown asset id: %x", id);
+        return false;
+    }
+    const auto &handle = it->second;
+    int sintf_idx = handle.storage_interface_idx;
+    if(sintf_idx < 0 || sintf_idx >= static_cast<int>(_d->storage_interfaces.size()))
+    {
+        log::error("[rmanager] read_partial_sync: invalid storage index %d for asset: %x", sintf_idx, id);
+        return false;
+    }
+    return _d->storage_interfaces[sintf_idx]->read_partial_sync(handle, offset, size, dst);
+}
+
 bool rmanager::write_all_sync(entt::id_type id, const void *data, std::size_t size)
 {
     auto it = _d->asset_handles.find(id);

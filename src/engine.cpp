@@ -16,6 +16,11 @@
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
 #include <newbase/utility/xdg.h>
 #endif
+#ifdef NEWBASE_WII
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#endif
 
 
 #include <SDL3/SDL.h>
@@ -76,25 +81,23 @@ engine::engine()
     log::info("[engine] logging ready");
 
 #ifdef NEWBASE_WII
-    // A/B test: bypass SDL_LoadFile before SDL_Init on Wii.
-    // Use embedded config so we can test whether early file I/O disrupts video init.
-    // TODO: remove once root cause is identified.
-    static const char wii_embedded_config[] =
-        "systems:\n"
-        "  render_simple:\n"
-        "    w: 640\n"
-        "    h: 480\n"
-        "  audio:\n"
-        "    bgm_gain: -0.2\n"
-        "    sfx_gain: 0.0\n"
-        "  input:\n"
-        "    default_actions: true\n"
-        "  clock: {}\n"
-        "resources:\n"
-        "  scanners:\n"
-        "    - type: \"fs_raw\"\n"
-        "      path: \"./res/\"\n";
-    _d->cfile = std::string{wii_embedded_config};
+    // On Wii, SDL_LoadFile cannot be used before SDL_Init (it goes through SDL's
+    // file abstraction which touches hardware state). Use POSIX open()/read() via
+    // newlib/devkitPPC to read the config from the FAT SD card directly.
+    {
+        const char *wii_cfg_path = "/nb/config.yaml";
+        int fd = open(wii_cfg_path, O_RDONLY);
+        if(fd < 0)
+        {
+            log::critical("[engine] could not open config file: %s", wii_cfg_path);
+            exit(1);
+        }
+        struct stat st;
+        fstat(fd, &st);
+        _d->cfile.resize(st.st_size);
+        read(fd, _d->cfile.data(), st.st_size);
+        close(fd);
+    }
 #else
     std::string cfgpath = std::string(NEWBASE_DEFAULT_RES_PREFIX) + "/config.yaml";
 #ifdef NEWBASE_USE_XDG_DATA_DIRS
@@ -202,7 +205,7 @@ bool engine::teardown()
 
 bool engine::step()
 {
-    log::debug("[engine] step");
+    log::verb("[engine] step");
 
     if(_d->exit_requested)
     {
@@ -248,7 +251,7 @@ bool engine::step()
 
 bool engine::event(SDL_Event *evt)
 {
-    log::debug("[engine] event");
+    log::verb("[engine] event");
     if(evt->type == SDL_EVENT_KEY_DOWN)
     {
 #ifndef __EMSCRIPTEN__

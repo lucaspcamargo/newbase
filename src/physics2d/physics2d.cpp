@@ -20,7 +20,6 @@ using namespace nb;
 using entt::operator""_hs;
 
 constexpr auto BODY2D_CONSTRUCT_UPDATE_STORAGE = "body2d_on_construct_update"_hs;
-constexpr auto BODY2D_DESTROY_STORAGE = "body2d_on_destroy"_hs; 
 
 // TODO: right now there's only physics for the default scene
 // we need per-scene physics worlds
@@ -49,11 +48,25 @@ struct nb::physics2d_p
     b2WorldDef world_def;
     b2WorldId world_id {b2_nullWorldId};
     std::unordered_map<b2BodyId, entt::entity> body_entt {};
-    std::unordered_map<b2BodyId, cbody2d*> body_comp {};
-    std::unordered_map<b2BodyId, cspatial*> body_spatial {}; // TODO spatial has no pointer stability, this is wrong and dangerous
 
     bool debug_draw_enabled {false};
     b2DebugDraw debug_draw {};
+
+    // contact events — populated during PHYSICS_UPDATE, read by scripts during PREPARE
+    struct contact_pair { entt::entity a; entt::entity b; };
+    std::vector<contact_pair> contact_begins {};
+
+    // signal receiver: called synchronously before cbody2d component data is freed
+    void on_body_destroy(entt::registry &reg, entt::entity eid)
+    {
+        cbody2d &body = reg.get<cbody2d>(eid);
+        if(B2_IS_NON_NULL(body._body_id))
+        {
+            body_entt.erase(body._body_id);
+            b2DestroyBody(body._body_id);
+            body._body_id = b2_nullBodyId;
+        }
+    }
 };
 
 physics2d::physics2d()
@@ -121,8 +134,7 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
     auto &reg = engine::instance().default_scene().registry();
     auto &on_construct_upd = reg.storage<entt::reactive>(BODY2D_CONSTRUCT_UPDATE_STORAGE);
     on_construct_upd.on_construct<cbody2d>().on_update<cbody2d>();
-    auto &on_destroy = reg.storage<entt::reactive>(BODY2D_DESTROY_STORAGE);
-    on_destroy.on_destroy<cbody2d>();
+    reg.on_destroy<cbody2d>().connect<&physics2d_p::on_body_destroy>(_d);
 
     return true;
 }
@@ -167,8 +179,6 @@ bool physics2d::step(step_phase phase)
                     ++idx;
                 }
                 _d->body_entt.emplace(id, entity);
-                _d->body_comp.emplace(id, &cbody);
-                _d->body_spatial.emplace(id, spatial);
             }
         }
         on_construct_upd.clear();
@@ -181,22 +191,34 @@ bool physics2d::step(step_phase phase)
         {
             b2World_Step(_d->world_id, time_step, substeps);
 
+            // collect contact begin events for scripts to read next frame
+            _d->contact_begins.clear();
+            b2ContactEvents contacts = b2World_GetContactEvents(_d->world_id);
+            for(int i = 0; i < contacts.beginCount; ++i)
+            {
+                const b2ContactBeginTouchEvent *ev = &contacts.beginEvents[i];
+                b2BodyId ba = b2Shape_GetBody(ev->shapeIdA);
+                b2BodyId bb = b2Shape_GetBody(ev->shapeIdB);
+                auto ita = _d->body_entt.find(ba);
+                auto itb = _d->body_entt.find(bb);
+                if(ita != _d->body_entt.end() && itb != _d->body_entt.end())
+                    _d->contact_begins.push_back({ita->second, itb->second});
+            }
+
             b2BodyEvents events = b2World_GetBodyEvents(_d->world_id);
             for (int i = 0; i < events.moveCount; ++i)
             {
                 const b2BodyMoveEvent* event = events.moveEvents + i;
-                auto it = _d->body_spatial.find(event->bodyId);
-                if(it != _d->body_spatial.end())
+                auto it = _d->body_entt.find(event->bodyId);
+                if(it != _d->body_entt.end())
                 {
-                    cspatial *spatial = it->second;
+                    cspatial *spatial = reg.try_get<cspatial>(it->second);
                     if(spatial)
                     {
                         spatial->pos = {event->transform.p.x, event->transform.p.y, spatial->pos.z};
                         spatial->rot.z = glm::degrees(b2Rot_GetAngle(event->transform.q));
                         spatial->apply();
                     }
-                    else
-                        log::warn("[p2d] no spatial: body_id=%llx", b2StoreBodyId(event->bodyId));
                 }
             }
         }
@@ -369,7 +391,6 @@ bool physics2d::body_torque(entt::entity ent, float torque, bool awake)
 
 bool physics2d::body_warp(entt::entity ent, glm::vec2 pos)
 {
-    // instantly set body position, keep current angle
     auto &reg = engine::instance().default_scene().registry();
     auto *cbody = reg.try_get<cbody2d>(ent);
     if(!cbody)
@@ -379,8 +400,15 @@ bool physics2d::body_warp(entt::entity ent, glm::vec2 pos)
     }
     if(!B2_IS_NON_NULL(cbody->_body_id))
     {
-        log::warn("[physics2d] body_warp: body has no physics body: %x", ent);
-        return false;
+        // body not created yet — set cspatial so it is created at the right position
+        auto *spatial = reg.try_get<cspatial>(ent);
+        if(spatial)
+        {
+            spatial->pos.x = pos.x;
+            spatial->pos.y = pos.y;
+            spatial->apply();
+        }
+        return true;
     }
     b2Transform xf = b2Body_GetTransform(cbody->_body_id);
     xf.p.x = pos.x;
@@ -388,6 +416,42 @@ bool physics2d::body_warp(entt::entity ent, glm::vec2 pos)
     b2Body_SetTransform(cbody->_body_id, xf.p, xf.q);
     log::verb("[physics2d] warped body %x to (%f, %f)", ent, pos.x, pos.y);
     return true;
+}
+
+bool physics2d::body_set_velocity(entt::entity ent, glm::vec2 vel)
+{
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_set_velocity: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        // body not created yet — store for use when body is built
+        cbody->initial_linear_velocity = vel;
+        return true;
+    }
+    b2Body_SetLinearVelocity(cbody->_body_id, {vel.x, vel.y});
+    return true;
+}
+
+unsigned int physics2d::contact_begins_count() const
+{
+    return static_cast<unsigned int>(_d->contact_begins.size());
+}
+
+entt::entity physics2d::contact_begin_a(unsigned int idx) const
+{
+    if(idx >= _d->contact_begins.size()) return entt::null;
+    return _d->contact_begins[idx].a;
+}
+
+entt::entity physics2d::contact_begin_b(unsigned int idx) const
+{
+    if(idx >= _d->contact_begins.size()) return entt::null;
+    return _d->contact_begins[idx].b;
 }
 
 // RTTI metadata
@@ -406,7 +470,15 @@ extern "C" void _rtti_init_physics2d()
         .func<&nb::physics2d::body_torque>("body_torque"_hs)
             .custom<rtti::func_info>(rtti::func_info{"body_torque"})
         .func<&nb::physics2d::body_warp>("body_warp"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"body_warp"});
+            .custom<rtti::func_info>(rtti::func_info{"body_warp"})
+        .func<&nb::physics2d::body_set_velocity>("body_set_velocity"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_set_velocity"})
+        .func<&nb::physics2d::contact_begins_count>("contact_begins_count"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"contact_begins_count"})
+        .func<&nb::physics2d::contact_begin_a>("contact_begin_a"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"contact_begin_a"})
+        .func<&nb::physics2d::contact_begin_b>("contact_begin_b"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"contact_begin_b"});
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::physics2d>>()

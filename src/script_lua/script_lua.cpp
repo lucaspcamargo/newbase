@@ -54,6 +54,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     bind_meta_types();
     bind_systems();
     bind_services();
+    bind_component_getters();
     bind_global_api();
     
     log::info("[script_lua] initialized");
@@ -299,6 +300,35 @@ void script_lua::bind_services()
     }
 }
 
+void script_lua::bind_component_getters()
+{
+    for (auto&& [cpp_id, mtype] : entt::resolve())
+    {
+        auto *info = mtype.custom().operator rtti::type_info*();
+        if (!info || info->type_class != rtti::TYPE_CLASS_COMPONENT)
+            continue;
+
+        // register get_<identifier>(eid) -> component box or nil
+        lua_pushinteger(_d->L, (lua_Integer)mtype.id());
+        lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+            auto eid  = static_cast<entt::entity>(lua_tointeger(L, 1));
+            auto cid  = static_cast<entt::id_type>(lua_tointeger(L, lua_upvalueindex(1)));
+            auto &reg = engine::instance().default_scene().registry();
+            auto *stor = reg.storage(cid);
+            if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
+            auto ctype = entt::resolve(cid);
+            auto any   = ctype.from_void(stor->value(eid));
+            if (!any) { lua_pushnil(L); return 1; }
+            lua::push_meta_any(L, std::move(any));
+            return 1;
+        }, 1);
+
+        std::string gname = std::string{"get_"} + static_cast<const char*>(info->identifier);
+        lua_setglobal(_d->L, gname.c_str());
+        log::info("[script_lua] registered component getter: %s", gname.c_str());
+    }
+}
+
 void script_lua::bind_global_api()
 {
     // hs(str) -> integer: entt hashed_string at runtime
@@ -312,6 +342,26 @@ void script_lua::bind_global_api()
     // engine: non-owning reference to nb::engine::instance()
     lua::push_meta_any(_d->L, entt::forward_as_meta(engine::instance()));
     lua_setglobal(_d->L, "engine");
+
+    // entity_destroy(eid) -- queue entity for destruction at end of PREPARE
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
+        engine::instance().default_scene().queue_destroy(eid);
+        return 0;
+    });
+    lua_setglobal(_d->L, "entity_destroy");
+
+    // entity_spawn(etree_id) -> eid -- instantiate etree, returns first entity id
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto etree_id = static_cast<entt::id_type>(lua_tointeger(L, 1));
+        auto eid = engine::instance().default_scene().build_etree(etree_id);
+        if(eid == entt::null)
+            lua_pushnil(L);
+        else
+            lua_pushinteger(L, static_cast<lua_Integer>(entt::to_integral(eid)));
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_spawn");
 }
 
 bool script_lua::step(step_phase phase)
@@ -456,6 +506,9 @@ bool script_lua::step(step_phase phase)
                 script.skip = true;
             }
         }
+
+        // flush entities queued for destruction by scripts this frame
+        engine::instance().default_scene().flush_destroy_queue();
     }
     return true;
 }

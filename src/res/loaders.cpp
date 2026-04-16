@@ -164,38 +164,80 @@ namespace nb {
     // vorbis loader
     rloader_vorbis::result_type rloader_vorbis::operator()(entt::id_type id) const
     {
+        static constexpr float CACHE_THRESHOLD_SECS = 2.0f;
+
         log::info("[rloader_vorbis] loading: %x", id);
         auto vorbis = std::make_shared<rvorbis>(id);
-        vorbis->valid = false;
-        if(!rman().read_all_sync(id, vorbis->data))
+
+        // Read the file into a temporary buffer for probing. We never store these
+        // raw bytes in the resource; they are discarded after this function returns.
+        std::vector<char> raw;
+        if(!rman().read_all_sync(id, raw))
         {
-            log::error("[rloader_vorbis] data loading failed: %x", id);
+            log::error("[rloader_vorbis] read failed: %x", id);
             return vorbis;
         }
-        
-        short *result;
-        int num_ch;
-        int freq;
-        int samplecount = stb_vorbis_decode_memory((const uint8_t*)vorbis->data.data(), vorbis->data.size(), &num_ch, &freq, &result);
-        
-        if(samplecount >= 0 && result)
+
+        // Open a decoder just to read stream metadata.
+        int err;
+        stb_vorbis *v = stb_vorbis_open_memory(
+            reinterpret_cast<const unsigned char*>(raw.data()), static_cast<int>(raw.size()),
+            &err, nullptr);
+        if(!v)
         {
-            // success
-            const size_t size_bytes = sizeof(short)*samplecount*num_ch;
-            vorbis->frames.resize(size_bytes);
-            memcpy(vorbis->frames.data(), result, size_bytes);
-            free(result);
-            // NOTE: we always get interleaved, 16-bit signed audio from stb_vorbis
-            vorbis->spec = audio_spec{audio_format::S16, num_ch, static_cast<unsigned int>(freq)};
-            vorbis->decoded = true;
-            vorbis->valid = true;
-            log::info("[rloader_vorbis] loaded: %x, %d frames at %d Hz, %d channels: %d bytes", id, samplecount, freq, num_ch, vorbis->frames.size());
+            log::error("[rloader_vorbis] decode open failed (err %d): %x", err, id);
+            return vorbis;
+        }
+
+        stb_vorbis_info info = stb_vorbis_get_info(v);
+        int total = stb_vorbis_stream_length_in_samples(v);
+        stb_vorbis_close(v);
+
+        if(total < 0)
+        {
+            log::error("[rloader_vorbis] could not determine stream length: %x", id);
+            return vorbis;
+        }
+
+        vorbis->spec = audio_spec{audio_format::S16,
+                                  static_cast<uint8_t>(info.channels),
+                                  static_cast<unsigned int>(info.sample_rate)};
+        vorbis->total_frames = static_cast<std::size_t>(total);
+
+        float duration_secs = static_cast<float>(total) / static_cast<float>(info.sample_rate);
+
+        if(duration_secs <= CACHE_THRESHOLD_SECS)
+        {
+            // Short sample: decode fully and cache the PCM.
+            short *pcm = nullptr;
+            int num_ch, freq;
+            int n = stb_vorbis_decode_memory(
+                reinterpret_cast<const unsigned char*>(raw.data()), static_cast<int>(raw.size()),
+                &num_ch, &freq, &pcm);
+            if(n > 0 && pcm)
+            {
+                const std::size_t size_bytes = sizeof(short) * static_cast<std::size_t>(n) * static_cast<std::size_t>(num_ch);
+                vorbis->frames.resize(size_bytes);
+                memcpy(vorbis->frames.data(), pcm, size_bytes);
+                free(pcm);
+                vorbis->cached = true;
+                log::info("[rloader_vorbis] cached: %x, %d frames, %.2fs, %d Hz, %d ch",
+                          id, n, duration_secs, freq, num_ch);
+            }
+            else
+            {
+                log::error("[rloader_vorbis] decode failed for short sample: %x", id);
+                return vorbis;
+            }
         }
         else
         {
-            log::error("[rloader_vorbis] data decode failed: %x", id);
+            // Long file: store only metadata; producer streams from storage.
+            log::info("[rloader_vorbis] streaming: %x, %d frames, %.2fs, %d Hz, %d ch",
+                      id, total, duration_secs, info.sample_rate, info.channels);
         }
 
+        vorbis->valid = true;
         return vorbis;
     }
 

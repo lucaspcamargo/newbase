@@ -27,6 +27,7 @@ bool demo_system::init(ryml::ConstNodeRef)
         // make a combo box with no label, that fills the whole width of the window, and has the current item selected
         ImGui::PushItemWidth(-1);
         ImGui::Combo("##combo", &current, items, 1);
+        ImGui::PopItemWidth();
         ImGui::SetWindowFontScale(1.0f);
 
         ImGui::Separator();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <box2d/box2d.h>
+#include <newbase/utility/glm.hpp>
 #include <vector>
 
 namespace nb {
@@ -55,6 +56,8 @@ namespace nb {
         bool bullet {false};
         
         std::vector<shape2d> shapes;
+
+        glm::vec2 initial_linear_velocity {0.0f, 0.0f};
 
         bool dirty {true};
         b2BodyId _body_id {b2_nullBodyId};

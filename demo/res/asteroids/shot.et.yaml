@@ -1,0 +1,14 @@
+- name: shot
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/asteroids/spr/shot.sprite"
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 0.0
+      shapes:
+       - type: CIRCLE
+         data: [6]

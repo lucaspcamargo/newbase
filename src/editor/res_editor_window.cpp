@@ -65,7 +65,7 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
         if (_resource->type_id() == "rvorbis"_hs.value())
         {
             auto* rv = static_cast<rvorbis*>(_resource.get());
-            if (rv->decoded && !rv->frames.empty())
+            if (rv->cached && !rv->frames.empty())
             {
                 _audio_widget = std::make_unique<audio_editor_widget>();
                 _audio_widget->open(rv->frames.data(), rv->frames.size(), rv->spec);
