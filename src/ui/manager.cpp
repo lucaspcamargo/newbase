@@ -1,6 +1,7 @@
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <newbase/ui/imgui_icons.hpp>
+#include <newbase/services/renderer_service.hpp>
 #include <newbase/log.hpp>
 #ifdef __EMSCRIPTEN__
 #include <newbase/utility/emscripten.hpp>
@@ -278,17 +279,32 @@ void ui_manager_simple::draw_perf()
     ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
     ImVec2 work_size = viewport->WorkSize;
 
-    ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(static_cast<ImGuiID>(_d->dockspace_id)); 
+    ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(static_cast<ImGuiID>(_d->dockspace_id));
     if (central_node)
     {
-        // if there is a window docked in the central node, abort drawing this overlay
-        if(central_node->Windows.Size > 0)
-            return;
-
         // If there is a DockSpace, use its bounds instead of the entire viewport
         work_pos = central_node->Pos;
         work_size = central_node->Size;
     }
+
+    // Keep the renderer's default viewport in sync with the central node.
+    // This runs every frame regardless of whether the perf overlay is drawn.
+    if(auto *rend = entt::locator<renderer_service*>::value())
+    {
+        viewport_handle dvp = rend->default_viewport();
+        if(dvp != VIEWPORT_INVALID && work_size.x > 1.f && work_size.y > 1.f)
+        {
+            const ImGuiIO &io = ImGui::GetIO();
+            float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+            float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+            rend->update_viewport(dvp,
+                static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
+                static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy));
+        }
+    }
+
+    if (central_node && central_node->Windows.Size > 0)
+        return;
 
     // maybe draw perf window
 

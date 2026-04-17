@@ -98,6 +98,12 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
     return first;
 }
 
+void nb::scene::clear()
+{
+    _d->pending_destroy.clear();
+    _d->reg.clear();
+}
+
 void nb::scene::queue_destroy(entt::entity e)
 {
     _d->pending_destroy.push_back(e);

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="341.33334"
+   height="213.33333"
+   viewBox="0 0 341.33334 213.33333"
+   sodipodi:docname="title.svg"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter4"
+       x="-0.0232056"
+       y="-0.54124298"
+       width="1.0464112"
+       height="2.082486">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="7.1708338"
+         id="feGaussianBlur4" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter6"
+       x="-0.078540393"
+       y="-1.8318611"
+       width="1.1570808"
+       height="4.6637222">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="26.257128"
+         id="feGaussianBlur6" />
+    </filter>
+  </defs>
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.5"
+     inkscape:cx="-113"
+     inkscape:cy="-126"
+     inkscape:window-width="1852"
+     inkscape:window-height="1044"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g1" />
+  <g
+     inkscape:groupmode="layer"
+     inkscape:label="Image"
+     id="g1">
+    <rect
+       style="fill:#000000;stroke:#2a7fff;stroke-width:4"
+       id="rect1"
+       width="1070.6035"
+       height="688.11554"
+       x="-522.60199"
+       y="-344.05777" />
+    <text
+       xml:space="preserve"
+       style="font-size:43.2669px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;fill:none;fill-opacity:1;stroke:#daf3ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       x="28.786325"
+       y="-153.28641"
+       id="text1"
+       transform="scale(1.0711758,0.93355358)"
+       inkscape:export-filename="title.png"
+       inkscape:export-xdpi="179.64432"
+       inkscape:export-ydpi="179.64432"><tspan
+         sodipodi:role="line"
+         id="tspan3"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:NiseGenesis;-inkscape-font-specification:NiseGenesis"
+         x="28.786341"
+         y="-153.28641">A  S  T  E  R  O  I  D  S</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:43.2669px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;fill:none;fill-opacity:1;stroke:#daf3ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel;filter:url(#filter4)"
+       x="28.786325"
+       y="-153.28641"
+       id="text4"
+       transform="scale(1.0711758,0.93355358)"><tspan
+         sodipodi:role="line"
+         id="tspan4"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:NiseGenesis;-inkscape-font-specification:NiseGenesis"
+         x="28.786341"
+         y="-153.28641">A  S  T  E  R  O  I  D  S</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:43.2669px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;fill:none;fill-opacity:1;stroke:#daf3ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel;filter:url(#filter4)"
+       x="28.786325"
+       y="-153.28641"
+       id="text5"
+       transform="scale(1.0711758,0.93355358)"><tspan
+         sodipodi:role="line"
+         id="tspan5"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:NiseGenesis;-inkscape-font-specification:NiseGenesis"
+         x="28.786341"
+         y="-153.28641">A  S  T  E  R  O  I  D  S</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:43.2669px;line-height:1.25;font-family:sans-serif;text-align:center;text-anchor:middle;fill:none;fill-opacity:1;stroke:#daf3ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel;filter:url(#filter6)"
+       x="28.786325"
+       y="-153.28641"
+       id="text6"
+       transform="scale(1.0711758,0.93355358)"><tspan
+         sodipodi:role="line"
+         id="tspan6"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:NiseGenesis;-inkscape-font-specification:NiseGenesis"
+         x="28.786341"
+         y="-153.28641">A  S  T  E  R  O  I  D  S</tspan></text>
+  </g>
+</svg>

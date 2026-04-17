@@ -33,6 +33,11 @@ public:
     virtual bool step(step_phase) = 0;
     virtual bool event(SDL_Event*) = 0;
 
+    // Called by the engine just before a scene change clears the current scene.
+    // Systems that hold scene-lifetime state (e.g. callbacks registered by scripts)
+    // should clean it up here.
+    virtual void on_scene_change() {}
+
     // factory method
     static std::shared_ptr<system> build(const std::string &id, const void *cfgnode);
 

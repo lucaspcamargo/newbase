@@ -1,0 +1,8 @@
+- name: life_indicator
+  comps:
+    spatial:
+      pos: [0, 0, 10]
+      rot: [0, 0, 0]
+      scale: [0.5, 0.5, 1]
+    sprite:
+      res: "res/asteroids/spr/ship-t.sprite"

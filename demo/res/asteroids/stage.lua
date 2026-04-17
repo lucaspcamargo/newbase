@@ -62,6 +62,7 @@ do
             local sp = get_spatial(eid)
             if sp then
                 sp.pos = vec3.new(x0 + (i - 1) * spacing, y0, 10)
+                sp:apply()
             end
             life_indicators[i] = eid
         end

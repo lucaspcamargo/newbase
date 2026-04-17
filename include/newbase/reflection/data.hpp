@@ -131,17 +131,7 @@ struct type_info
     // back to storage via rman().write_all_sync(). Returns false if unsupported or failed.
     bool (*saver_fn)(nb::resource*) {nullptr};
 
-    // for TYPE_CLASS_COMPONENT: creates a meta_any holding Type* so that meta_func::invoke
-    // operates on the actual component rather than a copy (from_void stores Type& which causes
-    // try_cast<Type> to fail the type_hash check and invoke on a temporary copy).
-    entt::meta_any (*make_ref_any)(void*) {nullptr};
 };
-
-template<typename T>
-entt::meta_any make_component_ref_any(void* ptr)
-{
-    return entt::meta_any{std::in_place_type<T*>, static_cast<T*>(ptr)};
-}
 
 struct func_info
 {

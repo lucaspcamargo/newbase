@@ -1,8 +1,11 @@
 #include <newbase/render_simple/render_simple.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
+#include <newbase/layer.hpp>
 #include <newbase/components/sprite.hpp>
 #include <newbase/components/spatial.hpp>
+#include <newbase/components/camera.hpp>
+#include <newbase/components/layers.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
 #include <newbase/res/manager.hpp>
@@ -30,11 +33,6 @@ using entt::operator""_hs;
 
 static SDL_Rect _safe {};
 bool _has_ui {false};
-float _cam2d_cx {0.0f};
-float _cam2d_cy {0.0f};
-float _cam2d_wmax {1024.0f};
-float _cam2d_hmax {1024.0f};
-float _cam2d_scale {1.0f};
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
 #endif
@@ -188,6 +186,10 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     SDL_GetWindowSafeArea(_win, &_safe);
     log::info("[render_simple] safe area: %dx%d@%d,%d", _safe.w, _safe.h, _safe.x, _safe.y);
 
+    // Create the persistent default viewport (full window, no clear).
+    _default_vp = create_viewport(0, 0, _wx, _wy, false);
+    log::info("[render_simple] default viewport: %u", _default_vp);
+
     return true;
 }
 
@@ -215,69 +217,80 @@ bool render_simple::step(nb::step_phase phase)
     else if(phase == step_phase::RENDER)
     {
         ZoneScopedN("Render");
-        // Rendering
 
-        // clear
-        SDL_SetRenderDrawColor(_render, 0,0,0,255);
+        // Full-screen clear first
+        SDL_SetRenderDrawColor(_render, 0, 0, 0, 255);
         SDL_RenderClear(_render);
 
-        // cam transform
-        glm::mat4x4 viewproj {glm::scale(
-            glm::translate(glm::mat4x4{1.0f}, glm::vec3{ _wx/2.0f, _wy/2.0f, 0.0f }), 
-            glm::vec3{_cam2d_scale, _cam2d_scale, 1.0f})};
+        const auto &layers = engine::instance().render_layers();
 
-        auto &reg = engine::instance().default_scene().registry(); // TODO change this
+        if(layers.empty())
+        {
+            // Fallback: draw default scene through the default viewport.
+            auto dvp_it = _viewports.find(_default_vp);
+            const viewport_entry &dvp = (dvp_it != _viewports.end())
+                ? dvp_it->second
+                : viewport_entry{ 0, 0, _wx, _wy, false, 0, 0, 0, 1 };
 
-        // order spatial components
-        reg.sort<cspatial>([](const cspatial &lhs, const cspatial &rhs) {
-            return lhs.pos[2] > rhs.pos[2];
-        });
-        //reg().sort<csprite, cspatial>(); // apply spatial ordering to sprite components 
-        
-        auto view = reg.view<const cspatial, const csprite>();
-        view.use<const cspatial>();
-        for(auto [id, spatial, sprite]: view.each()) {
-            auto spr_res = sprite.spr;
-            if(!spr_res) continue; // null sprite
-            auto tex = spr_res->tex;
-            if(!tex) continue; // missing texture resource
-            if(!tex->uploaded && tex->surf)
+            float cam_cx = _fallback_spatial.pos.x;
+            float cam_cy = _fallback_spatial.pos.y;
+            float zoom   = _fallback_camera.zoom > 0.f ? _fallback_camera.zoom : 1.f;
+            float vp_cx  = dvp.x + dvp.w * 0.5f;
+            float vp_cy  = dvp.y + dvp.h * 0.5f;
+            glm::mat4x4 viewproj =
+                glm::translate(glm::mat4x4{1.0f}, glm::vec3{vp_cx, vp_cy, 0.f}) *
+                glm::scale(glm::mat4x4{1.0f}, glm::vec3{zoom, zoom, 1.f}) *
+                glm::translate(glm::mat4x4{1.0f}, glm::vec3{-cam_cx, -cam_cy, 0.f});
+            auto &reg = engine::instance().default_scene().registry();
+            SDL_Rect clip_rect { dvp.x, dvp.y, dvp.w, dvp.h };
+            SDL_SetRenderClipRect(_render, &clip_rect);
+            _draw_scene(reg, viewproj, 0xFFFFFFFF, dvp);
+            SDL_SetRenderClipRect(_render, nullptr);
+        }
+        else
+        {
+            for(const auto &layer : layers)
             {
-                tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
-                tex->uploaded = true;
-                //if(tex->surf->format == SDL_PIXELFORMAT_XBGR8888)
-                //SDL_SetTextureBlendMode(tex->tex, SDL_BLENDMODE_ADD);
-                SDL_DestroySurface(tex->surf);
-                tex->surf = nullptr;
-            }
-            if(tex->uploaded)
-            {
-                glm::vec2 dims = spr_res->dims;
-                if(dims == glm::vec2{-1.0f, -1.0f})
+                auto *sc = engine::instance().find_scene(layer.scene_id);
+                if(!sc) continue;
+
+                auto it = _viewports.find(layer.viewport);
+                if(it == _viewports.end()) continue;
+                const auto &vp = it->second;
+
+                // Clear viewport region if requested
+                if(vp.clear)
                 {
-                    dims = glm::vec2{tex->tex->w, tex->tex->h};
+                    SDL_SetRenderDrawColor(_render,
+                        static_cast<Uint8>(vp.r * 255), static_cast<Uint8>(vp.g * 255),
+                        static_cast<Uint8>(vp.b * 255), static_cast<Uint8>(vp.a * 255));
+                    SDL_FRect clip { static_cast<float>(vp.x), static_cast<float>(vp.y),
+                                     static_cast<float>(vp.w), static_cast<float>(vp.h) };
+                    SDL_RenderFillRect(_render, &clip);
                 }
-                auto anchor_delta = dims * spr_res->anchor;
 
-                const glm::vec4 loc_origin{spatial.world * glm::vec4{-anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-                const glm::vec4 loc_right{spatial.world * glm::vec4{anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-                const glm::vec4 loc_down{spatial.world * glm::vec4{-anchor_delta.x, anchor_delta.y, 0.f, 1.f}};
+                // Build camera transform from camera entity
+                auto &reg = sc->registry();
+                float cam_cx = 0.f, cam_cy = 0.f, zoom = 1.f;
+                if(layer.camera != entt::null)
+                {
+                    auto *sp  = reg.try_get<cspatial>(layer.camera);
+                    auto *cam = reg.try_get<ccamera>(layer.camera);
+                    if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
+                    if(cam) { zoom = cam->zoom; }
+                }
 
-                const glm::vec4 view_origin{viewproj * loc_origin};
-                const glm::vec4 view_right{viewproj * loc_right};
-                const glm::vec4 view_down{viewproj * loc_down}; 
-                
-                const SDL_FPoint origin{view_origin.x, view_origin.y};
-                const SDL_FPoint right{view_right.x, view_right.y};
-                const SDL_FPoint down{view_down.x, view_down.y};
+                float vp_cx = vp.x + vp.w * 0.5f;
+                float vp_cy = vp.y + vp.h * 0.5f;
+                glm::mat4x4 viewproj =
+                    glm::translate(glm::mat4x4{1.0f}, glm::vec3{vp_cx, vp_cy, 0.f}) *
+                    glm::scale(glm::mat4x4{1.0f}, glm::vec3{zoom, zoom, 1.f}) *
+                    glm::translate(glm::mat4x4{1.0f}, glm::vec3{-cam_cx, -cam_cy, 0.f});
 
-                /*std::cerr << _wx << " "<< _wy << std::endl;
-                std::cerr << spr_res->anchor.x << " "<< spr_res->anchor.y << std::endl;
-                std::cerr << anchor_delta.x << " "<< anchor_delta.y << std::endl;
-                std::cerr << loc_origin.x << " "<< loc_origin.y << " "<< loc_origin.z << " " << std::endl;
-                std::cerr << glm::to_string(spatial.world) << std::endl;*/
-                SDL_RenderTextureAffine(_render, tex->tex, nullptr, &origin, &right, &down);
-
+                SDL_Rect clip_rect { vp.x, vp.y, vp.w, vp.h };
+                SDL_SetRenderClipRect(_render, &clip_rect);
+                _draw_scene(sc->registry(), viewproj, layer.layer_mask, vp);
+                SDL_SetRenderClipRect(_render, nullptr);
             }
         }
         
@@ -325,7 +338,11 @@ bool render_simple::event( SDL_Event * evt)
         {
             _wx = evt->window.data1;
             _wy = evt->window.data2;
-            cam_2d_setup(_cam2d_cx, _cam2d_cy, _cam2d_wmax, _cam2d_hmax);
+            if(!_default_vp_owned && _default_vp != VIEWPORT_INVALID)
+                update_viewport(_default_vp, 0, 0, _wx, _wy);
+            if(_fallback_camera.wmax > 0.f)
+                cam_2d_setup(_fallback_spatial.pos.x, _fallback_spatial.pos.y,
+                             _fallback_camera.wmax, _fallback_camera.hmax);
             log::info("[render_simple] resized to %dx%d", _wx, _wy);
         }
     }
@@ -355,67 +372,162 @@ int render_simple::window_height()
     return _wy;
 }
 
+void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj,
+                                uint32_t layer_mask, const viewport_entry &/*vp*/)
+{
+    reg.sort<cspatial>([](const cspatial &lhs, const cspatial &rhs) {
+        return lhs.pos[2] > rhs.pos[2];
+    });
+
+    auto view = reg.view<const cspatial, const csprite>();
+    view.use<const cspatial>();
+    for(auto [id, spatial, sprite] : view.each())
+    {
+        // layer mask check — entities without clayers pass through unconditionally
+        if(auto *lyr = reg.try_get<clayers>(id); lyr && !(lyr->mask & layer_mask))
+            continue;
+
+        auto spr_res = sprite.spr;
+        if(!spr_res) continue;
+        auto tex = spr_res->tex;
+        if(!tex) continue;
+        if(!tex->uploaded && tex->surf)
+        {
+            tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
+            tex->uploaded = true;
+            SDL_DestroySurface(tex->surf);
+            tex->surf = nullptr;
+        }
+        if(!tex->uploaded) continue;
+
+        glm::vec2 dims = spr_res->dims;
+        if(dims == glm::vec2{-1.0f, -1.0f})
+            dims = glm::vec2{tex->tex->w, tex->tex->h};
+
+        auto anchor_delta = dims * spr_res->anchor;
+        const glm::vec4 loc_origin{spatial.world * glm::vec4{-anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
+        const glm::vec4 loc_right {spatial.world * glm::vec4{ anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
+        const glm::vec4 loc_down  {spatial.world * glm::vec4{-anchor_delta.x,  anchor_delta.y, 0.f, 1.f}};
+
+        const SDL_FPoint origin{(viewproj * loc_origin).x, (viewproj * loc_origin).y};
+        const SDL_FPoint right {(viewproj * loc_right ).x, (viewproj * loc_right ).y};
+        const SDL_FPoint down  {(viewproj * loc_down  ).x, (viewproj * loc_down  ).y};
+        SDL_RenderTextureAffine(_render, tex->tex, nullptr, &origin, &right, &down);
+    }
+}
+
 void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
 {
-    _cam2d_cx = cx;
-    _cam2d_cy = cy;
-    _cam2d_wmax = wmax;
-    _cam2d_hmax = hmax;
+    _fallback_spatial.pos = { cx, cy, 0.f };
+    _fallback_camera.wmax = wmax;
+    _fallback_camera.hmax = hmax;
 
-    bool shrink_x = wmax < _wx;
-    bool shrink_y = hmax < _wy;
+    float scale_x = _wx / wmax;
+    float scale_y = _wy / hmax;
+    _fallback_camera.zoom = std::min(scale_x, scale_y);
 
-    if(shrink_x)
-    {
-        if(shrink_y)
-        {
-            // both
-            float scale_x = _wx / wmax;
-            float scale_y = _wy / hmax;
-            _cam2d_scale = std::min(scale_x, scale_y);
-        }
-        else
-        {
-            // just x
-            _cam2d_scale = _wx / wmax;
-        }
-    }
-    else
-    {
-        if(shrink_y)
-        {
-            // just y
-            _cam2d_scale = _wy / hmax;
-        }
-        else
-        {
-            // none
-            _cam2d_scale = 1.0f;
-        }
-    }
-
-    log::info("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f wx=%d wy=%d => scale=%f", 
-        _cam2d_cx, _cam2d_cy, _cam2d_wmax, _cam2d_hmax, _wx, _wy, _cam2d_scale);
+    log::info("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
+        cx, cy, wmax, hmax, _fallback_camera.zoom);
 }
 
 float render_simple::cam_2d_scale()
 {
-    return _cam2d_scale;
+    return _fallback_camera.zoom;
 }
 
 bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
 {
-    float span_x = _wx/_cam2d_scale;
-    float span_y = _wy/_cam2d_scale;
-    extents = {_wx, _wy,
-        span_x,
-        span_y,
-        _cam2d_cx - span_x/2,
-        _cam2d_cy - span_y/2,
-        _cam2d_cx + span_x/2,
-        _cam2d_cy + span_y/2,
-        _scale};
+    // Prefer the first configured render layer's camera
+    const auto &layers = engine::instance().render_layers();
+    if(!layers.empty())
+    {
+        const auto &layer = layers.front();
+        auto *sc = engine::instance().find_scene(layer.scene_id);
+        auto it  = _viewports.find(layer.viewport);
+        if(sc && it != _viewports.end())
+        {
+            auto &reg = sc->registry();
+            auto &vp  = it->second;
+            float cx = 0.f, cy = 0.f, zoom = 1.f;
+            if(layer.camera != entt::null)
+            {
+                if(auto *sp  = reg.try_get<cspatial>(layer.camera)) { cx = sp->pos.x; cy = sp->pos.y; }
+                if(auto *cam = reg.try_get<ccamera>(layer.camera))  { zoom = cam->zoom; }
+            }
+            float span_x = vp.w / zoom;
+            float span_y = vp.h / zoom;
+            extents = { vp.w, vp.h, span_x, span_y,
+                cx - span_x * 0.5f, cy - span_y * 0.5f,
+                cx + span_x * 0.5f, cy + span_y * 0.5f,
+                _scale };
+            return true;
+        }
+    }
+
+    // Fallback: use the default viewport's current rect.
+    auto dvp_it = _viewports.find(_default_vp);
+    int dvp_w = (dvp_it != _viewports.end()) ? dvp_it->second.w : _wx;
+    int dvp_h = (dvp_it != _viewports.end()) ? dvp_it->second.h : _wy;
+    float zoom   = _fallback_camera.zoom > 0.f ? _fallback_camera.zoom : 1.f;
+    float cx     = _fallback_spatial.pos.x;
+    float cy     = _fallback_spatial.pos.y;
+    float span_x = dvp_w / zoom;
+    float span_y = dvp_h / zoom;
+    extents = { dvp_w, dvp_h, span_x, span_y,
+        cx - span_x * 0.5f, cy - span_y * 0.5f,
+        cx + span_x * 0.5f, cy + span_y * 0.5f,
+        _scale };
     return true;
+}
+
+viewport_handle render_simple::create_viewport(int x, int y, int w, int h,
+                                               bool clear, float r, float g, float b, float a)
+{
+    viewport_handle handle = _next_vp_handle++;
+    _viewports[handle] = { x, y, w, h, clear, r, g, b, a };
+    log::info("[render_simple] viewport %u created: %dx%d@%d,%d", handle, w, h, x, y);
+    return handle;
+}
+
+void render_simple::update_viewport(viewport_handle vp, int x, int y, int w, int h)
+{
+    auto it = _viewports.find(vp);
+    if(it == _viewports.end()) return;
+    it->second.x = x; it->second.y = y;
+    it->second.w = w; it->second.h = h;
+
+    if(vp == _default_vp)
+    {
+        _default_vp_owned = true;
+        // Recompute zoom to fit the new viewport dimensions.
+        if(_fallback_camera.wmax > 0.f && w > 0 && h > 0)
+        {
+            _fallback_camera.zoom = std::min(
+                float(w) / _fallback_camera.wmax,
+                float(h) / _fallback_camera.hmax);
+        }
+    }
+}
+
+void render_simple::destroy_viewport(viewport_handle vp)
+{
+    _viewports.erase(vp);
+}
+
+viewport_handle render_simple::default_viewport() const
+{
+    return _default_vp;
+}
+
+void render_simple::reset_default_viewport()
+{
+    _default_vp_owned = false;
+    if(_default_vp != VIEWPORT_INVALID)
+        update_viewport(_default_vp, 0, 0, _wx, _wy);
+    // Recompute zoom for the full window.
+    if(_fallback_camera.wmax > 0.f)
+        cam_2d_setup(_fallback_spatial.pos.x, _fallback_spatial.pos.y,
+                     _fallback_camera.wmax, _fallback_camera.hmax);
 }
 
 
@@ -456,4 +568,6 @@ extern "C" void _rtti_init_render_simple()
 
     cspatial::_ensure_rtti();
     csprite::_ensure_rtti();
+    ccamera::_ensure_rtti();
+    clayers::_ensure_rtti();
 }

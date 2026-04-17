@@ -25,6 +25,12 @@ public:
         return m_update_counter;
     }
 
+    void on_scene_change() override
+    {
+        m_update.clear();
+        m_update_counter = 0;
+    }
+
 private:
     std::map<int, meta_callback> m_update;
     int m_update_counter {0};

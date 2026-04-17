@@ -1,6 +1,9 @@
 local shoot_hs = hs("btn_west")
 local dir_hs   = hs("dir")
 
+local spr_normal   = res_get_sprite(hs("res/asteroids/spr/ship.sprite"))
+local spr_thruster = res_get_sprite(hs("res/asteroids/spr/ship-t.sprite"))
+
 local ROT_TORQUE         = 30000000.0
 local THRUST             = 6000000
 local THRUST_ANGLE_DELTA = 180
@@ -15,6 +18,12 @@ clock_update_add(function(delta)
 
     local dir = input_action_direction(dir_hs)
     local sp  = c_spatial()
+
+    -- swap sprite based on thrust input
+    local spr_comp = c_sprite()
+    if spr_comp then
+        spr_comp.spr = (dir.y ~= 0) and spr_thruster or spr_normal
+    end
 
     -- thrust & rotation
     local thrust_dir = math.rad(sp.rot.z + THRUST_ANGLE_DELTA)

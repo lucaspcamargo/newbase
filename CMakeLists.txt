@@ -90,6 +90,7 @@ add_library(newbase STATIC
     # engine base
     src/engine.cpp
     src/scene.cpp
+    src/layer.cpp
     src/system_factory.cpp
 
     # components
@@ -98,6 +99,8 @@ add_library(newbase STATIC
     src/components/spatial_rtti.cpp
     src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
+    src/components/camera_rtti.cpp
+    src/components/layers_rtti.cpp
 
     # graphplan
     src/graphplan/domain.cpp

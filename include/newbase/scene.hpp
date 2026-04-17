@@ -19,6 +19,9 @@ public:
     // created entity, or entt::null if nothing was created.
     entt::entity build_etree(entt::id_type retree_id, entt::id_type parent = entt::null);
 
+    // Destroy all entities and clear pending-destroy queue.
+    void clear();
+
     // Queue an entity for destruction. The entity is destroyed at the next
     // flush_destroy_queue() call (end of PREPARE phase).
     void queue_destroy(entt::entity e);

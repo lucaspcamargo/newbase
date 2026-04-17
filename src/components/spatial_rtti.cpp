@@ -7,6 +7,8 @@
 using namespace nb;
 using entt::operator""_hs;
 
+static void _cspatial_apply(cspatial &self) { self.apply(); }
+
 void cspatial::_ensure_rtti()
 {
     entt::meta_factory<cspatial>{}
@@ -20,17 +22,16 @@ void cspatial::_ensure_rtti()
                         if(comp) static_cast<cspatial*>(comp)->apply();
                     }
                 }
-            },
-            .make_ref_any = &rtti::make_component_ref_any<cspatial>
+            }
         })
         .ctor<>()
-        .data<&cspatial::set_pos, &cspatial::pos>("pos"_hs)
+        .data<&cspatial::pos>("pos"_hs)
             .custom<rtti::data_info>(rtti::data_info{ "pos" })
-        .data<&cspatial::set_rot, &cspatial::rot>("rot"_hs)
+        .data<&cspatial::rot>("rot"_hs)
             .custom<rtti::data_info>(rtti::data_info{ "rot" })
         .func<&cspatial::clear>("clear"_hs)
             .custom<rtti::func_info>(rtti::func_info{"clear"})
-        .func<&cspatial::apply>("apply"_hs)
+        .func<&_cspatial_apply>("apply"_hs)
             .custom<rtti::func_info>(rtti::func_info{"apply"});
     
     log::info("[cspatial] registered: id=%x");

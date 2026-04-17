@@ -16,3 +16,7 @@ CMake*.json
 imgui.ini
 .vscode
 .cache
+
+demo/res/bad.ogg 
+demo/res/good.ogg 
+demo/res/ok.ogg

@@ -4,12 +4,14 @@
 #include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/script_lua/utility.hpp>
 #include <newbase/components/script.hpp>
+#include <newbase/res/manager.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/log.hpp>
 #include <entt/entt.hpp>
+#include <unordered_map>
 #include <vector>
 
 using namespace nb;
@@ -55,6 +57,7 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     bind_systems();
     bind_services();
     bind_component_getters();
+    bind_resource_getters();
     bind_global_api();
     
     log::info("[script_lua] initialized");
@@ -317,10 +320,7 @@ void script_lua::bind_component_getters()
             auto *stor = reg.storage(cid);
             if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
             auto ctype = entt::resolve(cid);
-            auto *ci   = ctype.custom().operator rtti::type_info*();
-            entt::meta_any any = (ci && ci->make_ref_any)
-                ? ci->make_ref_any(stor->value(eid))
-                : ctype.from_void(stor->value(eid));
+            auto any   = ctype.from_void(stor->value(eid));
             if (!any) { lua_pushnil(L); return 1; }
             lua::push_meta_any(L, std::move(any));
             return 1;
@@ -329,6 +329,62 @@ void script_lua::bind_component_getters()
         std::string gname = std::string{"get_"} + static_cast<const char*>(info->identifier);
         lua_setglobal(_d->L, gname.c_str());
         log::info("[script_lua] registered component getter: %s", gname.c_str());
+    }
+}
+
+void script_lua::bind_resource_getters()
+{
+    // Build a map: resource meta type id → ptr meta type id
+    // (matches TYPE_CLASS_RESOURCE to its TYPE_CLASS_RESOURCE_PTR counterpart)
+    std::unordered_map<entt::id_type, entt::id_type> res_to_ptr;
+    for(auto&& [cpp_id, mtype] : entt::resolve())
+    {
+        auto *info = mtype.custom().operator rtti::type_info*();
+        if(!info || info->type_class != rtti::TYPE_CLASS_RESOURCE_PTR)
+            continue;
+        res_to_ptr[info->data.resource_ptr.resource_type_id] = mtype.id();
+    }
+
+    // Register res_get_<identifier>(asset_hash) for each resource type that has a ptr type.
+    for(auto&& [cpp_id, mtype] : entt::resolve())
+    {
+        auto *info = mtype.custom().operator rtti::type_info*();
+        if(!info || info->type_class != rtti::TYPE_CLASS_RESOURCE)
+            continue;
+
+        auto it = res_to_ptr.find(mtype.id());
+        if(it == res_to_ptr.end())
+            continue;
+
+        entt::id_type type_id     = mtype.id();
+        entt::id_type ptr_type_id = it->second;
+
+        lua_pushinteger(_d->L, (lua_Integer)type_id);
+        lua_pushinteger(_d->L, (lua_Integer)ptr_type_id);
+        lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+            auto asset_id  = static_cast<entt::id_type>(lua_tointeger(L, 1));
+            auto type_id   = static_cast<entt::id_type>(lua_tointeger(L, lua_upvalueindex(1)));
+            auto ptr_tid   = static_cast<entt::id_type>(lua_tointeger(L, lua_upvalueindex(2)));
+
+            auto base = nb::rman().get(type_id, asset_id);
+            if(!base) { lua_pushnil(L); return 1; }
+
+            auto ptr_mtype = entt::resolve(ptr_tid);
+            if(!ptr_mtype) { lua_pushnil(L); return 1; }
+            auto *ptr_info = ptr_mtype.custom().operator nb::rtti::type_info*();
+            if(!ptr_info || !ptr_info->data.resource_ptr.set_ptr) { lua_pushnil(L); return 1; }
+
+            auto ptr_any = ptr_mtype.construct();
+            if(!ptr_any) { lua_pushnil(L); return 1; }
+            ptr_info->data.resource_ptr.set_ptr(ptr_any, base);
+
+            lua::push_meta_any(L, std::move(ptr_any));
+            return 1;
+        }, 2);
+
+        std::string gname = std::string{"res_get_"} + static_cast<const char*>(info->identifier);
+        lua_setglobal(_d->L, gname.c_str());
+        log::info("[script_lua] registered resource getter: %s", gname.c_str());
     }
 }
 
@@ -365,6 +421,14 @@ void script_lua::bind_global_api()
         return 1;
     });
     lua_setglobal(_d->L, "entity_spawn");
+
+    // scene_load(etree_id) -- queue a scene change; takes effect at start of next step
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto etree_id = static_cast<entt::id_type>(lua_tointeger(L, 1));
+        engine::instance().request_scene_change(etree_id);
+        return 0;
+    });
+    lua_setglobal(_d->L, "scene_load");
 }
 
 bool script_lua::step(step_phase phase)
@@ -473,10 +537,7 @@ bool script_lua::step(step_phase phase)
                             auto *stor  = engine::instance().default_scene().registry().storage(cid);
                             if (!stor || !stor->contains(eid)) { lua_pushnil(L); return 1; }
                             auto ctype  = entt::resolve(cid);
-                            auto *ci    = ctype.custom().operator rtti::type_info*();
-                            entt::meta_any any = (ci && ci->make_ref_any)
-                                ? ci->make_ref_any(stor->value(eid))
-                                : ctype.from_void(stor->value(eid));
+                            auto any    = ctype.from_void(stor->value(eid));
                             if (!any) { lua_pushnil(L); return 1; }
                             lua::push_meta_any(L, std::move(any));
                             return 1;

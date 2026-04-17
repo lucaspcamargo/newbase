@@ -33,6 +33,7 @@
 #include <entt/meta/pointer.hpp>
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -58,6 +59,9 @@ struct nb::engine_p {
 
     bool exit_requested {false};
     bool paused {false};
+    std::optional<entt::id_type> pending_scene_id;
+
+    std::vector<render_layer> render_layers;
 
     std::array<framecounter_data, nb::step_phase::_STEP_PHASE_COUNT+1> fc_data; // last one is for total
     size_t fc_end = 0;
@@ -203,6 +207,11 @@ bool engine::teardown()
     return true;
 }
 
+void engine::request_scene_change(entt::id_type etree_id)
+{
+    _d->pending_scene_id = etree_id;
+}
+
 bool engine::step()
 {
     log::verb("[engine] step");
@@ -211,6 +220,17 @@ bool engine::step()
     {
         log::info("[engine] exiting");
         return false;
+    }
+
+    if(_d->pending_scene_id.has_value())
+    {
+        entt::id_type next = *_d->pending_scene_id;
+        _d->pending_scene_id.reset();
+        log::info("[engine] scene change: %x", next);
+        for(auto &s : _d->_systems)
+            s->on_scene_change();
+        _d->default_scene.clear();
+        _d->default_scene.build_etree(next);
     }
 
     bool ret = true;
@@ -298,6 +318,36 @@ bool engine::event(SDL_Event *evt)
 ::nb::scene& engine::default_scene()
 {
     return _d->default_scene;
+}
+
+::nb::scene* engine::find_scene(entt::id_type /*scene_id*/)
+{
+    // TODO: support multiple named scenes; for now everything maps to default_scene
+    return &_d->default_scene;
+}
+
+void engine::add_render_layer(const render_layer &layer)
+{
+    _d->render_layers.push_back(layer);
+    std::stable_sort(_d->render_layers.begin(), _d->render_layers.end(),
+        [](const render_layer &a, const render_layer &b){ return a.order < b.order; });
+}
+
+void engine::remove_render_layer(int order)
+{
+    auto &v = _d->render_layers;
+    v.erase(std::remove_if(v.begin(), v.end(),
+        [order](const render_layer &l){ return l.order == order; }), v.end());
+}
+
+void engine::clear_render_layers()
+{
+    _d->render_layers.clear();
+}
+
+const std::vector<render_layer>& engine::render_layers() const
+{
+    return _d->render_layers;
 }
 
 

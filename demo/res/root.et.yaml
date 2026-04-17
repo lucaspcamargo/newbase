@@ -1,20 +1,12 @@
-- name: stage
+- name: title
   comps:
     script:
-      lua: "res/asteroids/stage.lua"
-- name: ship
+      lua: "res/asteroids/title.lua"
+- name: title_sprite
   comps:
     spatial:
       pos: [0, 0, 0]
-      rot: [0, 0, -90]
+      rot: [0, 0, 0]
       scale: [1, 1, 1]
     sprite:
-      res: "res/asteroids/spr/ship.sprite"
-    script:
-      lua: "res/asteroids/ship.lua"
-    body2d:
-      type: DYNAMIC
-      gravity_scale: 0.0
-      shapes:
-       - type: POLY
-         data: [-20, -20, 36, 0, -20, +20]
+      res: "res/asteroids/spr/title.sprite"

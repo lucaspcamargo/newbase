@@ -2,12 +2,14 @@
 
 #include <newbase/mixins.hpp>
 #include <newbase/nb_config.h>
+#include <newbase/layer.hpp>
 #include <entt/core/ident.hpp>
 #include <vector>
 #include <memory>
 #include <string>
 #include <functional>
 #include <map>
+#include <optional>
 
 // fwd
 extern "C" union SDL_Event;
@@ -34,10 +36,18 @@ public:
 
     // scenes
     ::nb::scene& default_scene();
-    // think about these later:
-    //bool has_scene(entt::id_type id);
-    //::nb::scene& scene_ref(entt::id_type id);
-    //bool destroy_scene(entt::id_type id);
+    // Returns a scene by id, or nullptr if not found.
+    // Currently only the default scene is supported (any id maps to it).
+    ::nb::scene* find_scene(entt::id_type scene_id);
+    // Queue a scene change: at the start of the next step, all systems are notified,
+    // the current scene is cleared, and the given etree is built into the fresh scene.
+    void request_scene_change(entt::id_type etree_id);
+
+    // render layers
+    void add_render_layer(const render_layer &layer);
+    void remove_render_layer(int order);
+    void clear_render_layers();
+    const std::vector<render_layer>& render_layers() const;
 
     void request_exit();
     void set_paused(bool paused);
