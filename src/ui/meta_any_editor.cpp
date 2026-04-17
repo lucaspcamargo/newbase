@@ -9,7 +9,7 @@
 
 namespace nb {
 
-bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing)
+bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing, const rtti::data_info* hint)
 {
     if (!ref) return false;
     auto ti = ref.type().info();
@@ -35,7 +35,11 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
         if (ImGui::DragFloat3(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
     } else if (ti == entt::type_id<glm::vec4>()) {
         glm::vec4 v = *ref.try_cast<glm::vec4>();
-        if (ImGui::DragFloat4(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+        if (hint && hint->subtype == rtti::DATA_SUBTYPE_COLOR) {
+            if (ImGui::ColorEdit4(label, &v.x)) { ref.assign(v); changed = true; }
+        } else {
+            if (ImGui::DragFloat4(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+        }
     } else if (ti == entt::type_id<glm::quat>()) {
         glm::quat v = *ref.try_cast<glm::quat>();
         if (ImGui::DragFloat4(label, &v.x, 0.001f)) { ref.assign(v); changed = true; }
@@ -70,7 +74,7 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
                 const rtti::data_info* di = d.custom().operator const rtti::data_info*();
                 const char* fname = di ? di->identifier.operator const char*() : "?";
                 auto member = d.get(ref);
-                if (draw_meta_any_editor(fname, member, true))
+                if (draw_meta_any_editor(fname, member, true, di))
                 {
                     d.set(ref, member);
                     changed = true;

@@ -18,6 +18,9 @@ local shot_entities           = {}
 local ASTEROID_ETREE       = hs("res/asteroids/asteroid.et.yaml")
 local SMALL_ASTEROID_ETREE = hs("res/asteroids/small_asteroid.et.yaml")
 local SHOT_ETREE           = hs("res/asteroids/shot.et.yaml")
+local SHIP_ETREE           = hs("res/asteroids/ship.et.yaml")
+local DEBRIS_ETREE         = hs("res/asteroids/debris.et.yaml")
+local TITLE_ETREE          = hs("res/root.et.yaml")
 
 local function spawn_asteroid(x, y, vx, vy)
     local eid = entity_spawn(ASTEROID_ETREE)
@@ -36,6 +39,18 @@ local function spawn_small_asteroid(x, y, vx, vy)
     physics2d_body_set_velocity(eid, vec2.new(vx, vy))
 end
 
+local function spawn_debris(x, y, count, speed)
+    for _ = 1, count do
+        local eid = entity_spawn(DEBRIS_ETREE)
+        if eid then
+            physics2d_body_warp(eid, vec2.new(x, y))
+            local spd = speed * (0.4 + math.random() * 0.6)
+            local ang = math.random() * math.pi * 2
+            physics2d_body_set_velocity(eid, vec2.new(math.cos(ang)*spd, math.sin(ang)*spd))
+        end
+    end
+end
+
 local function spawn_shot(x, y, angle_deg, speed)
     local eid = entity_spawn(SHOT_ETREE)
     if not eid then return end
@@ -47,6 +62,17 @@ end
 
 -- expose spawn_shot so ship.lua can call it
 _G.stage_spawn_shot = spawn_shot
+
+-- ship tracking
+local ship_eid      = nil
+local dead_timer    = 0.0
+local DEAD_DURATION = 3.0
+
+local function spawn_ship()
+    ship_eid = entity_spawn(SHIP_ETREE)
+end
+
+spawn_ship()
 
 -- lives display
 local LIVES_MAX            = 3
@@ -89,7 +115,7 @@ spawn_asteroid( 600,  300, -0.5*ASTEROID_SPEED, -0.2*ASTEROID_SPEED)
 spawn_asteroid(  50, -450,  0.6*ASTEROID_SPEED,  0.1*ASTEROID_SPEED)
 
 -- cull shots that have left the viewport
-clock_update_add(function(delta)
+local h_cull = clock_update_add(function(delta)
     local renderer_svc = svc_renderer_service()
     if not renderer_svc then return end
     local e  = renderer_svc:get_2d_extents()
@@ -106,7 +132,7 @@ clock_update_add(function(delta)
 end)
 
 -- contact handling
-clock_update_add(function(delta)
+local h_contacts = clock_update_add(function(delta)
     local p2d = sys_physics2d
     if not p2d then return end
 
@@ -135,12 +161,65 @@ clock_update_add(function(delta)
                 large_asteroid_entities[ast_eid] = nil
             end
 
+            local ast_sp = get_spatial(ast_eid)
             entity_destroy(shot_eid)
             entity_destroy(ast_eid)
             shot_entities[shot_eid]     = nil
             asteroid_entities[ast_eid]  = nil
 
+            if ast_sp then spawn_debris(ast_sp.pos.x, ast_sp.pos.y, 10, 200) end
             if sys_audio then audio_sfx_play(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0) end
         end
+
+        -- ship vs asteroid
+        if ship_eid then
+            local hit_ast = nil
+            if a == ship_eid and asteroid_entities[b] then
+                hit_ast = b
+            elseif b == ship_eid and asteroid_entities[a] then
+                hit_ast = a
+            end
+
+            local ship_invul = false
+            if hit_ast and ship_eid then
+                local env = script_get_env(ship_eid)
+                if env then ship_invul = env.is_invulnerable end
+            end
+
+            if hit_ast and not ship_invul then
+                local ship_sp = get_spatial(ship_eid)
+                entity_destroy(hit_ast)
+                asteroid_entities[hit_ast]       = nil
+                large_asteroid_entities[hit_ast]  = nil
+
+                entity_destroy(ship_eid)
+                ship_eid   = nil
+                dead_timer = DEAD_DURATION
+                lose_life()
+
+                if ship_sp then spawn_debris(ship_sp.pos.x, ship_sp.pos.y, 18, 280) end
+                if sys_audio then audio_sfx_play(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0) end
+            end
+        end
     end
+end)
+
+-- dead timer: respawn or game over
+local h_dead_timer = clock_update_add(function(delta)
+    if dead_timer <= 0 then return end
+    dead_timer = dead_timer - delta
+    if dead_timer <= 0 then
+        dead_timer = 0
+        if lives <= 0 then
+            scene_load(TITLE_ETREE)
+        else
+            spawn_ship()
+        end
+    end
+end)
+
+script_on_destroy(function()
+    clock_update_remove(h_cull)
+    clock_update_remove(h_contacts)
+    clock_update_remove(h_dead_timer)
 end)

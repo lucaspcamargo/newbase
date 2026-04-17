@@ -2,6 +2,7 @@
 #include <newbase/editor/about_window.hpp>
 #include <newbase/editor/rtti_window.hpp>
 #include <newbase/editor/hash_window.hpp>
+#include <newbase/editor/render_layers_window.hpp>
 #include <newbase/editor/console.hpp>
 #include <newbase/editor/res_browser.hpp>
 #include <newbase/editor/res_editor_window.hpp>
@@ -30,6 +31,7 @@ static bool _console_enabled = false;
 static bool _about_enabled = false;
 static bool _rtti_enabled = false;
 static bool _hash_enabled = false;
+static bool _render_layers_enabled = false;
 static bool _show_demo = false;
 static int _log_observer = -1;
 static console c;
@@ -38,6 +40,7 @@ static std::vector<nb::res_editor_window> _res_editors;
 static nb::about_window _about;
 static nb::rtti_window _rtti;
 static nb::hash_window _hash;
+static nb::render_layers_window _render_layers;
 
 static entt::entity _selected_entity = entt::null;
 
@@ -191,6 +194,9 @@ bool editor::step(step_phase phase)
         if(_hash_enabled)
             _hash.draw(&_hash_enabled);
 
+        if(_render_layers_enabled)
+            _render_layers.draw(&_render_layers_enabled);
+
     }
     return true;
 }
@@ -216,13 +222,18 @@ void editor::_draw_main_menu()
 
         if(ImGui::BeginMenu("View"))
         {
-            if(ImGui::MenuItem("Console", "F10", _console_enabled))
+            if(ImGui::MenuItem("Console", nullptr, _console_enabled))
             {
                 _console_enabled = !_console_enabled;
             }
-            if(ImGui::MenuItem("Editor", "F9", _enabled))
+            if(ImGui::MenuItem("Editor", nullptr, _enabled))
             {
                 _enabled = !_enabled;
+            }
+
+            if(ImGui::MenuItem("Render Layers", nullptr, _render_layers_enabled))
+            {
+                _render_layers_enabled = true;
             }
 
             ImGui::Separator();

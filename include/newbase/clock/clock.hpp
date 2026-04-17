@@ -25,6 +25,11 @@ public:
         return m_update_counter;
     }
 
+    void update_remove(int handle)
+    {
+        m_update.erase(handle);
+    }
+
     void on_scene_change() override
     {
         m_update.clear();

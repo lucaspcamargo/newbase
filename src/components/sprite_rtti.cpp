@@ -21,7 +21,11 @@ void csprite::_ensure_rtti()
         })
         .ctor<>()
         .data<&csprite::spr>("spr"_hs)
-            .custom<rtti::data_info>(rtti::data_info{"spr"});
+            .custom<rtti::data_info>(rtti::data_info{"spr"})
+        .data<&csprite::visible>("visible"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"visible"})
+        .data<&csprite::color>("color"_hs)
+            .custom<rtti::data_info>(rtti::data_info{.identifier="color", .subtype=rtti::DATA_SUBTYPE_COLOR});
     log::info("[csprite] registered: id=%x");
 }
 

@@ -26,6 +26,8 @@ int _lua_panic(lua_State * L);
 struct nb::script_lua_p {
     lua_State * L {nullptr};
     unsigned int seed {0};
+    // per-entity list of luaL_ref handles to destroy callbacks
+    std::unordered_map<entt::entity, std::vector<int>> on_destroy_callbacks;
 };
 
 
@@ -42,12 +44,49 @@ script_lua::~script_lua()
     log::info("[script_lua] destroyed");
 }
 
+void script_lua::_on_cscript_destroy(entt::registry &reg, entt::entity eid)
+{
+    auto sys_shared = engine::instance().system_from_id("script_lua"_hs);
+    if (!sys_shared) return;
+    auto *sys = static_cast<script_lua*>(sys_shared.get());
+    auto *d = sys->_d;
+    auto it = d->on_destroy_callbacks.find(eid);
+    if (it == d->on_destroy_callbacks.end()) return;
+    for (int ref : it->second)
+    {
+        lua_rawgeti(d->L, LUA_REGISTRYINDEX, ref);
+        if (lua_isfunction(d->L, -1))
+        {
+            if (lua_pcall(d->L, 0, 0, 0) != LUA_OK)
+            {
+                const char *err = lua_tostring(d->L, -1);
+                log::error("[script_lua] script_on_destroy error for entity %x: %s", eid, err ? err : "?");
+                lua_pop(d->L, 1);
+            }
+        }
+        else
+        {
+            lua_pop(d->L, 1);
+        }
+        luaL_unref(d->L, LUA_REGISTRYINDEX, ref);
+    }
+    d->on_destroy_callbacks.erase(it);
+
+    // unref the env table
+    auto *sc = reg.try_get<cscript>(eid);
+    if (sc && sc->env_ref != LUA_NOREF)
+        luaL_unref(d->L, LUA_REGISTRYINDEX, sc->env_ref);
+}
+
 bool script_lua::init(ryml::ConstNodeRef cfg)
 {
     log::info("[script_lua] init");
     _d->L = lua_newstate(&l_alloc, this, ++(_d->seed));
     lua_atpanic( _d->L, &_lua_panic );
     luaL_openlibs(_d->L);
+
+    // connect cscript destroy signal so we can fire per-entity cleanup callbacks
+    engine::instance().default_scene().registry().on_destroy<cscript>().connect<&_on_cscript_destroy>();
 
     lua_newtable(_d->L);
     lua_setglobal(_d->L, "_meta");
@@ -422,6 +461,16 @@ void script_lua::bind_global_api()
     });
     lua_setglobal(_d->L, "entity_spawn");
 
+    // script_get_env(eid) -> env table or nil
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
+        auto *sc = engine::instance().default_scene().registry().try_get<cscript>(eid);
+        if (!sc || sc->env_ref == LUA_NOREF) { lua_pushnil(L); return 1; }
+        lua_rawgeti(L, LUA_REGISTRYINDEX, sc->env_ref);
+        return 1;
+    });
+    lua_setglobal(_d->L, "script_get_env");
+
     // scene_load(etree_id) -- queue a scene change; takes effect at start of next step
     lua_pushcfunction(_d->L, [](lua_State *L) -> int {
         auto etree_id = static_cast<entt::id_type>(lua_tointeger(L, 1));
@@ -547,6 +596,27 @@ bool script_lua::step(step_phase phase)
                         lua_setfield(_d->L, env_idx, getter_name.c_str());
                     }
 
+                    // store the env table ref on the component so other code can retrieve it
+                    lua_pushvalue(_d->L, env_idx);
+                    script.env_ref = luaL_ref(_d->L, LUA_REGISTRYINDEX);
+
+                    // register script_on_destroy(fn) — per-entity cleanup hook
+                    {
+                        lua_pushlightuserdata(_d->L, this);
+                        lua_pushinteger(_d->L, (lua_Integer)entt::to_integral(id));
+                        lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+                            if (!lua_isfunction(L, 1))
+                                return luaL_error(L, "script_on_destroy: expected a function argument");
+                            auto  *sys_raw = static_cast<script_lua*>(lua_touserdata(L, lua_upvalueindex(1)));
+                            auto   eid     = static_cast<entt::entity>(lua_tointeger(L, lua_upvalueindex(2)));
+                            lua_pushvalue(L, 1);
+                            int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+                            sys_raw->_d->on_destroy_callbacks[eid].push_back(ref);
+                            return 0;
+                        }, 2);
+                        lua_setfield(_d->L, env_idx, "script_on_destroy");
+                    }
+
                     // attach environment to function's _ENV (upvalue 1)
                     lua_pushvalue(_d->L, env_idx);
                     lua_setupvalue(_d->L, func_idx, 1);
@@ -580,9 +650,21 @@ bool script_lua::step(step_phase phase)
     return true;
 }
 
-bool script_lua::event(SDL_Event*) 
+bool script_lua::event(SDL_Event*)
 {
     return true;
+}
+
+void script_lua::on_scene_change()
+{
+    // Disconnect signal from old registry before it's cleared.
+    // EnTT fires on_destroy signals during registry::clear(), so callbacks will
+    // already have been called for any remaining cscript entities. We just need
+    // to clean up our map and reconnect to the new scene's registry afterward.
+    _d->on_destroy_callbacks.clear();
+
+    // Reconnect to the new scene's registry.
+    engine::instance().default_scene().registry().on_destroy<cscript>().connect<&script_lua::_on_cscript_destroy>();
 }
 
 void* script_lua::l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)

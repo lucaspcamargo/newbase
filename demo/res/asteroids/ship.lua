@@ -4,8 +4,8 @@ local dir_hs   = hs("dir")
 local spr_normal   = res_get_sprite(hs("res/asteroids/spr/ship.sprite"))
 local spr_thruster = res_get_sprite(hs("res/asteroids/spr/ship-t.sprite"))
 
-local ROT_TORQUE         = 30000000.0
-local THRUST             = 6000000
+local ROT_TORQUE         = 15000000.0
+local THRUST             = 3000000
 local THRUST_ANGLE_DELTA = 180
 
 local SHOOT_SPEED    = 800    -- approximate world units/s
@@ -14,14 +14,37 @@ local SHOOT_OFFSET   = 40     -- pixels ahead of ship centre
 
 local shoot_timer = 0.0
 
-clock_update_add(function(delta)
+local INVUL_DURATION = 2.0
+local BLINK_RATE     = 10.0   -- flashes per second
+local invul_timer    = INVUL_DURATION
+
+-- readable by stage via script_get_env(ship_eid).is_invulnerable
+is_invulnerable = true
+
+local update_handle = clock_update_add(function(delta)
+
+    -- invulnerability countdown + blink
+    if invul_timer > 0 then
+        invul_timer = invul_timer - delta
+        if invul_timer <= 0 then
+            invul_timer    = 0
+            is_invulnerable = false
+            local spr_comp = c_sprite()
+            if spr_comp then spr_comp.visible = true end
+        else
+            local spr_comp = c_sprite()
+            if spr_comp then
+                spr_comp.visible = (math.floor(invul_timer * BLINK_RATE) % 2 == 0)
+            end
+        end
+    end
 
     local dir = input_action_direction(dir_hs)
     local sp  = c_spatial()
 
     -- swap sprite based on thrust input
     local spr_comp = c_sprite()
-    if spr_comp then
+    if spr_comp and spr_comp.visible then
         spr_comp.spr = (dir.y ~= 0) and spr_thruster or spr_normal
     end
 
@@ -68,4 +91,8 @@ clock_update_add(function(delta)
         if sys_audio then audio_sfx_play(hs("res/asteroids/sfx/blasteroids/bullet-laser.ogg"), -4.0) end
     end
 
+end)
+
+script_on_destroy(function()
+    clock_update_remove(update_handle)
 end)

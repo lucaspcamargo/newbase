@@ -387,6 +387,8 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
         if(auto *lyr = reg.try_get<clayers>(id); lyr && !(lyr->mask & layer_mask))
             continue;
 
+        if(!sprite.visible) continue;
+
         auto spr_res = sprite.spr;
         if(!spr_res) continue;
         auto tex = spr_res->tex;
@@ -412,7 +414,12 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
         const SDL_FPoint origin{(viewproj * loc_origin).x, (viewproj * loc_origin).y};
         const SDL_FPoint right {(viewproj * loc_right ).x, (viewproj * loc_right ).y};
         const SDL_FPoint down  {(viewproj * loc_down  ).x, (viewproj * loc_down  ).y};
+
+        SDL_SetTextureColorModFloat(tex->tex, sprite.color.r, sprite.color.g, sprite.color.b);
+        SDL_SetTextureAlphaModFloat(tex->tex, sprite.color.a);
         SDL_RenderTextureAffine(_render, tex->tex, nullptr, &origin, &right, &down);
+        SDL_SetTextureColorModFloat(tex->tex, 1.f, 1.f, 1.f);
+        SDL_SetTextureAlphaModFloat(tex->tex, 1.f);
     }
 }
 

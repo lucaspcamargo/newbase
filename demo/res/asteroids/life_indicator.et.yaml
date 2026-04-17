@@ -5,4 +5,6 @@
       rot: [0, 0, 0]
       scale: [0.5, 0.5, 1]
     sprite:
-      res: "res/asteroids/spr/ship-t.sprite"
+      res: "res/asteroids/spr/ship.sprite"
+      color: [0.2, 1.0, 0.4, 1.0]
+      

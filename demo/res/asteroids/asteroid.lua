@@ -1,6 +1,17 @@
--- asteroid script: screen wrapping only
+-- asteroid script: screen wrapping and 
 
-clock_update_add(function(delta)
+-- randomize tint slightly: warm grey-brown range
+do
+    local spr_comp = c_sprite()
+    if spr_comp then
+        local r = 0.75 + math.random() * 0.25
+        local g = 0.60 + math.random() * 0.25
+        local b = 0.45 + math.random() * 0.20
+        spr_comp.color = vec4.new(r, g, b, 1)
+    end
+end
+
+local update_handle = clock_update_add(function(delta)
     local sp = c_spatial()
     if not sp then return end
 
@@ -22,4 +33,8 @@ clock_update_add(function(delta)
     if nx ~= sp.pos.x or ny ~= sp.pos.y then
         physics2d_body_warp(eid, vec2.new(nx, ny))
     end
+end)
+
+script_on_destroy(function()
+    clock_update_remove(update_handle)
 end)

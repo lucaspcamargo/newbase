@@ -18,6 +18,7 @@ public:
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
+    void on_scene_change() override;
 
 private:
     void bind_meta_types();
@@ -29,6 +30,8 @@ private:
 
     // our own allocator provided to lua
     static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize);
+
+    static void _on_cscript_destroy(entt::registry &reg, entt::entity eid);
 
     static std::string _util_auto_identifier(const std::string_view &identifier);
 

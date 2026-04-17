@@ -35,6 +35,10 @@ bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
     c4::from_chars(def["res"].val(), &respath);
     auto hash = entt::hashed_string(respath.c_str());
     dst.spr = rman().get<rsprite>(hash.value());
+    if(def.has_child("color"))
+        load_vec4(def["color"], dst.color);
+    if(def.has_child("visible"))
+        def["visible"] >> dst.visible;
     return true;
 }
 
@@ -68,9 +72,11 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
     }
 
     if(def.has_child("gravity_scale"))
-    {
         def["gravity_scale"] >> dst.gravity_scale;
-    }
+    if(def.has_child("linear_damping"))
+        def["linear_damping"] >> dst.linear_damping;
+    if(def.has_child("angular_damping"))
+        def["angular_damping"] >> dst.angular_damping;
 
     if(def.has_child("shapes") && def["shapes"].is_seq())
     {

@@ -138,14 +138,20 @@ struct func_info
     cstrn<32> identifier {};
 };
 
+enum data_subtype_t {
+    DATA_SUBTYPE_NONE     = 0,
+    DATA_SUBTYPE_RESOURCE = 1,  // field holds a resource id (entt::id_type / hashed_string value)
+    DATA_SUBTYPE_COLOR    = 2,  // glm::vec4 displayed as an RGBA color picker
+};
+
 struct data_info
 {
     cstrn<32> identifier {};
 
-    // When true, this field holds a resource id (entt::id_type / hashed_string value).
-    // resource_type_id names the meta-type of the expected resource (e.g. "rtexture"_hs.value()).
-    // Leave resource_type_id at 0 to indicate "any resource type".
-    bool is_resource_id {false};
+    data_subtype_t subtype {DATA_SUBTYPE_NONE};
+
+    // For DATA_SUBTYPE_RESOURCE: meta-type of the expected resource (e.g. "rtexture"_hs.value()).
+    // Leave at 0 to indicate "any resource type".
     entt::id_type resource_type_id {0};
 };
 

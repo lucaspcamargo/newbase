@@ -51,7 +51,9 @@ extern "C" void _rtti_init_clock()
         .custom<rtti::type_info>(rtti::type_info{.identifier="clock", .type_class=rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
         .func<&nb::clock::update_add>("update_add"_hs)
-        .custom<rtti::func_info>(rtti::func_info{.identifier="update_add"});
+        .custom<rtti::func_info>(rtti::func_info{.identifier="update_add"})
+        .func<&nb::clock::update_remove>("update_remove"_hs)
+        .custom<rtti::func_info>(rtti::func_info{.identifier="update_remove"});
     entt::meta_factory<std::shared_ptr<nb::clock>>{rtti::ctx_systems()}
         .type("clock_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::clock>>()
