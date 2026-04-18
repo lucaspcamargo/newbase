@@ -21,7 +21,11 @@ void cscript::_ensure_rtti()
         })
         .ctor<>()
         .data<&cscript::script>("script"_hs)
-            .custom<rtti::data_info>(rtti::data_info{"script"});
+            .custom<rtti::data_info>(rtti::data_info{
+                .identifier       = "script",
+                .subtype          = rtti::DATA_SUBTYPE_RESOURCE,
+                .resource_type_id = "rscript"_hs.value()
+            });
     log::info("[cscript] registered: id=%x");
 }
 

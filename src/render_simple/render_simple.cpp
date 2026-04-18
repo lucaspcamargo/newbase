@@ -3,6 +3,7 @@
 #include <newbase/scene.hpp>
 #include <newbase/layer.hpp>
 #include <newbase/components/sprite.hpp>
+#include <newbase/components/mesh2d.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
@@ -32,6 +33,7 @@ using namespace nb;
 using entt::operator""_hs;
 
 static SDL_Rect _safe {};
+static std::vector<SDL_Vertex> _xform_buf {};
 bool _has_ui {false};
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
@@ -379,47 +381,85 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
         return lhs.pos[2] > rhs.pos[2];
     });
 
-    auto view = reg.view<const cspatial, const csprite>();
-    view.use<const cspatial>();
-    for(auto [id, spatial, sprite] : view.each())
+    auto spatial_view = reg.view<const cspatial>();
+    for (auto [id, spatial] : spatial_view.each())
     {
-        // layer mask check — entities without clayers pass through unconditionally
-        if(auto *lyr = reg.try_get<clayers>(id); lyr && !(lyr->mask & layer_mask))
+        if (auto* lyr = reg.try_get<clayers>(id); lyr && !(lyr->mask & layer_mask))
             continue;
 
-        if(!sprite.visible) continue;
-
-        auto spr_res = sprite.spr;
-        if(!spr_res) continue;
-        auto tex = spr_res->tex;
-        if(!tex) continue;
-        if(!tex->uploaded && tex->surf)
+        if (auto* sprite = reg.try_get<const csprite>(id))
         {
-            tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
-            tex->uploaded = true;
-            SDL_DestroySurface(tex->surf);
-            tex->surf = nullptr;
+            if (!sprite->visible) continue;
+            auto spr_res = sprite->spr;
+            if (!spr_res) continue;
+            auto tex = spr_res->tex;
+            if (!tex) continue;
+            if (!tex->uploaded && tex->surf)
+            {
+                tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
+                tex->uploaded = true;
+                SDL_DestroySurface(tex->surf);
+                tex->surf = nullptr;
+            }
+            if (!tex->uploaded) continue;
+
+            glm::vec2 dims = spr_res->dims;
+            if (dims == glm::vec2{-1.0f, -1.0f})
+                dims = glm::vec2{tex->tex->w, tex->tex->h};
+
+            auto anchor_delta = dims * spr_res->anchor;
+            const glm::vec4 loc_origin{spatial.world * glm::vec4{-anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
+            const glm::vec4 loc_right {spatial.world * glm::vec4{ anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
+            const glm::vec4 loc_down  {spatial.world * glm::vec4{-anchor_delta.x,  anchor_delta.y, 0.f, 1.f}};
+
+            const SDL_FPoint origin{(viewproj * loc_origin).x, (viewproj * loc_origin).y};
+            const SDL_FPoint right {(viewproj * loc_right ).x, (viewproj * loc_right ).y};
+            const SDL_FPoint down  {(viewproj * loc_down  ).x, (viewproj * loc_down  ).y};
+
+            SDL_SetTextureColorModFloat(tex->tex, sprite->color.r, sprite->color.g, sprite->color.b);
+            SDL_SetTextureAlphaModFloat(tex->tex, sprite->color.a);
+            SDL_RenderTextureAffine(_render, tex->tex, nullptr, &origin, &right, &down);
+            SDL_SetTextureColorModFloat(tex->tex, 1.f, 1.f, 1.f);
+            SDL_SetTextureAlphaModFloat(tex->tex, 1.f);
         }
-        if(!tex->uploaded) continue;
+        else if (auto* mesh = reg.try_get<const cmesh2d>(id))
+        {
+            if (!mesh->visible) continue;
+            if (!mesh->geom || mesh->geom->empty()) continue;
 
-        glm::vec2 dims = spr_res->dims;
-        if(dims == glm::vec2{-1.0f, -1.0f})
-            dims = glm::vec2{tex->tex->w, tex->tex->h};
+            SDL_Texture* sdl_tex = nullptr;
+            if (mesh->tex)
+            {
+                auto* tex = mesh->tex.get();
+                if (!tex->uploaded && tex->surf)
+                {
+                    tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
+                    tex->uploaded = true;
+                    SDL_DestroySurface(tex->surf);
+                    tex->surf = nullptr;
+                }
+                if (tex->uploaded) sdl_tex = tex->tex;
+            }
 
-        auto anchor_delta = dims * spr_res->anchor;
-        const glm::vec4 loc_origin{spatial.world * glm::vec4{-anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-        const glm::vec4 loc_right {spatial.world * glm::vec4{ anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-        const glm::vec4 loc_down  {spatial.world * glm::vec4{-anchor_delta.x,  anchor_delta.y, 0.f, 1.f}};
+            const auto& src = mesh->geom->vertices;
+            _xform_buf.resize(src.size());
+            for (size_t i = 0; i < src.size(); ++i)
+            {
+                const auto& v = src[i];
+                const glm::vec4 wp = viewproj * (spatial.world * glm::vec4(v.pos.x, v.pos.y, 0.f, 1.f));
+                _xform_buf[i] = SDL_Vertex{
+                    .position  = {wp.x, wp.y},
+                    .color     = {v.color.r, v.color.g, v.color.b, v.color.a},
+                    .tex_coord = {v.uv.x, v.uv.y},
+                };
+            }
 
-        const SDL_FPoint origin{(viewproj * loc_origin).x, (viewproj * loc_origin).y};
-        const SDL_FPoint right {(viewproj * loc_right ).x, (viewproj * loc_right ).y};
-        const SDL_FPoint down  {(viewproj * loc_down  ).x, (viewproj * loc_down  ).y};
-
-        SDL_SetTextureColorModFloat(tex->tex, sprite.color.r, sprite.color.g, sprite.color.b);
-        SDL_SetTextureAlphaModFloat(tex->tex, sprite.color.a);
-        SDL_RenderTextureAffine(_render, tex->tex, nullptr, &origin, &right, &down);
-        SDL_SetTextureColorModFloat(tex->tex, 1.f, 1.f, 1.f);
-        SDL_SetTextureAlphaModFloat(tex->tex, 1.f);
+            const auto& idx = mesh->geom->indices;
+            SDL_RenderGeometry(_render, sdl_tex,
+                               _xform_buf.data(), static_cast<int>(_xform_buf.size()),
+                               idx.empty() ? nullptr : idx.data(),
+                               static_cast<int>(idx.size()));
+        }
     }
 }
 
@@ -575,6 +615,7 @@ extern "C" void _rtti_init_render_simple()
 
     cspatial::_ensure_rtti();
     csprite::_ensure_rtti();
+    cmesh2d::_ensure_rtti();
     ccamera::_ensure_rtti();
     clayers::_ensure_rtti();
 }

@@ -5,11 +5,11 @@
 
 namespace nb {
     struct cspatial {
-        glm::vec3 pos;
-        glm::vec3 rot;
-        glm::vec3 scale;
+        glm::vec3 pos   {0.f, 0.f, 0.f};
+        glm::vec3 rot   {0.f, 0.f, 0.f};
+        glm::vec3 scale {1.f, 1.f, 1.f};
 
-        glm::mat4x4 world;
+        glm::mat4x4 world {1.f};
         
         inline void clear()
         {

@@ -26,11 +26,16 @@ struct visualizer_feedback
 
     SDL_Mutex* mtx {nullptr};
 
+    // ---- written by audio thread, read by main thread as a display hint ----
+    // Acceptable racy read: worst case is a one-frame stale sample rate label.
+    unsigned int sample_rate {44100};
+
     // ---- main thread only (no lock needed) ----
+    bool                          spectrum_mode {false};
     SDL_Surface*                  surface {nullptr};
     renderer_service::texture_handle texture {nullptr};
     int                           tex_w {256};
-    int                           tex_h {64};
+    int                           tex_h {80};
 
     visualizer_feedback()
     {

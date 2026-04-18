@@ -6,6 +6,8 @@
 #include <newbase/components/sprite.hpp>
 #include <newbase/components/script.hpp>
 #include <newbase/components/body2d.hpp>
+#include <newbase/components/mesh2d.hpp>
+#include <newbase/geom/geometry_buffer_2d.hpp>
 #include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
@@ -95,6 +97,22 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
             }
         }
     }
+    // TODO: remove — temporary cmesh2d smoke-test entity
+    {
+        auto eid = reg.create();
+        auto& sp = reg.emplace<nb::cspatial>(eid);
+        sp.pos = {0.f, 0.f, 5.f};
+        sp.apply();
+
+        auto geom = std::make_shared<nb::geometry_buffer_2d>();
+        geom->vertices.push_back({{   0.f, -100.f}, {0.5f, 0.f}, {1.f, 0.2f, 0.2f, 1.f}});
+        geom->vertices.push_back({{ 100.f,  100.f}, {1.f,  1.f}, {0.2f, 1.f, 0.2f, 1.f}});
+        geom->vertices.push_back({{-100.f,  100.f}, {0.f,  1.f}, {0.2f, 0.2f, 1.f, 1.f}});
+
+        auto& mesh = reg.emplace<nb::cmesh2d>(eid);
+        mesh.geom = geom;
+    }
+
     return first;
 }
 

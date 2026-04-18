@@ -168,7 +168,10 @@ local h_contacts = clock_update_add(function(delta)
             asteroid_entities[ast_eid]  = nil
 
             if ast_sp then spawn_debris(ast_sp.pos.x, ast_sp.pos.y, 10, 200) end
-            if sys_audio then audio_sfx_play(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0) end
+            if sys_audio then
+                local pitch = 0.85 + math.random() * 0.30
+                audio_sfx_play_pitched(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0, pitch)
+            end
         end
 
         -- ship vs asteroid
@@ -198,7 +201,10 @@ local h_contacts = clock_update_add(function(delta)
                 lose_life()
 
                 if ship_sp then spawn_debris(ship_sp.pos.x, ship_sp.pos.y, 18, 280) end
-                if sys_audio then audio_sfx_play(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0) end
+                if sys_audio then
+                    local pitch = 0.75 + math.random() * 0.20
+                    audio_sfx_play_pitched(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0, pitch)
+                end
             end
         end
     end

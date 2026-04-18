@@ -11,6 +11,7 @@
 #include <queue>
 #include <cassert>
 #include <cstring>
+#include <unordered_set>
 
 namespace nb::audio_graph
 {
@@ -63,8 +64,8 @@ public:
     const audio_spec& spec() const { return spec_; }
 
     // Pull `n_bytes` of audio into buffer.
-    // Processes all graph nodes in topological order, then copies the output
-    // node's buffer to the destination. Requires set_spec() to have been called.
+    // Starts a pull chain from the output node, which recursively pulls from its
+    // inputs. Requires set_spec() to have been called.
     void produce(uint8_t* buffer, size_t n_bytes)
     {
         assert(buffer);
@@ -83,29 +84,37 @@ public:
         }
         const size_t frames = n_bytes / frame_stride;
 
-        // Reverse adjacency: for each node, which nodes feed into it.
-        std::unordered_map<node_id, std::vector<node_id>> node_inputs;
-        for (const auto& [id, _] : nodes_)
-            node_inputs[id] = {};
-        for (const auto& [src, dsts] : edges_)
-            for (auto dst : dsts)
-                node_inputs[dst].push_back(src);
+        // Ensure output buffer.
+        if (!out_buf_ || out_buf_->spec() != spec_ || out_buf_->frames() != frames)
+            out_buf_ = std::make_unique<audio_buffer>(spec_, frames, nullptr);
 
-        // Process nodes sources-first.
-        auto order = topological_sort(nullptr);
-        for (auto id : order)
+        std::fill(out_buf_->data().begin(), out_buf_->data().end(), std::byte{0});
+
+        // Pull from output node — it recursively pulls the whole graph.
+        auto span = out_buf_->as_span();
+        nodes_.at(0)->pull(span, ++generation_);
+
+        // Explicitly pull feedback nodes (e.g. visualizers) that have no outgoing
+        // edges and are therefore not reachable from the output node's chain.
+        // Reuses the same generation so fan_out caches are shared with the main pull.
+        for (auto id : always_pull_)
         {
-            std::vector<audio_buffer*> input_bufs;
-            for (auto in_id : node_inputs.at(id))
-                if (auto* b = nodes_.at(in_id)->output_buffer())
-                    input_bufs.push_back(b);
-            nodes_.at(id)->process(spec_, frames, input_bufs);
+            auto edge_it = edges_.find(id);
+            if (edge_it != edges_.end() && !edge_it->second.empty())
+                continue; // already pulled by normal chain
+            auto node_it = nodes_.find(id);
+            if (node_it == nodes_.end()) continue;
+
+            if (!fb_buf_ || fb_buf_->spec() != spec_ || fb_buf_->frames() != frames)
+                fb_buf_ = std::make_unique<audio_buffer>(spec_, frames, nullptr);
+            std::fill(fb_buf_->data().begin(), fb_buf_->data().end(), std::byte{0});
+            auto fb_span = fb_buf_->as_span();
+            node_it->second->pull(fb_span, generation_);
         }
 
-        // Copy output node's result to device buffer.
-        auto* out_buf = nodes_.at(0)->output_buffer();
-        if (out_buf && out_buf->bytes() >= n_bytes)
-            std::memcpy(buffer, out_buf->data().data(), n_bytes);
+        // Copy result to device buffer.
+        if (out_buf_->bytes() >= n_bytes)
+            std::memcpy(buffer, out_buf_->data().data(), n_bytes);
         else
             std::memset(buffer, 0, n_bytes);
     }
@@ -114,10 +123,10 @@ public:
     {
         switch (operation.op_type)
         {
-            case op::type::ADD_NODE:    add_node(operation.node_ptr); break;
-            case op::type::REMOVE_NODE: remove_node(operation.src);   break;
-            case op::type::CONNECT:     connect(operation.src, operation.dst); break;
-            case op::type::DISCONNECT:  disconnect(operation.src, operation.dst); break;
+            case op::type::ADD_NODE:    add_node(operation.node_ptr); return;
+            case op::type::REMOVE_NODE: remove_node(operation.src);   return;
+            case op::type::CONNECT:     connect(operation.src, operation.dst); return;
+            case op::type::DISCONNECT:  disconnect(operation.src, operation.dst); return;
         }
     }
 
@@ -128,6 +137,7 @@ public:
         assert(nodes_.count(id) == 0 && "Node already exists");
         nodes_[id] = std::move(n);
         edges_[id] = {};
+        _wire_inputs();
     }
 
     void remove_node(const node_id& id)
@@ -137,7 +147,14 @@ public:
         edges_.erase(id);
         for (auto& [src, dsts] : edges_)
             dsts.erase(std::remove(dsts.begin(), dsts.end(), id), dsts.end());
+        always_pull_.erase(id);
+        _wire_inputs();
     }
+
+    // Mark a node to be explicitly pulled every cycle even when it has no
+    // outgoing edges (i.e. is not reachable from the output node).
+    // Used for side-effect nodes like visualizers.
+    void mark_always_pull(node_id id) { always_pull_.insert(id); }
 
     bool connect(const node_id& src, const node_id& dst)
     {
@@ -152,6 +169,7 @@ public:
             log::error("Connection from node {} to node {} would create a cycle", src, dst);
             return false;
         }
+        _wire_inputs();
         return true;
     }
 
@@ -162,9 +180,11 @@ public:
         auto  it   = std::remove(dsts.begin(), dsts.end(), dst);
         assert(it != dsts.end());
         dsts.erase(it, dsts.end());
+        _wire_inputs();
     }
 
     // Topological sort (Kahn's algorithm) — sources come first.
+    // Used for cycle detection and debug logging; not required for produce().
     std::vector<node_id> topological_sort(bool* has_cycle_out) const
     {
         std::unordered_map<node_id, int> in_degree;
@@ -199,12 +219,41 @@ private:
     audio_spec spec_;
     std::unordered_map<node_id, std::shared_ptr<node>>     nodes_;
     std::unordered_map<node_id, std::vector<node_id>>      edges_;
+    std::unordered_set<node_id>                             always_pull_;
+    std::unique_ptr<audio_buffer>                           out_buf_;
+    std::unique_ptr<audio_buffer>                           fb_buf_;
+    uint64_t                                                generation_ {0};
 
     bool has_cycle() const
     {
         bool ret;
         topological_sort(&ret);
         return ret;
+    }
+
+    // Rebuild each node's inputs_ vector from the current edge topology.
+    // Called after every structural change so pull() can traverse the graph.
+    void _wire_inputs()
+    {
+        // Build reverse adjacency: for each node, which nodes feed into it.
+        std::unordered_map<node_id, std::vector<node_id>> node_inputs;
+        for (const auto& [id, _] : nodes_)
+            node_inputs[id] = {};
+        for (const auto& [src, dsts] : edges_)
+            for (auto dst : dsts)
+                node_inputs[dst].push_back(src);
+
+        for (auto& [id, node_ptr] : nodes_)
+        {
+            std::vector<node*> inputs;
+            for (auto in_id : node_inputs.at(id))
+            {
+                auto it = nodes_.find(in_id);
+                if (it != nodes_.end())
+                    inputs.push_back(it->second.get());
+            }
+            node_ptr->set_inputs(std::move(inputs));
+        }
     }
 };
 

@@ -371,6 +371,25 @@ bool audio::sfx_play(entt::id_type res_id, float gain_db)
     return true;
 }
 
+bool audio::sfx_play_pitched(entt::id_type res_id, float gain_db, float pitch_ratio)
+{
+    auto vorbis_res = rman().get<rvorbis>(res_id);
+    if (!vorbis_res || !vorbis_res->valid)
+    {
+        log::error("[audio] sfx_play_pitched: invalid resource: %x", res_id);
+        return false;
+    }
+    auto nodes = _d->gm.add_player("sfx", res_id, /*loop=*/false);
+    if (gain_db != 0.f)
+        _d->gm.apply_gain_db(nodes.gain_node_id, gain_db);
+    if (pitch_ratio != 1.f)
+        _d->gm.apply_pitch_ratio(nodes.pitch_node_id, pitch_ratio);
+    _d->players.push_back({"sfx", nodes});
+    _d->gm.rebuild(_d->graph, _d->graph_mtx);
+    log::info("[audio] sfx_play_pitched: %x (gain_db=%.1f pitch=%.2f)", res_id, gain_db, pitch_ratio);
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Tool window
 // ---------------------------------------------------------------------------
@@ -454,7 +473,9 @@ extern "C" void _rtti_init_audio()
         .func<&audio::bgm_gain>("bgm_gain"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_gain"})
         .func<&audio::sfx_play>("sfx_play"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"sfx_play"});
+        .custom<rtti::func_info>(rtti::func_info{"sfx_play"})
+        .func<&audio::sfx_play_pitched>("sfx_play_pitched"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"sfx_play_pitched"});
 
     entt::meta_factory<std::shared_ptr<nb::audio>>{rtti::ctx_systems()}
         .type("audio_shared"_hs)

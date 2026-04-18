@@ -42,17 +42,21 @@ public:
 
     struct player_nodes {
         uint64_t vorbis_node_id   {0};
+        uint64_t pitch_node_id    {0};
         uint64_t gain_node_id     {0};
         uint64_t bus_input_node_id{0};
     };
 
     // Add a one-shot or looping vorbis player on the given bus.
-    // Topology: VORBIS → GAIN(0 dB) → BUS_INPUT.
-    // Returns the three graphplan node ids for later manipulation / removal.
+    // Topology: VORBIS → PITCH(1.0) → GAIN(0 dB) → BUS_INPUT.
+    // Returns the four graphplan node ids for later manipulation / removal.
     player_nodes add_player(const std::string& bus_name, entt::id_type res_id, bool loop);
 
-    // Remove a previously added player from the plan (all three nodes + links).
+    // Remove a previously added player from the plan (all four nodes + links).
     void remove_player(const player_nodes& nodes);
+
+    // Immediately apply a pitch ratio to a live pitch node (also updates the plan property).
+    void apply_pitch_ratio(uint64_t node_id, float ratio);
 
     // Return the vorbis_feedback for a player (nullptr if not yet built or already removed).
     std::shared_ptr<struct vorbis_feedback> get_player_feedback(const player_nodes& nodes) const;

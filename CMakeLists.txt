@@ -101,6 +101,7 @@ add_library(newbase STATIC
     src/components/body2d_rtti.cpp
     src/components/camera_rtti.cpp
     src/components/layers_rtti.cpp
+    src/components/mesh2d_rtti.cpp
 
     # graphplan
     src/graphplan/domain.cpp

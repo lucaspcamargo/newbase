@@ -27,6 +27,8 @@
 #include <unordered_set>
 #include <string>
 #include <memory>
+#include <complex>
+#include <cmath>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -55,6 +57,11 @@ struct nb::audio_graph_manager::impl {
     std::unordered_map<uint64_t, std::shared_ptr<vorbis_feedback>>      vorbis_fb_cache;
     std::unordered_map<uint64_t, std::shared_ptr<visualizer_feedback>>   vis_fb_cache;
 
+    // Fan-out buffer cache: graphplan node id → internally-injected fan_out_node.
+    // Keyed by (gp_id, output_pin_index) packed as gp_id*16 + pin_index.
+    // Currently all nodes have at most one output pin so pin_index is always 0.
+    std::unordered_map<uint64_t, std::shared_ptr<audio_graph::fan_out_node>> fan_out_cache;
+
     // Slot layout: each player occupies a row index.
     // vorbis_node_id → slot index.
     std::unordered_map<uint64_t, int> player_slots;
@@ -71,6 +78,39 @@ struct nb::audio_graph_manager::impl {
 };
 
 // ---------------------------------------------------------------------------
+// Visualizer FFT helper — Cooley-Tukey radix-2 DIT, in-place, n must be power of 2
+// ---------------------------------------------------------------------------
+static void vis_fft(std::complex<float>* x, size_t n)
+{
+    // Bit-reversal permutation.
+    for (size_t i = 1, j = 0; i < n; ++i)
+    {
+        size_t bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(x[i], x[j]);
+    }
+    // Butterfly passes.
+    for (size_t len = 2; len <= n; len <<= 1)
+    {
+        const float angle = -2.f * 3.14159265f / static_cast<float>(len);
+        const std::complex<float> wlen(std::cos(angle), std::sin(angle));
+        for (size_t i = 0; i < n; i += len)
+        {
+            std::complex<float> w(1.f, 0.f);
+            for (size_t j = 0; j < len / 2; ++j)
+            {
+                const auto u = x[i + j];
+                const auto v = x[i + j + len / 2] * w;
+                x[i + j]           = u + v;
+                x[i + j + len / 2] = u - v;
+                w *= wlen;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Audio domain definition — node types, pins, colors, draw functions
 // ---------------------------------------------------------------------------
 static constexpr int AUDIO_PIN_STREAM = 1;
@@ -83,6 +123,7 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     const int VBR = static_cast<int>(audio_graph::node_type::VORBIS_SOURCE);
     const int SIN = static_cast<int>(audio_graph::node_type::SINE_SOURCE);
     const int NOI = static_cast<int>(audio_graph::node_type::NOISE_SOURCE);
+    const int PIT = static_cast<int>(audio_graph::node_type::PITCH);
     enum { CAT_NONE=0, CAT_SOURCE=1, CAT_ROUTING=2, CAT_FX=3, CAT_BUS=4 };
 
     domain d;
@@ -192,6 +233,10 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                         prop_def{"feedback", entt::meta_any{0.5f}},
                         prop_def{"mix",      entt::meta_any{0.5f}} },
                       true, CAT_FX},
+        node_type_def{PIT, "Pitch",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"pitch_ratio", entt::meta_any{1.f}} },
+                      true, CAT_FX},
     };
 
     auto set_color = [&](audio_graph::node_type nt, ImVec4 color) {
@@ -229,6 +274,7 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     set_color(audio_graph::node_type::CHORUS,        FX_COLOR);
     set_color(audio_graph::node_type::WAVESHAPER,    FX_COLOR);
     set_color(audio_graph::node_type::PHASER,        FX_COLOR);
+    set_color(audio_graph::node_type::PITCH,         FX_COLOR);
 
     // Vorbis custom draw.
     auto vbr_it = std::find_if(d.node_types.begin(), d.node_types.end(),
@@ -317,6 +363,15 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                        ? entt::locator<renderer_service*>::value() : nullptr;
             if (!rs) { ImGui::TextDisabled("(no renderer)"); return false; }
 
+            // Mode toggle
+            {
+                const char* label = fb->spectrum_mode ? "FFT" : "Wave";
+                if (ImGui::SmallButton(label))
+                    fb->spectrum_mode = !fb->spectrum_mode;
+                ImGui::SameLine();
+                ImGui::TextDisabled("%u Hz", fb->sample_rate);
+            }
+
             if (!fb->surface)
             {
                 fb->surface = SDL_CreateSurface(fb->tex_w, fb->tex_h, SDL_PIXELFORMAT_RGBA32);
@@ -333,29 +388,97 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
             if (n > 0)
             {
                 const int W = fb->tex_w, H = fb->tex_h;
-                const float mid_y = H * 0.5f;
                 SDL_ClearSurface(fb->surface, 0.05f, 0.05f, 0.05f, 1.f);
-                Uint32* pixels   = static_cast<Uint32*>(fb->surface->pixels);
+                Uint32* pixels    = static_cast<Uint32*>(fb->surface->pixels);
                 const int pitch_px = fb->surface->pitch / 4;
-                const Uint32 wave_col = SDL_MapRGBA(SDL_GetPixelFormatDetails(fb->surface->format),
-                                                    nullptr, 60, 220, 80, 255);
-                const Uint32 center_col = SDL_MapRGBA(SDL_GetPixelFormatDetails(fb->surface->format),
-                                                      nullptr, 40, 80, 40, 255);
-                const int cy = static_cast<int>(mid_y);
-                for (int x = 0; x < W; ++x) pixels[cy * pitch_px + x] = center_col;
-                const size_t start = n >= static_cast<size_t>(W) ? n - static_cast<size_t>(W) : 0;
-                const size_t count = n - start;
-                for (size_t i = 0; i < count; ++i)
+                const auto* fmt   = SDL_GetPixelFormatDetails(fb->surface->format);
+
+                if (!fb->spectrum_mode)
                 {
-                    float s = fb->read_buf[start + i];
-                    s = s < -1.f ? -1.f : (s > 1.f ? 1.f : s);
-                    int y = static_cast<int>(mid_y - s * mid_y);
-                    y = y < 0 ? 0 : (y >= H ? H - 1 : y);
-                    int x = static_cast<int>(i);
-                    int y0 = cy, y1 = y;
-                    if (y1 < y0) { int tmp = y0; y0 = y1; y1 = tmp; }
-                    for (int yy = y0; yy <= y1; ++yy) pixels[yy * pitch_px + x] = wave_col;
+                    // ---- waveform ----
+                    const float mid_y = H * 0.5f;
+                    const Uint32 wave_col   = SDL_MapRGBA(fmt, nullptr, 60,  220, 80,  255);
+                    const Uint32 center_col = SDL_MapRGBA(fmt, nullptr, 40,  80,  40,  255);
+                    const int cy = static_cast<int>(mid_y);
+                    for (int x = 0; x < W; ++x) pixels[cy * pitch_px + x] = center_col;
+                    const size_t start = n >= static_cast<size_t>(W) ? n - static_cast<size_t>(W) : 0;
+                    const size_t count = n - start;
+                    for (size_t i = 0; i < count; ++i)
+                    {
+                        float s = fb->read_buf[start + i];
+                        s = s < -1.f ? -1.f : (s > 1.f ? 1.f : s);
+                        int y  = static_cast<int>(mid_y - s * mid_y);
+                        y = y < 0 ? 0 : (y >= H ? H - 1 : y);
+                        int xi = static_cast<int>(i);
+                        int y0 = cy, y1 = y;
+                        if (y1 < y0) { int tmp = y0; y0 = y1; y1 = tmp; }
+                        for (int yy = y0; yy <= y1; ++yy) pixels[yy * pitch_px + xi] = wave_col;
+                    }
                 }
+                else
+                {
+                    // ---- spectrum (FFT) ----
+                    constexpr size_t FFT_N = 1024;
+                    static std::complex<float> fft_buf[FFT_N];
+
+                    // Fill FFT input with the last FFT_N samples; apply Hann window.
+                    const size_t avail = n < FFT_N ? n : FFT_N;
+                    const size_t src_start = n - avail;
+                    for (size_t i = 0; i < FFT_N; ++i)
+                    {
+                        float sample = (i < avail) ? fb->read_buf[src_start + i] : 0.f;
+                        const float hann = 0.5f * (1.f - std::cos(2.f * 3.14159265f * static_cast<float>(i) / static_cast<float>(FFT_N - 1)));
+                        fft_buf[i] = std::complex<float>(sample * hann, 0.f);
+                    }
+                    vis_fft(fft_buf, FFT_N);
+
+                    // Log-frequency mapping: 20 Hz .. min(sr/2, 20 000 Hz)
+                    const float sr      = static_cast<float>(fb->sample_rate > 0 ? fb->sample_rate : 44100);
+                    const float f_lo    = 20.f;
+                    const float f_hi    = std::min(sr * 0.5f, 20000.f);
+                    const float log_lo  = std::log2(f_lo);
+                    const float log_hi  = std::log2(f_hi);
+                    const float log_rng = log_hi - log_lo;
+
+                    // Draw octave grid lines (faint)
+                    const Uint32 grid_col = SDL_MapRGBA(fmt, nullptr, 50, 50, 60, 255);
+                    for (float oct = std::ceil(log_lo); oct <= log_hi; oct += 1.f)
+                    {
+                        int gx = static_cast<int>((oct - log_lo) / log_rng * static_cast<float>(W - 1));
+                        if (gx >= 0 && gx < W)
+                            for (int y = 0; y < H; ++y)
+                                pixels[y * pitch_px + gx] = grid_col;
+                    }
+
+                    // Draw magnitude bars
+                    for (int xi = 0; xi < W; ++xi)
+                    {
+                        // Frequency at this pixel
+                        const float t = static_cast<float>(xi) / static_cast<float>(W - 1);
+                        const float freq = std::exp2(log_lo + t * log_rng);
+
+                        // Nearest FFT bin
+                        const size_t bin = static_cast<size_t>(freq / sr * static_cast<float>(FFT_N));
+                        const size_t bin_clamped = bin < FFT_N / 2 ? bin : FFT_N / 2 - 1;
+                        const float mag = std::abs(fft_buf[bin_clamped]) * 2.f / static_cast<float>(FFT_N);
+
+                        // Convert to dB, normalize to [0,1] in the range [-80, 0] dB
+                        const float db  = mag > 1e-7f ? 20.f * std::log10(mag) : -80.f;
+                        const float bar = (db + 80.f) / 80.f; // 0 = silent, 1 = 0 dBFS
+                        const float bf  = bar < 0.f ? 0.f : (bar > 1.f ? 1.f : bar);
+                        const int bar_h = static_cast<int>(bf * static_cast<float>(H));
+
+                        // Color: green (low) → yellow (mid) → red (high)
+                        Uint8 r, g, b;
+                        if (bf < 0.5f) { r = static_cast<Uint8>(bf * 2.f * 255); g = 220; b = 40; }
+                        else           { r = 255; g = static_cast<Uint8>((1.f - (bf - 0.5f) * 2.f) * 220); b = 40; }
+
+                        const Uint32 bar_col = SDL_MapRGBA(fmt, nullptr, r, g, b, 255);
+                        for (int y = H - bar_h; y < H; ++y)
+                            pixels[y * pitch_px + xi] = bar_col;
+                    }
+                }
+
                 rs->update_texture(fb->texture, fb->surface->pixels, fb->surface->pitch);
             }
 
@@ -423,29 +546,33 @@ audio_graph_manager::player_nodes audio_graph_manager::add_player(
 
     // Slot-based layout: players are arranged in rows to the right of the OUTPUT node.
     static constexpr float ROW_BASE_Y  =   80.f;
-    static constexpr float ROW_STEP_Y  =  275.f;  // 110 * 2.5
+    static constexpr float ROW_STEP_Y  =  275.f;
     static constexpr float VORBIS_X    =  900.f;
-    static constexpr float GAIN_X      = 1250.f;  // 900 + (1075-900)*2 = 900 + 350
-    static constexpr float BUS_INPUT_X = 1600.f;  // 900 + (1250-900)*2 = 900 + 700
+    static constexpr float PITCH_X     = 1100.f;
+    static constexpr float GAIN_X      = 1300.f;
+    static constexpr float BUS_INPUT_X = 1500.f;
 
     int   slot = _d->alloc_slot();
     float y    = ROW_BASE_Y + static_cast<float>(slot) * ROW_STEP_Y;
 
     uint64_t vorbis_id = _d->gplan->add_node_from_type(static_cast<int>(NT::VORBIS_SOURCE), VORBIS_X,    y);
-    uint64_t gain_id   = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),           GAIN_X,     y);
-    uint64_t bus_in_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_INPUT),      BUS_INPUT_X, y);
-    _d->gplan->nodes.at(vorbis_id).properties["res_id"]  = entt::meta_any{res_id};
-    _d->gplan->nodes.at(vorbis_id).properties["loop"]    = entt::meta_any{loop};
-    _d->gplan->nodes.at(gain_id).properties["gain_db"]   = entt::meta_any{0.f};
-    _d->gplan->nodes.at(bus_in_id).properties["bus_id"]  = entt::meta_any{bus_name};
-    _link(vorbis_id, gain_id);
+    uint64_t pitch_id  = _d->gplan->add_node_from_type(static_cast<int>(NT::PITCH),          PITCH_X,    y);
+    uint64_t gain_id   = _d->gplan->add_node_from_type(static_cast<int>(NT::GAIN),            GAIN_X,     y);
+    uint64_t bus_in_id = _d->gplan->add_node_from_type(static_cast<int>(NT::BUS_INPUT),       BUS_INPUT_X, y);
+    _d->gplan->nodes.at(vorbis_id).properties["res_id"]      = entt::meta_any{res_id};
+    _d->gplan->nodes.at(vorbis_id).properties["loop"]        = entt::meta_any{loop};
+    _d->gplan->nodes.at(pitch_id).properties["pitch_ratio"]  = entt::meta_any{1.f};
+    _d->gplan->nodes.at(gain_id).properties["gain_db"]       = entt::meta_any{0.f};
+    _d->gplan->nodes.at(bus_in_id).properties["bus_id"]      = entt::meta_any{bus_name};
+    _link(vorbis_id, pitch_id);
+    _link(pitch_id,  gain_id);
     _link(gain_id,   bus_in_id);
 
     _d->player_slots[vorbis_id] = slot;
 
-    log::verb("[audio] added player slot=%d bus='%s' vorbis=%llu gain=%llu bus_in=%llu",
-              slot, bus_name.c_str(), vorbis_id, gain_id, bus_in_id);
-    return {vorbis_id, gain_id, bus_in_id};
+    log::verb("[audio] added player slot=%d bus='%s' vorbis=%llu pitch=%llu gain=%llu bus_in=%llu",
+              slot, bus_name.c_str(), vorbis_id, pitch_id, gain_id, bus_in_id);
+    return {vorbis_id, pitch_id, gain_id, bus_in_id};
 }
 
 std::shared_ptr<vorbis_feedback> audio_graph_manager::get_player_feedback(const player_nodes& pn) const
@@ -459,7 +586,7 @@ void audio_graph_manager::remove_player(const player_nodes& pn)
 {
     if (!_d->gplan) return;
 
-    for (uint64_t node_id : {pn.vorbis_node_id, pn.gain_node_id, pn.bus_input_node_id})
+    for (uint64_t node_id : {pn.vorbis_node_id, pn.pitch_node_id, pn.gain_node_id, pn.bus_input_node_id})
     {
         auto nit = _d->gplan->nodes.find(node_id);
         if (nit == _d->gplan->nodes.end()) continue;
@@ -484,16 +611,18 @@ void audio_graph_manager::remove_player(const player_nodes& pn)
     _d->vorbis_res_cache.erase(pn.vorbis_node_id);
     _d->vorbis_fb_cache.erase(pn.vorbis_node_id);
     _d->player_slots.erase(pn.vorbis_node_id);
+    _d->node_cache.erase(pn.pitch_node_id);
     _d->node_cache.erase(pn.gain_node_id);
     _d->node_cache.erase(pn.bus_input_node_id);
 
-    log::verb("[audio] removed player vorbis=%llu gain=%llu bus_in=%llu",
-              pn.vorbis_node_id, pn.gain_node_id, pn.bus_input_node_id);
+    log::verb("[audio] removed player vorbis=%llu pitch=%llu gain=%llu bus_in=%llu",
+              pn.vorbis_node_id, pn.pitch_node_id, pn.gain_node_id, pn.bus_input_node_id);
 }
 
 void audio_graph_manager::shutdown()
 {
     _d->node_cache.clear();
+    _d->fan_out_cache.clear();
     _d->vorbis_res_cache.clear();
     _d->vorbis_fb_cache.clear();
 
@@ -518,6 +647,16 @@ void audio_graph_manager::apply_gain_db(uint64_t node_id, float db)
     if (it != _d->node_cache.end())
         if (auto* gn = dynamic_cast<audio_graph::gain_node*>(it->second.get()))
             gn->set_gain_db(db);
+}
+
+void audio_graph_manager::apply_pitch_ratio(uint64_t node_id, float ratio)
+{
+    if (!node_id || !_d->gplan) return;
+    _d->gplan->nodes.at(node_id).properties["pitch_ratio"] = entt::meta_any{ratio};
+    auto it = _d->node_cache.find(node_id);
+    if (it != _d->node_cache.end())
+        if (auto* pn = dynamic_cast<audio_graph::pitch_node*>(it->second.get()))
+            pn->set_pitch_ratio(ratio);
 }
 
 bool audio_graph_manager::draw_editor()
@@ -550,6 +689,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     const int CHORUS_TYPE      = static_cast<int>(audio_graph::node_type::CHORUS);
     const int WAVESHAPER_TYPE  = static_cast<int>(audio_graph::node_type::WAVESHAPER);
     const int PHASER_TYPE      = static_cast<int>(audio_graph::node_type::PHASER);
+    const int PITCH_TYPE       = static_cast<int>(audio_graph::node_type::PITCH);
 
     auto prop_f = [](const graphplan::node_data& nd, const char* key, float def) -> float {
         auto it = nd.properties.find(key);
@@ -682,6 +822,8 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 type_matches = dynamic_cast<audio_graph::waveshaper_node*>(cache_it->second.get()) != nullptr;
             else if (nd.type == PHASER_TYPE)
                 type_matches = dynamic_cast<audio_graph::phaser_node*>(cache_it->second.get()) != nullptr;
+            else if (nd.type == PITCH_TYPE)
+                type_matches = dynamic_cast<audio_graph::pitch_node*>(cache_it->second.get()) != nullptr;
             else
                 type_matches = dynamic_cast<audio_graph::source_node*>(cache_it->second.get()) != nullptr;
         }
@@ -773,6 +915,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 if (!fb_ptr) fb_ptr = std::make_shared<visualizer_feedback>();
                 _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
                 static_cast<audio_graph::visualizer_node*>(node_ptr.get())->set_feedback(fb_ptr);
+                new_graph.mark_always_pull(node_ptr->id());
             }
             else if (nd.type == BITCRUSHER_TYPE)
             {
@@ -809,6 +952,11 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                     ->set_params(prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth", 0.8f),
                                  prop_f(nd, "stages", 4.f),   prop_f(nd, "feedback", 0.5f),
                                  prop_f(nd, "mix", 0.5f));
+            }
+            else if (nd.type == PITCH_TYPE)
+            {
+                static_cast<audio_graph::pitch_node*>(node_ptr.get())
+                    ->set_pitch_ratio(prop_f(nd, "pitch_ratio", 1.f));
             }
 
             new_graph.add_node(node_ptr);
@@ -889,6 +1037,8 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 auto vn = std::make_shared<audio_graph::visualizer_node>(ag_id);
                 vn->set_feedback(fb_ptr);
                 node_ptr = std::move(vn);
+                // Visualizer is a side-effect sink — must be pulled even with no outgoing edges.
+                new_graph.mark_always_pull(ag_id);
             }
             else if (nd.type == BITCRUSHER_TYPE)
             {
@@ -924,6 +1074,11 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                     prop_f(nd, "rate_hz", 0.5f), prop_f(nd, "depth", 0.8f),
                     prop_f(nd, "stages", 4.f),   prop_f(nd, "feedback", 0.5f),
                     prop_f(nd, "mix", 0.5f));
+            }
+            else if (nd.type == PITCH_TYPE)
+            {
+                node_ptr = std::make_shared<audio_graph::pitch_node>(ag_id,
+                    prop_f(nd, "pitch_ratio", 1.f));
             }
             else
             {
@@ -961,24 +1116,94 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             ++it;
     }
 
-    // Wire edges.
-    for (const auto& [link_id, lk] : _d->gplan->links)
+    // Fan-out pass: detect graphplan nodes whose output feeds > 1 consumer.
+    // For each such node, inject an internal fan_out_node and route all consumers
+    // through it so the upstream node is only pulled once per generation.
     {
-        auto src_pin_it = _d->gplan->pins.find(lk.output_pin);
-        auto dst_pin_it = _d->gplan->pins.find(lk.input_pin);
-        if (src_pin_it == _d->gplan->pins.end() || dst_pin_it == _d->gplan->pins.end())
+        // Count outgoing links per graphplan source node.
+        std::unordered_map<uint64_t, int> out_degree;
+        for (const auto& [link_id, lk] : _d->gplan->links)
         {
-            log::warn("[audio] graphplan link %llu references unknown pin — skipped", link_id);
-            continue;
+            auto src_pin_it = _d->gplan->pins.find(lk.output_pin);
+            if (src_pin_it != _d->gplan->pins.end())
+                ++out_degree[src_pin_it->second.node_id];
         }
-        auto src_it = id_map.find(src_pin_it->second.node_id);
-        auto dst_it = id_map.find(dst_pin_it->second.node_id);
-        if (src_it == id_map.end() || dst_it == id_map.end())
+
+        // Create/reuse fan_out nodes and connect source → fan_out.
+        std::unordered_map<uint64_t, audio_graph::node_id> fan_out_id_map;
+        for (const auto& [gp_id, deg] : out_degree)
         {
-            log::warn("[audio] graphplan link %llu references unmapped node — skipped", link_id);
-            continue;
+            if (deg <= 1) continue;
+            auto src_it = id_map.find(gp_id);
+            if (src_it == id_map.end()) continue;
+
+            auto cache_it = _d->fan_out_cache.find(gp_id);
+            std::shared_ptr<audio_graph::fan_out_node> fo;
+            if (cache_it != _d->fan_out_cache.end())
+            {
+                fo = cache_it->second;
+                log::verb("[audio] reused fan_out node gp=%llu ag=%d", gp_id, fo->id());
+            }
+            else
+            {
+                audio_graph::node_id ag_id = _d->next_ag_id++;
+                fo = std::make_shared<audio_graph::fan_out_node>(ag_id);
+                _d->fan_out_cache[gp_id] = fo;
+                log::verb("[audio] created fan_out node gp=%llu ag=%d (out_degree=%d)",
+                          gp_id, ag_id, deg);
+            }
+            new_graph.add_node(fo);
+            fan_out_id_map[gp_id] = fo->id();
+            new_graph.connect(src_it->second, fo->id());
         }
-        new_graph.connect(src_it->second, dst_it->second);
+
+        // Evict fan_out nodes whose graphplan source no longer fans out.
+        for (auto it = _d->fan_out_cache.begin(); it != _d->fan_out_cache.end(); )
+        {
+            auto deg_it = out_degree.find(it->first);
+            it = (deg_it == out_degree.end() || deg_it->second <= 1)
+                 ? _d->fan_out_cache.erase(it) : std::next(it);
+        }
+
+        // Wire edges, routing through fan_out nodes where applicable.
+        for (const auto& [link_id, lk] : _d->gplan->links)
+        {
+            auto src_pin_it = _d->gplan->pins.find(lk.output_pin);
+            auto dst_pin_it = _d->gplan->pins.find(lk.input_pin);
+            if (src_pin_it == _d->gplan->pins.end() || dst_pin_it == _d->gplan->pins.end())
+            {
+                log::warn("[audio] graphplan link %llu references unknown pin — skipped", link_id);
+                continue;
+            }
+            const uint64_t src_gp_id = src_pin_it->second.node_id;
+            const uint64_t dst_gp_id = dst_pin_it->second.node_id;
+
+            // Use the fan_out node as source if one was injected.
+            audio_graph::node_id ag_src;
+            auto fo_it = fan_out_id_map.find(src_gp_id);
+            if (fo_it != fan_out_id_map.end())
+            {
+                ag_src = fo_it->second;
+            }
+            else
+            {
+                auto src_it = id_map.find(src_gp_id);
+                if (src_it == id_map.end())
+                {
+                    log::warn("[audio] graphplan link %llu src node unmapped — skipped", link_id);
+                    continue;
+                }
+                ag_src = src_it->second;
+            }
+
+            auto dst_it = id_map.find(dst_gp_id);
+            if (dst_it == id_map.end())
+            {
+                log::warn("[audio] graphplan link %llu dst node unmapped — skipped", link_id);
+                continue;
+            }
+            new_graph.connect(ag_src, dst_it->second);
+        }
     }
 
     // Debug log.

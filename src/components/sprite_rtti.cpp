@@ -21,7 +21,11 @@ void csprite::_ensure_rtti()
         })
         .ctor<>()
         .data<&csprite::spr>("spr"_hs)
-            .custom<rtti::data_info>(rtti::data_info{"spr"})
+            .custom<rtti::data_info>(rtti::data_info{
+                .identifier       = "spr",
+                .subtype          = rtti::DATA_SUBTYPE_RESOURCE,
+                .resource_type_id = "rsprite"_hs.value()
+            })
         .data<&csprite::visible>("visible"_hs)
             .custom<rtti::data_info>(rtti::data_info{"visible"})
         .data<&csprite::color>("color"_hs)

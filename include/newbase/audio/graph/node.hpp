@@ -31,6 +31,7 @@ enum class node_type
     CHORUS       = 16, // multi-voice LFO-modulated delay for lush/spatial effects
     WAVESHAPER   = 17, // non-linear distortion via drive + shape curve
     PHASER       = 18, // all-pass cascade swept by an LFO
+    PITCH        = 19, // pitch shifter via linear-interpolation resampling
 };
 
 class node
@@ -41,14 +42,16 @@ public:
 
     const node_id& id() const { return id_; }
 
-    // Called during produce pass.
-    // inputs: output buffers of upstream nodes (empty for source nodes).
-    virtual void process(audio_spec spec, size_t frames,
-                         const std::vector<audio_buffer*>& inputs) = 0;
+    // Pull `dst.frames()` frames of audio into dst.
+    // Recursively pulls from inputs_ as needed.
+    // gen: monotonically increasing generation counter (reserved for fan-out caching).
+    virtual void pull(audio_buffer::span& dst, uint64_t gen) = 0;
 
-    // Returns the output buffer populated by the last process() call.
-    // May be nullptr before process() is first called.
-    virtual audio_buffer* output_buffer() = 0;
+    // Called by graph::_wire_inputs() after topology changes.
+    void set_inputs(std::vector<node*> inputs) { inputs_ = std::move(inputs); }
+
+protected:
+    std::vector<node*> inputs_;
 
 private:
     node_id id_;

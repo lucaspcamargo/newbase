@@ -148,6 +148,10 @@ static float_drag_params infer_float_drag(const char* name)
     if (strcmp(name, "ratio") == 0)
         return {0.1f, 1.f, 20.f, "%.1f:1"};
 
+    // Pitch ratio
+    if (strcmp(name, "pitch_ratio") == 0)
+        return {0.1f, 0.f, 20.f, "%.1fx"};
+
     // Bit depth
     if (strcmp(name, "bits") == 0)
         return {0.1f, 1.f, 32.f, "%.1f bit"};

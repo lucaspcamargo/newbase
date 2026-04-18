@@ -8,20 +8,21 @@
 #include <memory>
 #include <cassert>
 #include <cstring>
+#include <cmath>
 #include <vector>
 
 namespace nb::audio_graph
 {
 
 // Add src samples into dst (float format only; asserts otherwise).
-inline void mix_add(audio_buffer& dst, const audio_buffer& src, size_t frames)
+inline void mix_add(audio_buffer::span& dst, const audio_buffer::span& src)
 {
-    if (dst.spec().format != audio_format::FLOAT) assert(false);
-    if (src.spec().format != audio_format::FLOAT) assert(false);
-    assert(dst.spec().channels == src.spec().channels);
-    float*       d     = reinterpret_cast<float*>(dst.data().data());
-    const float* s     = reinterpret_cast<const float*>(src.data().data());
-    size_t       count = frames * static_cast<size_t>(dst.spec().channels);
+    assert(dst.buffer_ref().spec().format == audio_format::FLOAT);
+    assert(src.buffer_ref().spec().format == audio_format::FLOAT);
+    assert(dst.buffer_ref().spec().channels == src.buffer_ref().spec().channels);
+    float*       d     = reinterpret_cast<float*>(dst.begin());
+    const float* s     = reinterpret_cast<const float*>(src.begin());
+    const size_t count = dst.frames() * static_cast<size_t>(dst.buffer_ref().channels());
     for (size_t i = 0; i < count; ++i)
         d[i] += s[i];
 }
@@ -33,28 +34,34 @@ class output_node : public node
 public:
     explicit output_node(node_id id) : node(id) {}
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        log::verb("[output_node %d] processing NUM_INPUTS=%zu frames=%zu", id(), inputs.size(), frames);
-        ensure_buf(spec, frames);
-        std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-        for (auto* input : inputs)
+        log::verb("[output_node %d] pull inputs=%zu frames=%zu", id(), inputs_.size(), dst.frames());
+        std::fill(dst.begin(), dst.end(), std::byte{0});
+        for (size_t i = 0; i < inputs_.size(); ++i)
         {
-            if (input && input->frames() >= frames)
-                mix_add(*buf_, *input, frames);
+            if (i == 0)
+            {
+                inputs_[0]->pull(dst, gen);
+            }
+            else
+            {
+                ensure_scratch(dst.buffer_ref().spec(), dst.frames());
+                std::fill(scratch_->data().begin(), scratch_->data().end(), std::byte{0});
+                auto scratch_span = scratch_->as_span();
+                inputs_[i]->pull(scratch_span, gen);
+                mix_add(dst, scratch_span);
+            }
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
-    std::unique_ptr<audio_buffer> buf_;
+    std::unique_ptr<audio_buffer> scratch_;
 
-    void ensure_buf(audio_spec spec, size_t frames)
+    void ensure_scratch(audio_spec spec, size_t frames)
     {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
+        if (!scratch_ || scratch_->spec() != spec || scratch_->frames() != frames)
+            scratch_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
     }
 };
 
@@ -70,11 +77,9 @@ public:
     {
     }
 
-    void process(audio_spec graph_spec, size_t frames,
-                 const std::vector<audio_buffer*>& /*inputs*/) override
+    void pull(audio_spec graph_spec, size_t frames, audio_buffer::span& dst)
     {
-        ensure_out_buf(graph_spec, frames);
-        std::fill(out_buf_->data().begin(), out_buf_->data().end(), std::byte{0});
+        std::fill(dst.begin(), dst.end(), std::byte{0});
 
         if (!producer_)
             return;
@@ -84,13 +89,10 @@ public:
         if (prod_spec == graph_spec)
         {
             log::verb("[source_node %d] direct pull, frames=%zu", id(), frames);
-            auto sp = out_buf_->as_span();
-            producer_->frames_pull(std::move(sp), frames);
+            producer_->frames_pull(audio_buffer::span(dst), frames);
         }
         else
         {
-            // How many producer frames are needed to supply `frames` output frames?
-            // Subtract frames already buffered in the converter, then ceiling-round.
             ensure_converter(prod_spec, graph_spec);
             const size_t already = converter_->available();
             const size_t need    = already >= frames ? 0 : frames - already;
@@ -103,40 +105,32 @@ public:
             {
                 ensure_scratch_buf(prod_spec, input_frames);
                 std::fill(scratch_buf_->data().begin(), scratch_buf_->data().end(), std::byte{0});
-                auto sp = scratch_buf_->as_span();
-                producer_->frames_pull(std::move(sp), input_frames);
-
+                producer_->frames_pull(audio_buffer::span(scratch_buf_->as_span()), input_frames);
                 auto scratch_sp = scratch_buf_->as_span();
-                converter_->put(scratch_sp);
+                converter_->put(audio_buffer::span(scratch_sp));
             }
-            auto out_sp = out_buf_->as_span();
-            converter_->take(std::move(out_sp));
+            converter_->take(audio_buffer::span(dst));
         }
     }
 
-    audio_buffer* output_buffer() override { return out_buf_.get(); }
+    void pull(audio_buffer::span& dst, uint64_t /*gen*/) override
+    {
+        pull(dst.buffer_ref().spec(), dst.frames(), dst);
+    }
 
     audio_producer* producer() { return producer_.get(); }
     void set_producer(std::unique_ptr<audio_producer> p)
     {
         producer_ = std::move(p);
-        // Reset converter so it is rebuilt for the new producer's spec.
         converter_.reset();
     }
 
 private:
     std::unique_ptr<audio_producer>  producer_;
-    std::unique_ptr<audio_buffer>    out_buf_;
     std::unique_ptr<audio_buffer>    scratch_buf_;
     std::unique_ptr<audio_converter> converter_;
     audio_spec                       converter_in_spec_;
     audio_spec                       converter_out_spec_;
-
-    void ensure_out_buf(audio_spec spec, size_t frames)
-    {
-        if (!out_buf_ || out_buf_->spec() != spec || out_buf_->frames() != frames)
-            out_buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 
     void ensure_scratch_buf(audio_spec spec, size_t frames)
     {
@@ -162,29 +156,36 @@ class mixer_node : public node
 public:
     explicit mixer_node(node_id id) : node(id) {}
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        ensure_buf(spec, frames);
-        std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-        for (auto* input : inputs)
+        std::fill(dst.begin(), dst.end(), std::byte{0});
+        for (size_t i = 0; i < inputs_.size(); ++i)
         {
-            if (input && input->frames() >= frames)
-                mix_add(*buf_, *input, frames);
+            if (i == 0)
+            {
+                inputs_[0]->pull(dst, gen);
+            }
+            else
+            {
+                ensure_scratch(dst.buffer_ref().spec(), dst.frames());
+                std::fill(scratch_->data().begin(), scratch_->data().end(), std::byte{0});
+                auto scratch_span = scratch_->as_span();
+                inputs_[i]->pull(scratch_span, gen);
+                mix_add(dst, scratch_span);
+            }
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
-    std::unique_ptr<audio_buffer> buf_;
+    std::unique_ptr<audio_buffer> scratch_;
 
-    void ensure_buf(audio_spec spec, size_t frames)
+    void ensure_scratch(audio_spec spec, size_t frames)
     {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
+        if (!scratch_ || scratch_->spec() != spec || scratch_->frames() != frames)
+            scratch_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
     }
 };
+
 
 // Schroeder reverb: 4 parallel comb filters → 2 allpass filters in series.
 // Operates on FLOAT interleaved audio. One set of delay lines per channel
@@ -197,28 +198,22 @@ public:
         : node(id), room_size_(room_size), damping_(damping), wet_(wet)
     {}
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
+        else
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+
+        const audio_spec spec = dst.buffer_ref().spec();
         assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
+        const size_t frames = dst.frames();
+        const int    ch     = spec.channels;
+        float*       out    = reinterpret_cast<float*>(dst.begin());
+        const float  dry    = 1.f - wet_;
+
         ensure_delay_lines(spec);
 
-        const int   ch      = spec.channels;
-        float*      out     = reinterpret_cast<float*>(buf_->data().data());
-        const float dry     = 1.f - wet_;
-
-        // Gather input (sum all upstream buffers).
-        std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-        for (auto* input : inputs)
-        {
-            if (!input || input->frames() < frames) continue;
-            const float* src = reinterpret_cast<const float*>(input->data().data());
-            for (size_t s = 0; s < frames * static_cast<size_t>(ch); ++s)
-                out[s] += src[s];
-        }
-
-        // Process each channel independently through comb → allpass chain.
         for (int c = 0; c < ch; ++c)
         {
             auto& cl = ch_lines_[static_cast<size_t>(c)];
@@ -227,7 +222,6 @@ public:
                 float x = out[f * static_cast<size_t>(ch) + static_cast<size_t>(c)];
                 float rev = 0.f;
 
-                // 4 parallel comb filters.
                 for (size_t i = 0; i < NUM_COMBS; ++i)
                 {
                     auto& d   = cl.comb[i];
@@ -237,9 +231,8 @@ public:
                     d.pos = (d.pos + 1) % d.buf.size();
                     rev  += buf_sample;
                 }
-                rev *= 0.25f; // normalise 4 combs
+                rev *= 0.25f;
 
-                // 2 allpass filters in series.
                 for (size_t i = 0; i < NUM_ALLPASS; ++i)
                 {
                     auto& d    = cl.allpass[i];
@@ -256,8 +249,6 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
     void set_params(float room_size, float damping, float wet)
     {
         room_size_ = room_size;
@@ -270,13 +261,9 @@ private:
     float damping_;
     float wet_;
 
-    std::unique_ptr<audio_buffer> buf_;
-
     static constexpr size_t NUM_COMBS   = 4;
     static constexpr size_t NUM_ALLPASS = 2;
 
-    // Comb/allpass delay line base sizes in samples at 44100 Hz, per channel.
-    // Second channel gets a small offset for stereo spread.
     static constexpr int COMB_SIZES[NUM_COMBS]     = {1317, 1637, 1813, 1931};
     static constexpr int ALLPASS_SIZES[NUM_ALLPASS] = {221,  75};
     static constexpr int STEREO_SPREAD              = 23;
@@ -297,12 +284,6 @@ private:
     std::vector<channel_lines> ch_lines_;
     unsigned int               built_for_freq_ {0};
     int                        built_for_ch_   {0};
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 
     void ensure_delay_lines(audio_spec spec)
     {
@@ -337,11 +318,9 @@ private:
     }
 };
 
+
 // Dynamics compressor with optional auto-duck sidechain.
-// Input 0: main signal. Input 1 (optional): sidechain — when present, its
-// RMS drives the gain reduction applied to input 0 (auto-duck).
-// All processing is in FLOAT interleaved format.
-// Props: threshold_db, ratio, attack_ms, release_ms, makeup_db.
+// Input 0: main signal. Input 1 (optional): sidechain.
 class compressor_node : public node
 {
 public:
@@ -366,23 +345,30 @@ public:
         makeup_db_    = makeup_db;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
+        const audio_spec spec = dst.buffer_ref().spec();
         assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
 
-        const audio_buffer* main     = (inputs.size() > 0) ? inputs[0] : nullptr;
-        const audio_buffer* sidechain= (inputs.size() > 1) ? inputs[1] : nullptr;
-
-        float* out = reinterpret_cast<float*>(buf_->data().data());
-
-        // Copy main signal into output (or silence if no input).
-        if (main && main->frames() >= frames)
-            std::memcpy(out, main->data().data(), frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        // Pull main signal into dst.
+        if (inputs_.size() > 0)
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
+        // Pull optional sidechain into scratch.
+        const float* sidechain_ptr = nullptr;
+        if (inputs_.size() > 1)
+        {
+            ensure_scratch(spec, dst.frames());
+            std::fill(scratch_->data().begin(), scratch_->data().end(), std::byte{0});
+            auto sc_span = scratch_->as_span();
+            inputs_[1]->pull(sc_span, gen);
+            sidechain_ptr = reinterpret_cast<const float*>(scratch_->data().data());
+        }
+
+        const size_t frames = dst.frames();
+        float* out = reinterpret_cast<float*>(dst.begin());
         const int   ch        = spec.channels;
         const float sr        = static_cast<float>(spec.frequency);
         const float thresh_lin = db_to_lin(threshold_db_);
@@ -392,23 +378,15 @@ public:
 
         for (size_t f = 0; f < frames; ++f)
         {
-            // Compute detector signal: sidechain channel-0 or main channel-0.
             float det = 0.f;
-            if (sidechain && sidechain->frames() > f)
-            {
-                const float* sc = reinterpret_cast<const float*>(sidechain->data().data());
-                det = std::fabs(sc[f * static_cast<size_t>(ch)]);
-            }
+            if (sidechain_ptr)
+                det = std::fabs(sidechain_ptr[f * static_cast<size_t>(ch)]);
             else
-            {
                 det = std::fabs(out[f * static_cast<size_t>(ch)]);
-            }
 
-            // Envelope follower.
             float coef = (det > env_) ? attack_coef : release_coef;
             env_ = det + coef * (env_ - det);
 
-            // Gain computer.
             float gain = 1.f;
             if (env_ > thresh_lin && ratio_ > 1.f)
             {
@@ -418,13 +396,10 @@ public:
             }
             gain *= makeup_lin;
 
-            // Apply gain to all channels.
             for (int c = 0; c < ch; ++c)
                 out[f * static_cast<size_t>(ch) + static_cast<size_t>(c)] *= gain;
         }
     }
-
-    audio_buffer* output_buffer() override { return buf_.get(); }
 
 private:
     float threshold_db_;
@@ -432,15 +407,14 @@ private:
     float attack_ms_;
     float release_ms_;
     float makeup_db_;
-
     float env_ {0.f};
 
-    std::unique_ptr<audio_buffer> buf_;
+    std::unique_ptr<audio_buffer> scratch_;
 
-    void ensure_buf(audio_spec spec, size_t frames)
+    void ensure_scratch(audio_spec spec, size_t frames)
     {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
+        if (!scratch_ || scratch_->spec() != spec || scratch_->frames() != frames)
+            scratch_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
     }
 
     static float db_to_lin(float db) { return std::pow(10.f, db / 20.f); }
@@ -449,9 +423,6 @@ private:
 
 
 // 5-band parametric EQ.
-// Bands 0 and 4 are low/high shelves; bands 1-3 are peaking filters.
-// All bands operate on FLOAT interleaved audio.
-// Per-band props (prefix band0_ … band4_): freq_hz, gain_db, q.
 class eq5_node : public node
 {
 public:
@@ -471,23 +442,20 @@ public:
         dirty_ = true;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = (inputs.size() > 0) ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+
+        const audio_spec spec = dst.buffer_ref().spec();
+        assert(spec.format == audio_format::FLOAT);
+        const size_t frames = dst.frames();
+        float* out  = reinterpret_cast<float*>(dst.begin());
+        const int ch = spec.channels;
 
         rebuild_coeffs(spec);
-
-        float* out  = reinterpret_cast<float*>(buf_->data().data());
-        const int ch = spec.channels;
 
         for (size_t f = 0; f < frames; ++f)
         {
@@ -501,8 +469,6 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     static constexpr size_t NUM_BANDS = 5;
 
@@ -514,25 +480,15 @@ private:
         {12000.f,0.f, 0.707f},
     };
 
-    // Biquad coefficients per band.
     struct biquad_coeffs { float b0, b1, b2, a1, a2; };
     biquad_coeffs coeffs_[NUM_BANDS] {};
 
-    // Per-band per-channel state (x1, x2, y1, y2).
     struct biquad_state { float x1{}, x2{}, y1{}, y2{}; };
-    // state_[band][channel]
-    std::vector<std::array<biquad_state, NUM_BANDS>> ch_state_; // indexed [ch][band]
+    std::vector<std::array<biquad_state, NUM_BANDS>> ch_state_;
 
-    std::unique_ptr<audio_buffer> buf_;
     unsigned int built_for_freq_ {0};
     int          built_for_ch_   {0};
     bool         dirty_          {true};
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 
     void rebuild_coeffs(audio_spec spec)
     {
@@ -556,7 +512,6 @@ private:
 
             if (b == 0)
             {
-                // Low shelf
                 const float sqA = std::sqrt(A);
                 float b0 =  A * ((A + 1) - (A - 1)*cw + 2*sqA*alpha);
                 float b1 =  2*A * ((A - 1) - (A + 1)*cw);
@@ -568,7 +523,6 @@ private:
             }
             else if (b == NUM_BANDS - 1)
             {
-                // High shelf
                 const float sqA = std::sqrt(A);
                 float b0 =  A * ((A + 1) + (A - 1)*cw + 2*sqA*alpha);
                 float b1 = -2*A * ((A - 1) + (A + 1)*cw);
@@ -580,7 +534,6 @@ private:
             }
             else
             {
-                // Peaking EQ
                 float b0 =  1 + alpha * A;
                 float b1 = -2 * cw;
                 float b2 =  1 - alpha * A;
@@ -591,11 +544,8 @@ private:
             }
         }
 
-        // Resize state array if channel count changed.
         if (built_for_ch_ != spec.channels)
-        {
             ch_state_.assign(static_cast<size_t>(spec.channels), {});
-        }
 
         built_for_freq_ = spec.frequency;
         built_for_ch_   = spec.channels;
@@ -613,8 +563,8 @@ private:
     }
 };
 
-// Simple gain node — multiplies all samples by a linear gain derived from gain_db.
-// Passes through FLOAT interleaved audio unchanged in structure.
+
+// Simple gain node.
 class gain_node : public node
 {
 public:
@@ -623,43 +573,27 @@ public:
 
     void set_gain_db(float gain_db) { gain_db_ = gain_db; }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
-        const float gain  = std::pow(10.f, gain_db_ / 20.f);
-        float* out        = reinterpret_cast<float*>(buf_->data().data());
-        const size_t count = frames * static_cast<size_t>(spec.channels);
+        assert(dst.buffer_ref().spec().format == audio_format::FLOAT);
+        const float gain   = std::pow(10.f, gain_db_ / 20.f);
+        float*      out    = reinterpret_cast<float*>(dst.begin());
+        const size_t count = dst.frames() * static_cast<size_t>(dst.buffer_ref().channels());
         for (size_t i = 0; i < count; ++i)
             out[i] *= gain;
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float gain_db_;
-    std::unique_ptr<audio_buffer> buf_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 };
 
-// Bitcrusher: reduces bit depth (quantisation) and/or sample rate (sample-and-hold).
-// bits:       1–32, number of bits to quantise to (lower = more grit).
-// downsample: 1–32, hold each sample N times (integer decimation, no filtering).
-// Both operate on FLOAT interleaved audio.
+
+// Bitcrusher: reduces bit depth and/or sample rate.
 class bitcrusher_node : public node
 {
 public:
@@ -672,28 +606,22 @@ public:
         downsample_ = downsample;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
-        float* out = reinterpret_cast<float*>(buf_->data().data());
+        const audio_spec spec = dst.buffer_ref().spec();
+        assert(spec.format == audio_format::FLOAT);
+        const size_t frames = dst.frames();
+        float* out = reinterpret_cast<float*>(dst.begin());
         const int ch = spec.channels;
-        const size_t total = frames * static_cast<size_t>(ch);
 
-        // Quantisation: map [-1,1] to N-bit integer steps and back.
         const float levels = std::pow(2.f, std::max(1.f, std::min(bits_, 32.f))) - 1.f;
         const int   ds     = std::max(1, static_cast<int>(downsample_));
 
-        // Per-channel held sample for sample-rate reduction.
         if (static_cast<int>(hold_.size()) < ch)
             hold_.assign(static_cast<size_t>(ch), 0.f);
 
@@ -702,37 +630,21 @@ public:
             for (int c = 0; c < ch; ++c)
             {
                 float& s = out[f * static_cast<size_t>(ch) + static_cast<size_t>(c)];
-                // Sample-and-hold: only update held value every ds frames.
                 if ((static_cast<int>(f) % ds) == 0)
                     hold_[static_cast<size_t>(c)] = std::round(s * levels) / levels;
                 s = hold_[static_cast<size_t>(c)];
             }
         }
-        (void)total;
     }
-
-    audio_buffer* output_buffer() override { return buf_.get(); }
 
 private:
     float bits_;
     float downsample_;
-    std::unique_ptr<audio_buffer> buf_;
-    std::vector<float>            hold_; // per-channel held sample
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-        {
-            buf_  = std::make_unique<audio_buffer>(spec, frames, nullptr);
-            hold_.clear(); // rebuild hold state for new channel count
-        }
-    }
+    std::vector<float> hold_;
 };
 
+
 // Delay line with feedback.
-// delay_ms: delay time in milliseconds.
-// feedback: [0,1) — fraction of output fed back into the delay line.
-// mix:      [0,1] — wet/dry blend (0 = dry, 1 = fully wet).
 class delay_node : public node
 {
 public:
@@ -744,25 +656,22 @@ public:
         delay_ms_ = delay_ms;
         feedback_ = feedback;
         mix_      = mix;
-        // Rebuild delay buffers if time changed significantly.
         built_for_freq_ = 0;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
+        else
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+
+        const audio_spec spec = dst.buffer_ref().spec();
         assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
+        const size_t frames = dst.frames();
         ensure_delay(spec);
 
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
-        else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-
-        float*     out = reinterpret_cast<float*>(buf_->data().data());
+        float*     out = reinterpret_cast<float*>(dst.begin());
         const int  ch  = spec.channels;
         const float fb  = std::min(std::max(feedback_, 0.f), 0.99f);
         const float wet = std::min(std::max(mix_, 0.f), 1.f);
@@ -783,8 +692,6 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float delay_ms_;
     float feedback_;
@@ -794,14 +701,6 @@ private:
     std::vector<delay_line> lines_;
     unsigned int built_for_freq_ {0};
     int          built_for_ch_   {0};
-
-    std::unique_ptr<audio_buffer> buf_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 
     void ensure_delay(audio_spec spec)
     {
@@ -822,9 +721,7 @@ private:
 };
 
 
-// Ring modulator: multiplies the input by a sine carrier.
-// carrier_hz: frequency of the carrier sine wave.
-// mix:        [0,1] wet/dry blend.
+// Ring modulator.
 class ring_mod_node : public node
 {
 public:
@@ -837,20 +734,17 @@ public:
         mix_        = mix;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
-        float*      out  = reinterpret_cast<float*>(buf_->data().data());
+        const audio_spec spec = dst.buffer_ref().spec();
+        assert(spec.format == audio_format::FLOAT);
+        const size_t frames = dst.frames();
+        float*      out  = reinterpret_cast<float*>(dst.begin());
         const int   ch   = spec.channels;
         const float sr   = static_cast<float>(spec.frequency);
         const float wet  = std::min(std::max(mix_, 0.f), 1.f);
@@ -870,24 +764,14 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float carrier_hz_;
     float mix_;
     float phase_ {0.f};
-    std::unique_ptr<audio_buffer> buf_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 };
 
 
-// 1-input 1-output pass-through node that captures float samples into a
-// visualizer_feedback struct for waveform display on the main thread.
+// 1-input 1-output pass-through node that captures samples for waveform display.
 class visualizer_node : public node
 {
 public:
@@ -895,44 +779,29 @@ public:
 
     void set_feedback(std::shared_ptr<nb::visualizer_feedback> fb) { fb_ = std::move(fb); }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
         if (fb_)
         {
-            const float* ptr = reinterpret_cast<const float*>(buf_->data().data());
-            fb_->push_samples(ptr, spec.channels, frames);
+            const audio_spec spec = dst.buffer_ref().spec();
+            assert(spec.format == audio_format::FLOAT);
+            fb_->sample_rate = spec.frequency;
+            const float* ptr = reinterpret_cast<const float*>(dst.begin());
+            fb_->push_samples(ptr, spec.channels, dst.frames());
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
-    std::unique_ptr<audio_buffer>               buf_;
-    std::shared_ptr<nb::visualizer_feedback>    fb_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
+    std::shared_ptr<nb::visualizer_feedback> fb_;
 };
 
+
 // Chorus: N voices, each a short LFO-modulated delay tap, summed with dry.
-// rate_hz:  LFO speed (0.01–10 Hz).
-// depth_ms: maximum LFO delay modulation in milliseconds (1–30).
-// voices:   number of delay taps (1–4); each is phase-offset evenly.
-// mix:      wet/dry blend [0,1].
 class chorus_node : public node
 {
 public:
@@ -946,31 +815,28 @@ public:
         depth_ms_ = depth_ms;
         voices_   = voices;
         mix_      = mix;
-        built_for_freq_ = 0; // force delay buffer rebuild
+        built_for_freq_ = 0;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
+        else
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+
+        const audio_spec spec = dst.buffer_ref().spec();
         assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
+        const size_t frames = dst.frames();
         ensure_lines(spec);
 
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
-        else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-
-        float*     out  = reinterpret_cast<float*>(buf_->data().data());
+        float*     out  = reinterpret_cast<float*>(dst.begin());
         const int  ch   = spec.channels;
         const float sr  = static_cast<float>(spec.frequency);
         const float wet = std::min(std::max(mix_, 0.f), 1.f);
         const float dry = 1.f - wet;
         const int   nv  = std::max(1, std::min(static_cast<int>(voices_), 4));
         const float step = 2.f * 3.14159265f * rate_hz_ / sr;
-        // max delay in samples; base delay is half that so the LFO swings both ways
         const float max_delay_smp = depth_ms_ * 0.001f * sr;
         const float base_delay    = max_delay_smp * 0.5f + 1.f;
 
@@ -983,16 +849,13 @@ public:
 
                 for (int v = 0; v < nv; ++v)
                 {
-                    // Each voice has an evenly spread LFO phase offset.
                     const float voice_phase = lfo_phase_
                         + static_cast<float>(v) * (2.f * 3.14159265f / static_cast<float>(nv));
                     const float lfo = std::sin(voice_phase);
                     const float delay_smp = base_delay + lfo * max_delay_smp * 0.5f;
 
                     auto& line = lines_[static_cast<size_t>(v * ch + c)];
-                    // Write current sample into the circular buffer.
                     line.buf[line.write_pos] = dry_s;
-                    // Read back with fractional delay (linear interpolation).
                     const float read_f = static_cast<float>(line.write_pos) - delay_smp;
                     const size_t sz = line.buf.size();
                     auto wrap = [sz](float p) -> size_t {
@@ -1015,8 +878,6 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float rate_hz_;
     float depth_ms_;
@@ -1025,16 +886,9 @@ private:
     float lfo_phase_ {0.f};
 
     struct circ_line { std::vector<float> buf; size_t write_pos {0}; };
-    std::vector<circ_line> lines_; // [voice * ch + ch]
+    std::vector<circ_line> lines_;
     unsigned int built_for_freq_ {0};
     int          built_for_ch_   {0};
-    std::unique_ptr<audio_buffer> buf_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 
     void ensure_lines(audio_spec spec)
     {
@@ -1042,7 +896,6 @@ private:
         if (built_for_freq_ == spec.frequency && built_for_ch_ == spec.channels
             && static_cast<int>(lines_.size()) == nv * spec.channels)
             return;
-        // +4 samples headroom beyond maximum possible delay
         const size_t max_smp = static_cast<size_t>(depth_ms_ * 0.001f * static_cast<float>(spec.frequency)) + 4;
         lines_.assign(static_cast<size_t>(nv * spec.channels), circ_line{});
         for (auto& l : lines_) { l.buf.assign(max_smp, 0.f); l.write_pos = 0; }
@@ -1053,9 +906,6 @@ private:
 
 
 // Waveshaper: non-linear distortion via drive + selectable shape curve.
-// drive: input gain before shaping [1, 100].
-// shape: 0 = soft clip (tanh), 1 = hard clip, 2 = fold-back.
-// mix:   wet/dry blend [0,1].
 class waveshaper_node : public node
 {
 public:
@@ -1069,25 +919,21 @@ public:
         mix_   = mix;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
-        assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
-
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
         else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
+            std::fill(dst.begin(), dst.end(), std::byte{0});
 
-        float*      out  = reinterpret_cast<float*>(buf_->data().data());
+        const audio_spec spec = dst.buffer_ref().spec();
+        assert(spec.format == audio_format::FLOAT);
+        const size_t frames = dst.frames();
+        float*      out  = reinterpret_cast<float*>(dst.begin());
         const size_t cnt = frames * static_cast<size_t>(spec.channels);
         const float wet  = std::min(std::max(mix_,   0.f), 1.f);
         const float dry  = 1.f - wet;
         const float drv  = std::max(1.f, drive_);
-        // normalise output by drive so perceived loudness stays roughly constant
         const float norm = 1.f / std::tanh(drv);
         const int   mode = static_cast<int>(std::round(std::min(std::max(shape_, 0.f), 2.f)));
 
@@ -1097,22 +943,21 @@ public:
             float shaped;
             switch (mode)
             {
-                case 1: // hard clip
+                case 1:
                 {
                     float x = in_s * drv;
                     shaped  = x < -1.f ? -1.f : (x > 1.f ? 1.f : x);
                     break;
                 }
-                case 2: // fold-back
+                case 2:
                 {
                     float x = in_s * drv;
-                    // fold: if |x|>1 reflect back
                     while (x >  1.f) x =  2.f - x;
                     while (x < -1.f) x = -2.f - x;
                     shaped = x;
                     break;
                 }
-                default: // soft clip (tanh)
+                default:
                     shaped = std::tanh(in_s * drv) * norm;
                     break;
             }
@@ -1120,29 +965,14 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float drive_;
     float shape_;
     float mix_;
-    std::unique_ptr<audio_buffer> buf_;
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
-    }
 };
 
 
 // Phaser: cascade of N all-pass filters whose centre frequency is swept by an LFO.
-// Creates notch patterns that move through the spectrum.
-// rate_hz:  LFO rate [0.01, 10].
-// depth:    LFO modulation depth [0, 1].
-// stages:   number of all-pass stages (2 / 4 / 6 / 8).
-// feedback: fraction of output fed back to input [0, 0.99].
-// mix:      wet/dry blend [0, 1].
 class phaser_node : public node
 {
 public:
@@ -1160,21 +990,19 @@ public:
         dirty_    = true;
     }
 
-    void process(audio_spec spec, size_t frames,
-                 const std::vector<audio_buffer*>& inputs) override
+    void pull(audio_buffer::span& dst, uint64_t gen) override
     {
+        if (!inputs_.empty())
+            inputs_[0]->pull(dst, gen);
+        else
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+
+        const audio_spec spec = dst.buffer_ref().spec();
         assert(spec.format == audio_format::FLOAT);
-        ensure_buf(spec, frames);
+        const size_t frames = dst.frames();
         ensure_state(spec);
 
-        const audio_buffer* src = inputs.size() > 0 ? inputs[0] : nullptr;
-        if (src && src->frames() >= frames)
-            std::memcpy(buf_->data().data(), src->data().data(),
-                        frames * static_cast<size_t>(spec.channels) * sizeof(float));
-        else
-            std::fill(buf_->data().begin(), buf_->data().end(), std::byte{0});
-
-        float*      out  = reinterpret_cast<float*>(buf_->data().data());
+        float*      out  = reinterpret_cast<float*>(dst.begin());
         const int   ch   = spec.channels;
         const float sr   = static_cast<float>(spec.frequency);
         const float wet  = std::min(std::max(mix_,      0.f), 1.f);
@@ -1183,16 +1011,13 @@ public:
         const float step = 2.f * 3.14159265f * rate_hz_ / sr;
         const int   nst  = num_stages();
 
-        // LFO modulates the all-pass coefficient 'a' in [min_a, max_a].
-        // a = (tan(π·fc/sr) - 1) / (tan(π·fc/sr) + 1)  — first-order all-pass
-        // We sweep fc between base_hz and base_hz + depth·(sr/2 - base_hz).
         const float base_hz  = 200.f;
         const float top_hz   = sr * 0.45f;
         const float range_hz = (top_hz - base_hz) * std::min(std::max(depth_, 0.f), 1.f);
 
         for (size_t f = 0; f < frames; ++f)
         {
-            const float lfo  = 0.5f * (1.f + std::sin(lfo_phase_));  // [0,1]
+            const float lfo  = 0.5f * (1.f + std::sin(lfo_phase_));
             const float fc   = base_hz + lfo * range_hz;
             const float tanw = std::tan(3.14159265f * fc / sr);
             const float a    = (tanw - 1.f) / (tanw + 1.f);
@@ -1200,14 +1025,12 @@ public:
             for (int c = 0; c < ch; ++c)
             {
                 float x = out[f * static_cast<size_t>(ch) + static_cast<size_t>(c)];
-                // add feedback from previous output
                 x += fb * fb_state_[static_cast<size_t>(c)];
 
                 float y = x;
                 for (int s = 0; s < nst; ++s)
                 {
                     auto& st = ap_state_[static_cast<size_t>(c * MAX_STAGES + s)];
-                    // y[n] = a*(x[n] - y[n-1]) + x[n-1]
                     float yn = a * (y - st.y1) + st.x1;
                     st.x1 = y;
                     st.y1 = yn;
@@ -1223,8 +1046,6 @@ public:
         }
     }
 
-    audio_buffer* output_buffer() override { return buf_.get(); }
-
 private:
     float rate_hz_;
     float depth_;
@@ -1237,25 +1058,16 @@ private:
     static constexpr int MAX_STAGES = 8;
 
     struct ap_state { float x1 {0.f}, y1 {0.f}; };
-    // ap_state_[ch * MAX_STAGES + stage]
     std::vector<ap_state> ap_state_;
-    std::vector<float>    fb_state_; // per-channel feedback
+    std::vector<float>    fb_state_;
 
-    std::unique_ptr<audio_buffer> buf_;
     int built_for_ch_ {0};
 
     int num_stages() const
     {
-        // round to nearest even in {2,4,6,8}
         int n = static_cast<int>(std::round(stages_));
         n = n < 2 ? 2 : (n > MAX_STAGES ? MAX_STAGES : n);
-        return (n + 1) & ~1; // round up to even
-    }
-
-    void ensure_buf(audio_spec spec, size_t frames)
-    {
-        if (!buf_ || buf_->spec() != spec || buf_->frames() != frames)
-            buf_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
+        return (n + 1) & ~1;
     }
 
     void ensure_state(audio_spec spec)
@@ -1265,6 +1077,126 @@ private:
         fb_state_.assign(static_cast<size_t>(spec.channels), 0.f);
         built_for_ch_ = spec.channels;
         dirty_        = false;
+    }
+};
+
+
+// Internal fan-out buffer: caches one pull per generation so multiple downstream
+// nodes can share a single upstream pull. Automatically injected by the graph
+// manager when a graphplan node fans out to more than one consumer.
+// On frame-count mismatch between the cached pull and a subsequent pull in the
+// same generation, the output is clipped or zero-padded and a warning is logged.
+class fan_out_node : public node
+{
+public:
+    explicit fan_out_node(node_id id) : node(id) {}
+
+    void pull(audio_buffer::span& dst, uint64_t gen) override
+    {
+        const audio_spec spec   = dst.buffer_ref().spec();
+        const size_t     frames = dst.frames();
+
+        if (gen != last_gen_)
+        {
+            // New generation — pull fresh from the single input.
+            ensure_cache(spec, frames);
+            std::fill(cache_->data().begin(), cache_->data().end(), std::byte{0});
+            if (!inputs_.empty())
+            {
+                auto cache_span = cache_->as_span();
+                inputs_[0]->pull(cache_span, gen);
+            }
+            last_gen_ = gen;
+        }
+        else if (cache_ && (cache_->frames() != frames || cache_->spec() != spec))
+        {
+            log::warn("[fan_out_node %d] frame/spec mismatch: cached=%zu requested=%zu"
+                      " — clipping/padding", id(), cache_->frames(), frames);
+        }
+
+        // Serve cached data; clip if cache is larger, zero-pad if smaller.
+        if (!cache_) { std::fill(dst.begin(), dst.end(), std::byte{0}); return; }
+        const size_t stride      = audio_format_size(spec.format) * static_cast<size_t>(spec.channels);
+        const size_t copy_frames = std::min(frames, cache_->frames());
+        std::memcpy(dst.begin(), cache_->data().data(), copy_frames * stride);
+        if (copy_frames < frames)
+            std::fill(dst.begin() + copy_frames * stride, dst.end(), std::byte{0});
+    }
+
+private:
+    uint64_t                      last_gen_ {~uint64_t{0}}; // max → always fresh on first pull
+    std::unique_ptr<audio_buffer> cache_;
+
+    void ensure_cache(audio_spec spec, size_t frames)
+    {
+        if (!cache_ || cache_->spec() != spec || cache_->frames() != frames)
+            cache_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
+    }
+};
+
+
+// Pitch shifter via linear-interpolation resampling.
+// pitch_ratio > 1.0 = pitch up (consume more source frames per output frame).
+// pitch_ratio < 1.0 = pitch down.
+class pitch_node : public node
+{
+public:
+    pitch_node(node_id id, float pitch_ratio)
+        : node(id), pitch_ratio_(pitch_ratio) {}
+
+    void set_pitch_ratio(float ratio) { pitch_ratio_ = ratio; }
+    float pitch_ratio() const { return pitch_ratio_; }
+
+    void pull(audio_buffer::span& dst, uint64_t gen) override
+    {
+        if (inputs_.empty())
+        {
+            std::fill(dst.begin(), dst.end(), std::byte{0});
+            return;
+        }
+
+        const audio_spec spec = dst.buffer_ref().spec();
+        assert(spec.format == audio_format::FLOAT);
+        const size_t out_frames = dst.frames();
+        const int    ch         = spec.channels;
+
+        // How many source frames do we need to produce out_frames at pitch_ratio_?
+        const size_t in_frames = static_cast<size_t>(
+            std::ceil(static_cast<double>(out_frames) * static_cast<double>(pitch_ratio_))) + 2;
+
+        ensure_scratch(spec, in_frames);
+        std::fill(scratch_->data().begin(), scratch_->data().end(), std::byte{0});
+        auto scratch_span = scratch_->as_span();
+        inputs_[0]->pull(scratch_span, gen);
+
+        const float* src     = reinterpret_cast<const float*>(scratch_->data().data());
+        float*       out_buf = reinterpret_cast<float*>(dst.begin());
+
+        for (size_t i = 0; i < out_frames; ++i)
+        {
+            const double src_pos = static_cast<double>(i) * static_cast<double>(pitch_ratio_);
+            const size_t i0      = static_cast<size_t>(src_pos);
+            const size_t i1      = (i0 + 1 < in_frames) ? i0 + 1 : i0;
+            const float  t       = static_cast<float>(src_pos - static_cast<double>(i0));
+
+            for (int c = 0; c < ch; ++c)
+            {
+                const float s0 = src[i0 * static_cast<size_t>(ch) + static_cast<size_t>(c)];
+                const float s1 = src[i1 * static_cast<size_t>(ch) + static_cast<size_t>(c)];
+                out_buf[i * static_cast<size_t>(ch) + static_cast<size_t>(c)] =
+                    s0 * (1.f - t) + s1 * t;
+            }
+        }
+    }
+
+private:
+    float pitch_ratio_ {1.f};
+    std::unique_ptr<audio_buffer> scratch_;
+
+    void ensure_scratch(audio_spec spec, size_t frames)
+    {
+        if (!scratch_ || scratch_->spec() != spec || scratch_->frames() != frames)
+            scratch_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
     }
 };
 
