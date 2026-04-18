@@ -2,3 +2,4 @@
   comps:
     script:
       lua: "res/asteroids/stage.lua"
+

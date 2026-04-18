@@ -9,4 +9,5 @@ namespace nb {
     struct rwav;
     struct ryaml;
     struct rparticle_emitter;
+    struct rtexfont;
 }

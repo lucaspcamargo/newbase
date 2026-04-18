@@ -6,4 +6,5 @@ namespace nb {
     struct cscript;
     struct cbody2d;
     struct cparticle_emitter;
+    struct ctextext;
 }

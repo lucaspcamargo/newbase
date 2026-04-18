@@ -46,4 +46,9 @@ struct rloader_particle_emitter {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_texfont {
+    using result_type = std::shared_ptr<rtexfont>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

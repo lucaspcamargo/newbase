@@ -1,0 +1,17 @@
+- name: box
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/square.sprite
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 1.0
+      enable_sleep: false
+      shapes:
+        - type: BOX
+          data: [30, 30]
+          restitution: 0.3
+          friction: 0.4

@@ -21,10 +21,22 @@ local SHOT_ETREE           = hs("res/asteroids/shot.et.yaml")
 local SHIP_ETREE           = hs("res/asteroids/ship.et.yaml")
 local DEBRIS_ETREE         = hs("res/asteroids/debris.et.yaml")
 local EXPLOSION_ETREE      = hs("res/asteroids/explosion.et.yaml")
-local TITLE_ETREE          = hs("res/root.et.yaml")
+local TITLE_ETREE          = hs("res/asteroids/title.et.yaml")
 local STARS_ETREE          = hs("res/asteroids/stars.et.yaml")
+local SCORE_DISPLAY_ETREE  = hs("res/asteroids/score_display.et.yaml")
 
 entity_spawn(STARS_ETREE)
+
+-- score
+local score             = 0
+local score_display_eid = entity_spawn(SCORE_DISPLAY_ETREE)
+
+local function add_score(points)
+    score = score + points
+    if score_display_eid then
+        textext_set_text(score_display_eid, "SCORE: " .. score)
+    end
+end
 
 local function spawn_asteroid(x, y, vx, vy)
     local eid = entity_spawn(ASTEROID_ETREE)
@@ -174,6 +186,9 @@ local h_contacts = clock_update_add(function(delta)
                     spawn_small_asteroid(sp.pos.x, sp.pos.y, -math.cos(ang)*spd, -math.sin(ang)*spd)
                 end
                 large_asteroid_entities[ast_eid] = nil
+                add_score(100)
+            else
+                add_score(50)
             end
 
             local ast_sp = get_spatial(ast_eid)

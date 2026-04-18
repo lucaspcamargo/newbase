@@ -10,6 +10,7 @@
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
 #include <newbase/res/particle_emitter.hpp>
+#include <newbase/res/texfont.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include "IconsForkAwesome.h"
@@ -126,6 +127,17 @@ namespace nb::rtti {
                 }
             });
 
+        entt::meta_factory<rtexfont>{}
+            .type("rtexfont"_hs)
+            .custom<type_info>(type_info{
+                .identifier = "texfont",
+                .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_FONT, .extensions = "texfont"}},
+                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return rloader_texfont{}(id);
+                }
+            });
+
         // shared_ptr<T> registrations — used by meta_any_editor to display resource fields
 #define NB_REG_RES_PTR(T, name_str) \
     entt::meta_factory<std::shared_ptr<T>>{} \
@@ -160,6 +172,7 @@ namespace nb::rtti {
         NB_REG_RES_PTR(ryaml,             "ryaml")
         NB_REG_RES_PTR(retree,            "retree")
         NB_REG_RES_PTR(rparticle_emitter, "rparticle_emitter")
+        NB_REG_RES_PTR(rtexfont,          "rtexfont")
 #undef NB_REG_RES_PTR
     }
 

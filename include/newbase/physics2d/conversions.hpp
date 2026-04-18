@@ -81,8 +81,9 @@ namespace nb
             {
                 if(shape.shape_data.size() != 2)
                     return false;
-                b2Polygon box = b2MakeBox(50.0f, 10.0f);
+                b2Polygon box = b2MakeBox(shape.shape_data[0], shape.shape_data[1]);
                 b2CreatePolygonShape(id, &def, &box);
+                return true;
             }
             break;
 

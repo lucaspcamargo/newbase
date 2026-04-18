@@ -1,12 +1,4 @@
-- name: title
+- name: root
   comps:
     script:
-      lua: "res/asteroids/title.lua"
-- name: title_sprite
-  comps:
-    spatial:
-      pos: [0, 0, 0]
-      rot: [0, 0, 0]
-      scale: [1, 1, 1]
-    sprite:
-      res: "res/asteroids/spr/title.sprite"
+      lua: "res/hello_world/scene.lua"

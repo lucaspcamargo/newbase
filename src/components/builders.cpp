@@ -4,7 +4,9 @@
 #include <newbase/components/script.hpp>
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
+#include <newbase/components/textext.hpp>
 #include <newbase/res/particle_emitter.hpp>
+#include <newbase/res/texfont.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/yaml/glm.hpp>
 #include <newbase/log.hpp>
@@ -114,5 +116,25 @@ bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
     }
     if (def.has_child("emitting"))
         def["emitting"] >> dst.emitting;
+    return true;
+}
+
+bool nb::build_textext(ryml::ConstNodeRef def, ctextext &dst)
+{
+    if (def.has_child("font"))
+    {
+        std::string respath;
+        c4::from_chars(def["font"].val(), &respath);
+        dst.font = rman().get<rtexfont>(entt::hashed_string{respath.c_str()}.value());
+    }
+    if (def.has_child("text"))
+    {
+        std::string t;
+        def["text"] >> t;
+        dst.text  = std::move(t);
+        dst.dirty = true;
+    }
+    if (def.has_child("color"))
+        load_vec4(def["color"], dst.color);
     return true;
 }

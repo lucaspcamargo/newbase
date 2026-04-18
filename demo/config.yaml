@@ -13,6 +13,7 @@ systems:
   clock: {}
   particle_system: {}
   sprite_anim: {}
+  textext: {}
   physics2d:
     world_scale: 100
   steam:

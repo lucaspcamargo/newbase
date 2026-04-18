@@ -1,0 +1,63 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/physics2d_demo/scene.lua"
+
+# Container background graphic
+- name: container_display
+  comps:
+    spatial:
+      pos: [0, 0, 10]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/box_container.sprite
+
+# Static container walls
+- name: wall_floor
+  comps:
+    spatial:
+      pos: [0, 200, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    body2d:
+      type: STATIC
+      shapes:
+        - type: BOX
+          data: [300, 10]
+
+- name: wall_ceiling
+  comps:
+    spatial:
+      pos: [0, -200, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    body2d:
+      type: STATIC
+      shapes:
+        - type: BOX
+          data: [300, 10]
+
+- name: wall_left
+  comps:
+    spatial:
+      pos: [-300, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    body2d:
+      type: STATIC
+      shapes:
+        - type: BOX
+          data: [10, 200]
+
+- name: wall_right
+  comps:
+    spatial:
+      pos: [300, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    body2d:
+      type: STATIC
+      shapes:
+        - type: BOX
+          data: [10, 200]

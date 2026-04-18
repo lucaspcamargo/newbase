@@ -22,15 +22,16 @@
 #include <sys/stat.h>
 #endif
 
-
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_thread.h>
 #include <SDL3/SDL_init.h>
+#include <SDL3/SDL_stdinc.h>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/utility.hpp>
 #include <entt/meta/pointer.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <functional>
 #include <optional>
@@ -39,7 +40,6 @@
 #include <sstream>
 #include <iostream>
 
-#include <SDL3/SDL_stdinc.h>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -73,6 +73,7 @@ struct nb::engine_p {
 
 engine::engine()
 {
+    ZoneScoped;
     log::info("[engine] constructing (thread id: %lu)", SDL_ThreadID());
 
     _d = new engine_p();
@@ -136,6 +137,9 @@ engine::engine()
     auto systems = _d->cfg["systems"];
     for(ryml::ConstNodeRef n : systems.children())
     {
+        ZoneNamed(scope_sys_init, true);
+        ZoneTextV(scope_sys_init, n.key().str, n.key().len);
+
         std::string sysname;
         c4::from_chars(n.key(), &sysname);
         log::info("[engine] creating system: %s", sysname.c_str());
@@ -172,6 +176,7 @@ engine::~engine()
 
 bool engine::init(int argc, char ** argv)
 {
+    ZoneScoped;
     log::info("[engine] init");
 
     _register_default_services();
@@ -214,6 +219,7 @@ void engine::request_scene_change(entt::id_type etree_id)
 
 bool engine::step()
 {
+    ZoneScoped;
     log::verb("[engine] step");
 
     if(_d->exit_requested)
@@ -224,6 +230,7 @@ bool engine::step()
 
     if(_d->pending_scene_id.has_value())
     {
+        ZoneNamed(scope_scene_change, true);
         entt::id_type next = *_d->pending_scene_id;
         _d->pending_scene_id.reset();
         log::info("[engine] scene change: %x", next);
@@ -237,6 +244,9 @@ bool engine::step()
 
     for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
     {
+        ZoneNamed(scope_update_phase, true);
+        ZoneTextVF(scope_update_phase, "phase %d", i);
+
         if(ret)
         {
             auto phase = static_cast<nb::step_phase>(i);

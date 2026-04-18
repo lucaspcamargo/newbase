@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1920"
+   height="1080"
+   viewBox="0 0 1920 1080"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   sodipodi:docname="template.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#999999"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="0.91354167"
+     inkscape:cx="922.23489"
+     inkscape:cy="651.31129"
+     inkscape:window-width="1852"
+     inkscape:window-height="1044"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Camada 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#5f8dd3;stroke:#daf3ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect1"
+       width="1920"
+       height="1080"
+       x="0"
+       y="0" />
+    <rect
+       style="fill:#d5f6ff;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect2"
+       width="620"
+       height="420"
+       x="650"
+       y="330" />
+    <rect
+       style="fill:#00112b;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect3"
+       width="580"
+       height="380"
+       x="670"
+       y="350"
+       inkscape:export-filename="box.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#e9ddaf;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect4"
+       width="60"
+       height="60"
+       x="960"
+       y="540"
+       inkscape:export-filename="square.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#d3bc5f;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect5"
+       width="47.685291"
+       height="47.685291"
+       x="966.15735"
+       y="546.15735" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect6"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="569.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect7"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="563.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect8"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="557.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect9"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="551.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect10"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="575.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect11"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="581.37817" />
+    <rect
+       style="fill:#decd87;stroke:none;stroke-width:4.00001;stroke-linecap:round;stroke-linejoin:bevel"
+       id="rect12"
+       width="47.685291"
+       height="1.2436143"
+       x="966.15735"
+       y="587.37817" />
+    <g
+       id="g15"
+       inkscape:export-filename="circle.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96">
+      <circle
+         style="fill:#e9ddaf;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+         id="path3"
+         cx="829.73773"
+         cy="576.89014"
+         r="25" />
+      <circle
+         style="fill:#d3bc5f;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+         id="circle4"
+         cx="829.73773"
+         cy="576.89014"
+         r="18.705814" />
+      <circle
+         style="fill:#e9ddaf;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+         id="path12"
+         cx="839.82031"
+         cy="588.35797"
+         r="2.322084" />
+      <circle
+         style="fill:#e9ddaf;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+         id="circle13"
+         cx="440.21146"
+         cy="925.93823"
+         r="2.322084"
+         transform="rotate(-30)" />
+      <circle
+         style="fill:#e9ddaf;stroke:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel"
+         id="circle15"
+         cx="-74.650085"
+         cy="1018.4869"
+         r="2.322084"
+         transform="rotate(-60)" />
+    </g>
+  </g>
+</svg>

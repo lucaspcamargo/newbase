@@ -222,7 +222,9 @@ bool render_simple::step(nb::step_phase phase)
         ZoneScopedN("Render");
 
         // Full-screen clear first
-        SDL_SetRenderDrawColor(_render, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(_render,
+            static_cast<Uint8>(_clear_r * 255), static_cast<Uint8>(_clear_g * 255),
+            static_cast<Uint8>(_clear_b * 255), 255);
         SDL_RenderClear(_render);
 
         const auto &layers = engine::instance().render_layers();
@@ -610,6 +612,16 @@ void render_simple::destroy_texture(texture_handle tex)
     SDL_DestroyTexture(static_cast<SDL_Texture*>(tex));
 }
 
+void render_simple::set_clear_color(float r, float g, float b)
+{
+    _clear_r = r; _clear_g = g; _clear_b = b;
+}
+
+void render_simple::on_scene_change()
+{
+    _clear_r = _clear_g = _clear_b = 0.f;
+}
+
 // RTTI metadata
 extern "C" void _rtti_init_render_simple()
 {
@@ -624,7 +636,9 @@ extern "C" void _rtti_init_render_simple()
         .func<&nb::render_simple::window_width>("window_width"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_width"})
         .func<&nb::render_simple::window_height>("window_height"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"window_height"});
+        .custom<rtti::func_info>(rtti::func_info{"window_height"})
+        .func<&nb::render_simple::set_clear_color>("set_clear_color"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"set_clear_color"});
     entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
         .type("render_simple_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()

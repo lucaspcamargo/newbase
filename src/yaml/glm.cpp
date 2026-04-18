@@ -1,4 +1,5 @@
 #include <newbase/yaml/glm.hpp>
+#include <ryml_std.hpp>
 #include <string>
 
 namespace nb {

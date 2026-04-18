@@ -30,6 +30,8 @@ public:
     void cam_2d_setup(float cx, float cy, float wmax, float hmax);
     float cam_2d_scale();
 
+    void set_clear_color(float r, float g, float b);
+
     // renderer_service interface
     bool get_2d_extents(renderer_service::extents_2d &extents) override;
 
@@ -58,10 +60,13 @@ private:
     void _draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj,
                      uint32_t layer_mask, const viewport_entry &vp);
 
+    void on_scene_change() override;
+
     SDL_Window    *_win;
     SDL_Renderer  *_render;
     float          _scale;
     int            _wx, _wy;
+    float          _clear_r{0.f}, _clear_g{0.f}, _clear_b{0.f};
 
     // fallback camera used when no render layers are configured
     cspatial _fallback_spatial {};

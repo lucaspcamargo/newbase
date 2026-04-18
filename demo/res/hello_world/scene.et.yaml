@@ -1,0 +1,15 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/hello_world/scene.lua"
+
+- name: logo
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/hello_world/sprite.sprite"
+    script:
+      lua: "res/hello_world/sprite.lua"
