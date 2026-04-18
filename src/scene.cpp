@@ -98,6 +98,7 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
         }
     }
     // TODO: remove — temporary cmesh2d smoke-test entity
+    /*
     {
         auto eid = reg.create();
         auto& sp = reg.emplace<nb::cspatial>(eid);
@@ -112,6 +113,7 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
         auto& mesh = reg.emplace<nb::cmesh2d>(eid);
         mesh.geom = geom;
     }
+    */
 
     return first;
 }
