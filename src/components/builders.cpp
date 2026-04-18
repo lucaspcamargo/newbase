@@ -3,6 +3,8 @@
 #include <newbase/components/sprite.hpp>
 #include <newbase/components/script.hpp>
 #include <newbase/components/body2d.hpp>
+#include <newbase/components/particle_emitter.hpp>
+#include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/yaml/glm.hpp>
 #include <newbase/log.hpp>
@@ -97,7 +99,20 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
             dst.shapes.push_back(shape);
         }
     }
-        
 
+    return true;
+}
+
+bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
+{
+    if (def.has_child("res"))
+    {
+        std::string respath;
+        c4::from_chars(def["res"].val(), &respath);
+        auto hash = entt::hashed_string(respath.c_str());
+        dst.res = rman().get<rparticle_emitter>(hash.value());
+    }
+    if (def.has_child("emitting"))
+        def["emitting"] >> dst.emitting;
     return true;
 }

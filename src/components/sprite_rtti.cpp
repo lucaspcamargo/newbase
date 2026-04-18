@@ -29,7 +29,13 @@ void csprite::_ensure_rtti()
         .data<&csprite::visible>("visible"_hs)
             .custom<rtti::data_info>(rtti::data_info{"visible"})
         .data<&csprite::color>("color"_hs)
-            .custom<rtti::data_info>(rtti::data_info{.identifier="color", .subtype=rtti::DATA_SUBTYPE_COLOR});
+            .custom<rtti::data_info>(rtti::data_info{.identifier="color", .subtype=rtti::DATA_SUBTYPE_COLOR})
+        .data<&csprite::sequence>("sequence"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"sequence"})
+        .data<&csprite::frame>("frame"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"frame"})
+        .data<&csprite::animating>("animating"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"animating"});
     log::info("[csprite] registered: id=%x");
 }
 

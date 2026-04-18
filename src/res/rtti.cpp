@@ -9,6 +9,7 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
+#include <newbase/res/particle_emitter.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include "IconsForkAwesome.h"
@@ -60,6 +61,26 @@ namespace nb::rtti {
                 .custom<rtti::data_info>(rtti::data_info{"dims"})
             .data<&rsprite::tex>("tex"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"tex"});
+
+        entt::meta_factory<rparticle_emitter>{}
+            .type("rparticle_emitter"_hs)
+            .custom<type_info>(type_info{
+                .identifier = "particle_emitter",
+                .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_STAR_O, .extensions = "particle"}},
+                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return rloader_particle_emitter{}(id);
+                }
+            })
+            .ctor<>()
+            .data<&rparticle_emitter::max_particles>("max_particles"_hs)
+                .custom<data_info>(data_info{"max_particles"})
+            .data<&rparticle_emitter::tex>("tex"_hs)
+                .custom<data_info>(data_info{
+                    .identifier       = "tex",
+                    .subtype          = DATA_SUBTYPE_RESOURCE,
+                    .resource_type_id = "rtexture"_hs.value()
+                });
 
         entt::meta_factory<rvorbis>{}
             .type("rvorbis"_hs)
@@ -131,13 +152,14 @@ namespace nb::rtti {
         }} \
         });
 
-        NB_REG_RES_PTR(rtexture, "rtexture")
-        NB_REG_RES_PTR(rsprite,  "rsprite")
-        NB_REG_RES_PTR(rscript,  "rscript")
-        NB_REG_RES_PTR(rvorbis,  "rvorbis")
-        NB_REG_RES_PTR(rwav,     "rwav")
-        NB_REG_RES_PTR(ryaml,    "ryaml")
-        NB_REG_RES_PTR(retree,   "retree")
+        NB_REG_RES_PTR(rtexture,          "rtexture")
+        NB_REG_RES_PTR(rsprite,           "rsprite")
+        NB_REG_RES_PTR(rscript,           "rscript")
+        NB_REG_RES_PTR(rvorbis,           "rvorbis")
+        NB_REG_RES_PTR(rwav,              "rwav")
+        NB_REG_RES_PTR(ryaml,             "ryaml")
+        NB_REG_RES_PTR(retree,            "retree")
+        NB_REG_RES_PTR(rparticle_emitter, "rparticle_emitter")
 #undef NB_REG_RES_PTR
     }
 

@@ -168,6 +168,10 @@ bool physics2d::step(step_phase phase)
             {
                 b2BodyId id = b2CreateBody(_d->world_id, &bodyDef);
                 cbody._body_id = id;
+                if (cbody.initial_linear_velocity  != glm::vec2{0.f})
+                    b2Body_SetLinearVelocity(id, {cbody.initial_linear_velocity.x, cbody.initial_linear_velocity.y});
+                if (cbody.initial_angular_velocity != 0.f)
+                    b2Body_SetAngularVelocity(id, cbody.initial_angular_velocity);
 
                 int idx = 0;
                 for(auto &shape: cbody.shapes)
@@ -429,11 +433,28 @@ bool physics2d::body_set_velocity(entt::entity ent, glm::vec2 vel)
     }
     if(!B2_IS_NON_NULL(cbody->_body_id))
     {
-        // body not created yet — store for use when body is built
         cbody->initial_linear_velocity = vel;
         return true;
     }
     b2Body_SetLinearVelocity(cbody->_body_id, {vel.x, vel.y});
+    return true;
+}
+
+bool physics2d::body_set_angular_velocity(entt::entity ent, float omega)
+{
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if(!cbody)
+    {
+        log::warn("[physics2d] body_set_angular_velocity: no body2d component: %x", ent);
+        return false;
+    }
+    if(!B2_IS_NON_NULL(cbody->_body_id))
+    {
+        cbody->initial_angular_velocity = omega;
+        return true;
+    }
+    b2Body_SetAngularVelocity(cbody->_body_id, omega);
     return true;
 }
 
@@ -473,6 +494,8 @@ extern "C" void _rtti_init_physics2d()
             .custom<rtti::func_info>(rtti::func_info{"body_warp"})
         .func<&nb::physics2d::body_set_velocity>("body_set_velocity"_hs)
             .custom<rtti::func_info>(rtti::func_info{"body_set_velocity"})
+        .func<&nb::physics2d::body_set_angular_velocity>("body_set_angular_velocity"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"body_set_angular_velocity"})
         .func<&nb::physics2d::contact_begins_count>("contact_begins_count"_hs)
             .custom<rtti::func_info>(rtti::func_info{"contact_begins_count"})
         .func<&nb::physics2d::contact_begin_a>("contact_begin_a"_hs)

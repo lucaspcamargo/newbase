@@ -34,6 +34,7 @@ public:
 
     // set linear velocity directly (or as initial velocity before first physics step)
     bool body_set_velocity(entt::entity ent, glm::vec2 vel);
+    bool body_set_angular_velocity(entt::entity ent, float omega);
 
     // contact events collected during the last PHYSICS_UPDATE step
     unsigned int contact_begins_count() const;

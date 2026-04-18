@@ -41,4 +41,9 @@ struct rloader_yaml {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_particle_emitter {
+    using result_type = std::shared_ptr<rparticle_emitter>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

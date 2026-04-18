@@ -1,1 +1,12 @@
-texture: res/asteroids/spr/asteroid-1.png
+texture: res/asteroids/spr/asteroid-ss.png
+
+sequences:
+  - name: default
+    loop: false
+    strip:
+      x: 0
+      y: 0
+      w: 160
+      h: 160
+      count: 3
+      duration: 0.1

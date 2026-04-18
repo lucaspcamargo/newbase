@@ -20,7 +20,11 @@ local SMALL_ASTEROID_ETREE = hs("res/asteroids/small_asteroid.et.yaml")
 local SHOT_ETREE           = hs("res/asteroids/shot.et.yaml")
 local SHIP_ETREE           = hs("res/asteroids/ship.et.yaml")
 local DEBRIS_ETREE         = hs("res/asteroids/debris.et.yaml")
+local EXPLOSION_ETREE      = hs("res/asteroids/explosion.et.yaml")
 local TITLE_ETREE          = hs("res/root.et.yaml")
+local STARS_ETREE          = hs("res/asteroids/stars.et.yaml")
+
+entity_spawn(STARS_ETREE)
 
 local function spawn_asteroid(x, y, vx, vy)
     local eid = entity_spawn(ASTEROID_ETREE)
@@ -47,6 +51,17 @@ local function spawn_debris(x, y, count, speed)
             local spd = speed * (0.4 + math.random() * 0.6)
             local ang = math.random() * math.pi * 2
             physics2d_body_set_velocity(eid, vec2.new(math.cos(ang)*spd, math.sin(ang)*spd))
+        end
+    end
+end
+
+local function spawn_explosion(x, y)
+    local eid = entity_spawn(EXPLOSION_ETREE)
+    if eid then
+        local sp = get_spatial(eid)
+        if sp then
+            sp.pos = vec3.new(x, y, 5)
+            sp:apply()
         end
     end
 end
@@ -167,7 +182,10 @@ local h_contacts = clock_update_add(function(delta)
             shot_entities[shot_eid]     = nil
             asteroid_entities[ast_eid]  = nil
 
-            if ast_sp then spawn_debris(ast_sp.pos.x, ast_sp.pos.y, 10, 200) end
+            if ast_sp then
+                spawn_debris(ast_sp.pos.x, ast_sp.pos.y, 10, 200)
+                spawn_explosion(ast_sp.pos.x, ast_sp.pos.y)
+            end
             if sys_audio then
                 local pitch = 0.85 + math.random() * 0.30
                 audio_sfx_play_pitched(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0, pitch)
@@ -200,7 +218,10 @@ local h_contacts = clock_update_add(function(delta)
                 dead_timer = DEAD_DURATION
                 lose_life()
 
-                if ship_sp then spawn_debris(ship_sp.pos.x, ship_sp.pos.y, 18, 280) end
+                if ship_sp then
+                    spawn_debris(ship_sp.pos.x, ship_sp.pos.y, 18, 280)
+                    spawn_explosion(ship_sp.pos.x, ship_sp.pos.y)
+                end
                 if sys_audio then
                     local pitch = 0.75 + math.random() * 0.20
                     audio_sfx_play_pitched(hs("res/asteroids/sfx/blasteroids/explosion.ogg"), 0.0, pitch)

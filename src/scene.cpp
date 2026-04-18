@@ -7,7 +7,7 @@
 #include <newbase/components/script.hpp>
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/mesh2d.hpp>
-#include <newbase/geom/geometry_buffer_2d.hpp>
+#include <newbase/components/particle_emitter.hpp>
 #include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
@@ -90,6 +90,11 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
             {
                 auto &s = reg.emplace<nb::cbody2d>(eid);
                 nb::build_body2d(comp, s);
+            }
+            else if(compname == "particle_emitter")
+            {
+                auto &s = reg.emplace<nb::cparticle_emitter>(eid);
+                nb::build_particle_emitter(comp, s);
             }
             else
             {

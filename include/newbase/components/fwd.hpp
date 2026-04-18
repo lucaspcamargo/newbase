@@ -5,4 +5,5 @@ namespace nb {
     struct csprite;
     struct cscript;
     struct cbody2d;
+    struct cparticle_emitter;
 }

@@ -6,10 +6,13 @@
 
 namespace nb {
 
+enum class blend_mode_2d { ALPHA, ADD };
+
 struct cmesh2d {
     std::shared_ptr<geometry_buffer_2d> geom;
-    std::shared_ptr<rtexture>           tex;   // nullptr = untextured (vertex colors only)
-    bool                                visible {true};
+    std::shared_ptr<rtexture>           tex;        // nullptr = untextured (vertex colors only)
+    blend_mode_2d                       blend_mode  { blend_mode_2d::ALPHA };
+    bool                                visible     { true };
 
     static void _ensure_rtti();
 };

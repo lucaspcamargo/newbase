@@ -8,7 +8,18 @@ do
         local g = 0.60 + math.random() * 0.25
         local b = 0.45 + math.random() * 0.20
         spr_comp.color = vec4.new(r, g, b, 1)
+        spr_comp.frame = math.random(0, 2)
     end
+end
+
+do
+    local sp = c_spatial()
+    if sp then
+        sp.rot = vec3.new(0, 0, math.random() * 360)
+        sp:apply()
+    end
+    local max_spin = 180  -- degrees per second
+    physics2d_body_set_angular_velocity(eid, math.rad((math.random() * 2 - 1) * max_spin))
 end
 
 local update_handle = clock_update_add(function(delta)

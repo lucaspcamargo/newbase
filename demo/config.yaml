@@ -11,6 +11,8 @@ systems:
   input:
     default_actions: true
   clock: {}
+  particle_system: {}
+  sprite_anim: {}
   physics2d:
     world_scale: 100
   steam:

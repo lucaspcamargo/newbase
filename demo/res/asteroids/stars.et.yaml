@@ -1,0 +1,8 @@
+- name: stars
+  comps:
+    spatial:
+      pos: [0, 0, 9999]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    particle_emitter:
+      res: "res/asteroids/particles/stars.particle"

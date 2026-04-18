@@ -8,4 +8,5 @@ namespace nb {
     struct rvorbis;
     struct rwav;
     struct ryaml;
+    struct rparticle_emitter;
 }

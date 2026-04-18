@@ -58,7 +58,8 @@ namespace nb {
         
         std::vector<shape2d> shapes;
 
-        glm::vec2 initial_linear_velocity {0.0f, 0.0f};
+        glm::vec2 initial_linear_velocity  {0.0f, 0.0f};
+        float     initial_angular_velocity {0.0f};
 
         bool dirty {true};
         b2BodyId _body_id {b2_nullBodyId};
