@@ -8,7 +8,7 @@ local ROT_TORQUE         = 15000000.0
 local THRUST             = 3000000
 local THRUST_ANGLE_DELTA = 180
 
-local SHOOT_SPEED    = 800    -- approximate world units/s
+local SHOOT_SPEED    = 2400    -- approximate world units/s
 local SHOOT_COOLDOWN = 0.25   -- seconds between shots
 local SHOOT_OFFSET   = 40     -- pixels ahead of ship centre
 
