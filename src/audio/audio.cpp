@@ -59,6 +59,7 @@ struct nb::audio_p {
 
     std::vector<managed_bus>    buses;
     std::vector<managed_player> players;
+    float global_pitch {1.0f};
 
     // Audio-thread → main-thread visualisation buffer
     float      vis_buf[VIS_FRAMES] {};
@@ -318,7 +319,10 @@ bool audio::bgm_play(entt::id_type res_id)
         return false;
     }
     stop_bus_players(_d, _d->gm, "bgm");
-    _d->players.push_back({"bgm", _d->gm.add_player("bgm", res_id, /*loop=*/true)});
+    auto bgm_nodes = _d->gm.add_player("bgm", res_id, /*loop=*/true);
+    if (_d->global_pitch != 1.0f)
+        _d->gm.apply_pitch_ratio(bgm_nodes.pitch_node_id, _d->global_pitch);
+    _d->players.push_back({"bgm", bgm_nodes});
     _d->gm.rebuild(_d->graph, _d->graph_mtx);
     log::info("[audio] bgm_play: %x", res_id);
     return true;
@@ -346,6 +350,13 @@ void audio::bgm_gain(float db)
     }
 }
 
+void audio::set_global_pitch(float ratio)
+{
+    _d->global_pitch = ratio;
+    for (auto& p : _d->players)
+        _d->gm.apply_pitch_ratio(p.nodes.pitch_node_id, ratio);
+}
+
 void audio::sfx_gain(float db)
 {
     if (auto* b = find_bus(_d, "sfx")) {
@@ -365,6 +376,8 @@ bool audio::sfx_play(entt::id_type res_id, float gain_db)
     auto nodes = _d->gm.add_player("sfx", res_id, /*loop=*/false);
     if (gain_db != 0.f)
         _d->gm.apply_gain_db(nodes.gain_node_id, gain_db);
+    if (_d->global_pitch != 1.0f)
+        _d->gm.apply_pitch_ratio(nodes.pitch_node_id, _d->global_pitch);
     _d->players.push_back({"sfx", nodes});
     _d->gm.rebuild(_d->graph, _d->graph_mtx);
     log::info("[audio] sfx_play: %x (gain_db=%.1f)", res_id, gain_db);
@@ -382,8 +395,7 @@ bool audio::sfx_play_pitched(entt::id_type res_id, float gain_db, float pitch_ra
     auto nodes = _d->gm.add_player("sfx", res_id, /*loop=*/false);
     if (gain_db != 0.f)
         _d->gm.apply_gain_db(nodes.gain_node_id, gain_db);
-    if (pitch_ratio != 1.f)
-        _d->gm.apply_pitch_ratio(nodes.pitch_node_id, pitch_ratio);
+    _d->gm.apply_pitch_ratio(nodes.pitch_node_id, pitch_ratio * _d->global_pitch);
     _d->players.push_back({"sfx", nodes});
     _d->gm.rebuild(_d->graph, _d->graph_mtx);
     log::info("[audio] sfx_play_pitched: %x (gain_db=%.1f pitch=%.2f)", res_id, gain_db, pitch_ratio);
@@ -472,6 +484,8 @@ extern "C" void _rtti_init_audio()
         .custom<rtti::func_info>(rtti::func_info{"bgm_stop"})
         .func<&audio::bgm_gain>("bgm_gain"_hs)
         .custom<rtti::func_info>(rtti::func_info{"bgm_gain"})
+        .func<&audio::set_global_pitch>("set_global_pitch"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"set_global_pitch"})
         .func<&audio::sfx_play>("sfx_play"_hs)
         .custom<rtti::func_info>(rtti::func_info{"sfx_play"})
         .func<&audio::sfx_play_pitched>("sfx_play_pitched"_hs)

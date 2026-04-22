@@ -56,4 +56,11 @@ struct rloader_tilemap {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_graphplan {
+    using result_type = std::shared_ptr<rgraphplan>;
+    result_type operator()(entt::id_type) const;
+    // Load from a filesystem path directly (bypasses resource manager).
+    static result_type from_path(const char* path);
+};
+
 }

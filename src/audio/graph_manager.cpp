@@ -8,6 +8,11 @@
 #include <newbase/audio/graph/nodes.hpp>
 #include <newbase/graphplan/plan.hpp>
 #include <newbase/graphplan/editor.hpp>
+#include <newbase/graphplan/domain_registry.hpp>
+#include <newbase/res/graphplan.hpp>
+#include <newbase/res/loaders.hpp>
+#include <newbase/res/writers.hpp>
+#include <newbase/yaml/meta_any.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/res/manager.hpp>
@@ -600,6 +605,8 @@ graphplan::plan* audio_graph_manager::plan() const { return _d->gplan; }
 
 void audio_graph_manager::init(audio_spec spec)
 {
+    graphplan::register_domain(AUDIO_DOMAIN);
+
     log::verb("[audio] creating graphplan");
     _d->gplan = new graphplan::plan(AUDIO_DOMAIN);
 
@@ -757,8 +764,109 @@ void audio_graph_manager::apply_pitch_ratio(uint64_t node_id, float ratio)
             pn->set_pitch_ratio(ratio);
 }
 
+void audio_graph_manager::_reset_plan_caches(impl* d)
+{
+    d->node_cache.clear();
+    d->fan_out_cache.clear();
+    d->vorbis_res_cache.clear();
+    d->vorbis_fb_cache.clear();
+#ifdef NEWBASE_TALKIE_PCM
+    d->talkie_pcm_fb_cache.clear();
+#endif
+    if (auto* rs = entt::locator<renderer_service*>::has_value()
+                   ? entt::locator<renderer_service*>::value() : nullptr)
+    {
+        for (auto& [id, fb] : d->vis_fb_cache)
+            if (fb && fb->texture) { rs->destroy_texture(fb->texture); fb->texture = nullptr; }
+    }
+    d->vis_fb_cache.clear();
+    d->bus_cache.clear();
+    d->player_slots.clear();
+    d->bus_count = 0;
+}
+
+void audio_graph_manager::_apply_rgraphplan(impl* d, const rgraphplan& gp)
+{
+    _reset_plan_caches(d);
+
+    if (d->editor) { delete d->editor; d->editor = nullptr; }
+
+    d->gplan->nodes.clear();
+    d->gplan->pins.clear();
+    d->gplan->links.clear();
+    d->out_node_id = 0;
+
+    // Map from saved node id → newly allocated gp node id.
+    std::unordered_map<uint64_t, uint64_t> id_remap;
+
+    const int OUTPUT_TYPE = static_cast<int>(audio_graph::node_type::OUTPUT);
+
+    for (const auto& nd : gp.nodes)
+    {
+        const auto* tdef = d->gplan->dom().find_type_by_name(nd.type_name.c_str());
+        if (!tdef)
+        {
+            log::warn("[audio] _apply_rgraphplan: unknown type '%s' — skipped", nd.type_name.c_str());
+            continue;
+        }
+        uint64_t new_id = d->gplan->add_node_from_type(tdef->type_id, nd.pos_x, nd.pos_y);
+        id_remap[nd.id] = new_id;
+
+        auto& new_nd = d->gplan->nodes.at(new_id);
+        for (const auto& [pname, pval] : nd.properties)
+            new_nd.properties[pname] = pval;
+
+        if (tdef->type_id == OUTPUT_TYPE)
+            d->out_node_id = new_id;
+    }
+
+    for (const auto& ld : gp.links)
+    {
+        auto from_it = id_remap.find(ld.from_node);
+        auto to_it   = id_remap.find(ld.to_node);
+        if (from_it == id_remap.end() || to_it == id_remap.end()) continue;
+
+        auto& from_nd = d->gplan->nodes.at(from_it->second);
+        auto& to_nd   = d->gplan->nodes.at(to_it->second);
+
+        if (ld.from_pin < 0 || ld.from_pin >= static_cast<int>(from_nd.output_pins.size())) continue;
+        if (ld.to_pin   < 0 || ld.to_pin   >= static_cast<int>(to_nd.input_pins.size()))   continue;
+
+        uint64_t lid     = d->gplan->get_next_unique_id();
+        uint64_t out_pin = from_nd.output_pins[ld.from_pin];
+        uint64_t in_pin  = to_nd.input_pins[ld.to_pin];
+        d->gplan->links.insert({lid, graphplan::link_data{lid, in_pin, out_pin}});
+    }
+
+    log::info("[audio] applied graphplan: %zu nodes, %zu links",
+              d->gplan->nodes.size(), d->gplan->links.size());
+}
+
+void audio_graph_manager::_load_plan_from_file(impl* d, const char* path)
+{
+    auto gp = rloader_graphplan::from_path(path);
+    if (!gp)
+    {
+        log::error("[audio] failed to load graphplan from '%s'", path);
+        return;
+    }
+    _apply_rgraphplan(d, *gp);
+}
+
 bool audio_graph_manager::draw_editor()
 {
+    static char s_path[512] = {};
+
+    ImGui::SetNextItemWidth(320.f);
+    ImGui::InputText("##path", s_path, sizeof(s_path));
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FK_FLOPPY_O " Save"))
+        write_graphplan_plan(*_d->gplan, s_path);
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_FK_FOLDER_OPEN_O " Load"))
+        _load_plan_from_file(_d, s_path);
+    ImGui::Separator();
+
     if (!_d->editor)
         _d->editor = new graphplan::editor(*_d->gplan);
     return _d->editor->draw();

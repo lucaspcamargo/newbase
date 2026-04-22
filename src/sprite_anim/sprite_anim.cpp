@@ -1,12 +1,12 @@
 #include <newbase/sprite_anim/sprite_anim.hpp>
 #include <newbase/components/sprite.hpp>
+#include <newbase/clock/clock.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
-#include <SDL3/SDL.h>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -20,10 +20,8 @@ bool sprite_anim::step(step_phase phase)
 {
     if (phase != step_phase::GENERAL_UPDATE) return true;
 
-    static uint64_t last_ns = SDL_GetTicksNS();
-    const uint64_t  now_ns  = SDL_GetTicksNS();
-    const float     dt      = static_cast<float>(now_ns - last_ns) * 1e-9f;
-    last_ns = now_ns;
+    const float dt = entt::locator<nb::clock*>::has_value()
+        ? entt::locator<nb::clock*>::value()->get_real_dt() : (1.0f/60.0f);
 
     auto& reg  = engine::instance().default_scene().registry();
     auto  view = reg.view<csprite>();

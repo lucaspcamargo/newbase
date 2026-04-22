@@ -1,0 +1,16 @@
+- name: powerup_slowtime
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [3, 3, 1]
+    sprite:
+      res: "res/asteroids/spr/powerup_slowtime.sprite"
+      color: [0.3, 0.8, 1.0, 1.0]
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 0.0
+      shapes:
+        - type: CIRCLE
+          data: [18]
+          contact_events: true

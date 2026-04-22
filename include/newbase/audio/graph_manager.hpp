@@ -68,6 +68,10 @@ private:
 
     struct impl;
     impl* _d {nullptr};
+
+    static void _reset_plan_caches(impl*);
+    static void _apply_rgraphplan(impl*, const struct rgraphplan&);
+    static void _load_plan_from_file(impl*, const char* path);
 };
 
 } // namespace nb

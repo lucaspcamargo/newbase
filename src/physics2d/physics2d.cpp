@@ -4,6 +4,7 @@
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/character2d.hpp>
 #include <newbase/components/spatial.hpp>
+#include <newbase/clock/clock.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
@@ -189,7 +190,8 @@ bool physics2d::step(step_phase phase)
         on_construct_upd.clear();
 
         const int substeps = 4;
-        const float dt = 1.0f/60.0f;
+        const float dt = entt::locator<nb::clock*>::has_value()
+            ? entt::locator<nb::clock*>::value()->get_dt() : (1.0f/60.0f);
 
         if(B2_IS_NON_NULL(_d->world_id))
         {

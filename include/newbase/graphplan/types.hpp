@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <cstring>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -85,6 +86,13 @@ namespace nb::graphplan {
         {
             for (const auto& ptd : pin_types)
                 if (ptd.type_id == type_id) return &ptd;
+            return nullptr;
+        }
+
+        const node_type_def* find_type_by_name(const char* name) const
+        {
+            for (const auto& ntd : node_types)
+                if (strcmp(ntd.name, name) == 0) return &ntd;
             return nullptr;
         }
 

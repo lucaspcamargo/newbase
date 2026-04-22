@@ -31,6 +31,7 @@ public:
     bool bgm_playing();
     bool bgm_stop();
     void bgm_gain(float db);
+    void set_global_pitch(float ratio);
     void sfx_gain(float db);
 
     // sound effects

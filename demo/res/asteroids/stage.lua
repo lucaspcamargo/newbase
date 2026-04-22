@@ -14,16 +14,18 @@ end
 local asteroid_entities       = {}  -- all asteroids (large + small)
 local large_asteroid_entities = {}  -- large ones that split on death
 local shot_entities           = {}
+local powerup_entities        = {}
 
-local ASTEROID_ETREE       = hs("res/asteroids/asteroid.et.yaml")
-local SMALL_ASTEROID_ETREE = hs("res/asteroids/small_asteroid.et.yaml")
-local SHOT_ETREE           = hs("res/asteroids/shot.et.yaml")
-local SHIP_ETREE           = hs("res/asteroids/ship.et.yaml")
-local DEBRIS_ETREE         = hs("res/asteroids/debris.et.yaml")
-local EXPLOSION_ETREE      = hs("res/asteroids/explosion.et.yaml")
-local TITLE_ETREE          = hs("res/asteroids/title.et.yaml")
-local STARS_ETREE          = hs("res/asteroids/stars.et.yaml")
-local SCORE_DISPLAY_ETREE  = hs("res/asteroids/score_display.et.yaml")
+local ASTEROID_ETREE          = hs("res/asteroids/asteroid.et.yaml")
+local SMALL_ASTEROID_ETREE    = hs("res/asteroids/small_asteroid.et.yaml")
+local SHOT_ETREE              = hs("res/asteroids/shot.et.yaml")
+local SHIP_ETREE              = hs("res/asteroids/ship.et.yaml")
+local DEBRIS_ETREE            = hs("res/asteroids/debris.et.yaml")
+local EXPLOSION_ETREE         = hs("res/asteroids/explosion.et.yaml")
+local TITLE_ETREE             = hs("res/asteroids/title.et.yaml")
+local STARS_ETREE             = hs("res/asteroids/stars.et.yaml")
+local SCORE_DISPLAY_ETREE     = hs("res/asteroids/score_display.et.yaml")
+local POWERUP_SLOWTIME_ETREE  = hs("res/asteroids/powerup_slowtime.et.yaml")
 
 entity_spawn(STARS_ETREE)
 
@@ -76,6 +78,14 @@ local function spawn_explosion(x, y)
             sp:apply()
         end
     end
+end
+
+local function spawn_powerup_slowtime(x, y, vx, vy)
+    local eid = entity_spawn(POWERUP_SLOWTIME_ETREE)
+    if not eid then return end
+    powerup_entities[eid] = true
+    physics2d_body_warp(eid, vec2.new(x, y))
+    physics2d_body_set_velocity(eid, vec2.new(vx, vy))
 end
 
 local function spawn_shot(x, y, angle_deg, speed)
@@ -132,6 +142,52 @@ end
 
 _G.stage_lose_life = lose_life
 
+-- bullet-time powerup state
+local SLOWTIME_SCALE    = 1/3
+local SLOWTIME_DURATION = 5.0
+local SLOWTIME_RAMP     = 0.5   -- seconds to ramp in/out
+
+local slowtime_timer  = 0.0   -- countdown (real seconds), 0 = inactive
+local ramp_current    = 1.0   -- actual time scale currently applied
+local ramp_target     = 1.0   -- where we're headed
+
+local BG_NORMAL = {0.0,  0.0,  0.0}
+local BG_SLOW   = {0.02, 0.06, 0.18}
+
+local function apply_scale(s)
+    ramp_current = s
+    clock_set_time_scale(s)
+    if sys_audio then audio_set_global_pitch(s) end
+    -- lerp background colour: t=0 at normal speed, t=1 at full slowdown
+    local t = (1.0 - s) / (1.0 - SLOWTIME_SCALE)
+    t = math.max(0.0, math.min(1.0, t))
+    local r = BG_NORMAL[1] + (BG_SLOW[1] - BG_NORMAL[1]) * t
+    local g = BG_NORMAL[2] + (BG_SLOW[2] - BG_NORMAL[2]) * t
+    local b = BG_NORMAL[3] + (BG_SLOW[3] - BG_NORMAL[3]) * t
+    render_simple_set_clear_color(r, g, b)
+end
+
+local h_slowtime = clock_update_add_monotonic(function(real_dt)
+    -- ramp toward target
+    if ramp_current ~= ramp_target then
+        local dir  = (ramp_target > ramp_current) and 1 or -1
+        local step = dir * real_dt / SLOWTIME_RAMP
+        local next = ramp_current + step
+        if (dir > 0 and next >= ramp_target) or (dir < 0 and next <= ramp_target) then
+            next = ramp_target
+        end
+        apply_scale(next)
+    end
+
+    -- countdown
+    if slowtime_timer <= 0 then return end
+    slowtime_timer = slowtime_timer - real_dt
+    if slowtime_timer <= 0 then
+        slowtime_timer = 0
+        ramp_target = 1.0
+    end
+end)
+
 local ASTEROID_SPEED = 200
 
 -- spawn some initial asteroids
@@ -140,6 +196,9 @@ spawn_asteroid( 500, -250, -0.4*ASTEROID_SPEED,  0.3*ASTEROID_SPEED)
 spawn_asteroid(-400,  350,  0.2*ASTEROID_SPEED, -0.6*ASTEROID_SPEED)
 spawn_asteroid( 600,  300, -0.5*ASTEROID_SPEED, -0.2*ASTEROID_SPEED)
 spawn_asteroid(  50, -450,  0.6*ASTEROID_SPEED,  0.1*ASTEROID_SPEED)
+
+spawn_powerup_slowtime(200, 150,  20, -15)
+spawn_powerup_slowtime(-300, -200, -15,  20)
 
 -- cull shots that have left the viewport
 local h_cull = clock_update_add(function(delta)
@@ -207,6 +266,22 @@ local h_contacts = clock_update_add(function(delta)
             end
         end
 
+        -- ship vs powerup
+        if ship_eid then
+            local pu_eid = nil
+            if a == ship_eid and powerup_entities[b] then
+                pu_eid = b
+            elseif b == ship_eid and powerup_entities[a] then
+                pu_eid = a
+            end
+            if pu_eid then
+                entity_destroy(pu_eid)
+                powerup_entities[pu_eid] = nil
+                slowtime_timer = SLOWTIME_DURATION
+                ramp_target    = SLOWTIME_SCALE
+            end
+        end
+
         -- ship vs asteroid
         if ship_eid then
             local hit_ast = nil
@@ -264,4 +339,6 @@ script_on_destroy(function()
     clock_update_remove(h_cull)
     clock_update_remove(h_contacts)
     clock_update_remove(h_dead_timer)
+    clock_update_remove(h_slowtime)
+    apply_scale(1.0)
 end)

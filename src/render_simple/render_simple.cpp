@@ -492,7 +492,7 @@ void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
     float scale_y = _wy / hmax;
     _fallback_camera.zoom = std::min(scale_x, scale_y);
 
-    log::info("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
+    log::verb("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
         cx, cy, wmax, hmax, _fallback_camera.zoom);
 }
 

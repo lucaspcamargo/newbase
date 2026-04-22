@@ -123,6 +123,7 @@ add_library(newbase STATIC
 
     # yaml conversions
     src/yaml/glm.cpp
+    src/yaml/meta_any.cpp
 
     # rtti
     src/reflection/contexts.cpp

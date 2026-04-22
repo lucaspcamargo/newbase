@@ -1,6 +1,7 @@
 #include <newbase/particle_system/particle_system.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/mesh2d.hpp>
+#include <newbase/clock/clock.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
@@ -10,7 +11,6 @@
 #include <entt/meta/factory.hpp>
 #include <glm/trigonometric.hpp>
 #include <glm/common.hpp>
-#include <SDL3/SDL.h>
 #include <cmath>
 #include <cstdint>
 
@@ -195,10 +195,8 @@ bool particle_system::step(step_phase phase)
 {
     if (phase != step_phase::GENERAL_UPDATE) return true;
 
-    static uint64_t last_ns = SDL_GetTicksNS();
-    const uint64_t  now_ns  = SDL_GetTicksNS();
-    const float     dt      = static_cast<float>(now_ns - last_ns) * 1e-9f;
-    last_ns = now_ns;
+    const float dt = entt::locator<nb::clock*>::has_value()
+        ? entt::locator<nb::clock*>::value()->get_dt() : (1.0f/60.0f);
 
     auto& reg  = engine::instance().default_scene().registry();
     auto  view = reg.view<cparticle_emitter>();

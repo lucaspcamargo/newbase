@@ -11,4 +11,5 @@ namespace nb {
     struct rparticle_emitter;
     struct rtexfont;
     struct rtilemap;
+    struct rgraphplan;
 }
