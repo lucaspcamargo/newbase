@@ -65,16 +65,15 @@ static float sx {1.0f};
 static float sy {1.0f};
 static float line_thickness {1.0f};
 
-void nb::physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float scale_x, float scale_y, float world_scale, float ui_scale)
+void nb::physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float scale_x, float scale_y, float world_scale, float ui_scale, float screen_center_x, float screen_center_y)
 {
     ImGui::GetBackgroundDrawList();
-    auto center = ImGui::GetMainViewport()->GetCenter();
-
-    dx = center.x + cx;
-    dy = center.y + cy;
 
     sx = scale_x / ui_scale;
     sy = scale_y / ui_scale;
+
+    dx = screen_center_x - cx * sx;
+    dy = screen_center_y - cy * sy;
 
     //log::info("PRE DEBUG DRAW dx=%f, dy=%f, sx=%f, sy=%f", dx, dy, sx, sy);
 
@@ -125,7 +124,8 @@ static void DrawSolidCircle( b2Transform transform, float radius, b2HexColor col
     auto dl = ImGui::GetBackgroundDrawList();
     b2Vec2 center = b2TransformPoint(transform, b2Vec2_zero);
     ImVec2 c {center.x*sx + dx, center.y*sy + dy};
-    dl->AddCircleFilled(c, radius*sx, color|ALPHA_ONE, 0);
+    dl->AddCircleFilled(c, radius*sx, color|ALPHA_25);
+    dl->AddCircle(c, radius*sx, color|ALPHA_ONE, 0, line_thickness);
 }
 
 /// Draw a solid capsule.

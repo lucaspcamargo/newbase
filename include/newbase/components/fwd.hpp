@@ -7,4 +7,6 @@ namespace nb {
     struct cbody2d;
     struct cparticle_emitter;
     struct ctextext;
+    struct ctilemap;
+    struct ccharacter2d;
 }

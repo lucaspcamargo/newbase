@@ -1,0 +1,85 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/platformer/scene.lua"
+
+- name: tilemap
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    tilemap:
+      res: "res/platformer/map/map_0.tmj"
+      collision_layer: "fg"
+
+- name: player
+  comps:
+    spatial:
+      pos: [490, 100, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/circle.sprite
+    character2d:
+      capsule_radius: 16.0
+      capsule_half_height: 19.0
+      gravity_scale: 1.0
+      category_bits: 2
+      mask_bits: 1
+    script:
+      lua: "res/platformer/player.lua"
+
+- name: box0
+  comps:
+    spatial:
+      pos: [350, 100, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/square.sprite
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 1.0
+      enable_sleep: false
+      shapes:
+        - type: BOX
+          data: [30, 30]
+          restitution: 0.3
+          friction: 0.4
+
+- name: box1
+  comps:
+    spatial:
+      pos: [560, 100, 0]
+      rot: [0, 0, 15]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/square.sprite
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 1.0
+      enable_sleep: false
+      shapes:
+        - type: BOX
+          data: [30, 30]
+          restitution: 0.3
+          friction: 0.4
+
+- name: ball0
+  comps:
+    spatial:
+      pos: [700, 100, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/circle.sprite
+    body2d:
+      type: DYNAMIC
+      gravity_scale: 1.0
+      enable_sleep: false
+      shapes:
+        - type: CIRCLE
+          data: [25]
+          restitution: 0.4
+          friction: 0.3

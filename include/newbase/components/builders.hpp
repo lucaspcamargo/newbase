@@ -11,4 +11,6 @@ namespace nb
     bool build_body2d(ryml::ConstNodeRef def, cbody2d &dst);
     bool build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst);
     bool build_textext(ryml::ConstNodeRef def, ctextext &dst);
+    bool build_tilemap(ryml::ConstNodeRef def, ctilemap &dst);
+    bool build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst);
 }

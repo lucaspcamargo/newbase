@@ -14,6 +14,7 @@ systems:
   particle_system: {}
   sprite_anim: {}
   textext: {}
+  tilemap_system: {}
   physics2d:
     world_scale: 100
   steam:

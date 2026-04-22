@@ -2,6 +2,7 @@
 #include <newbase/physics2d/debug_draw.hpp>
 #include <newbase/physics2d/conversions.hpp>
 #include <newbase/components/body2d.hpp>
+#include <newbase/components/character2d.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
@@ -187,13 +188,12 @@ bool physics2d::step(step_phase phase)
         }
         on_construct_upd.clear();
 
-        // TODO do use fixed timestep, but maybe not every frame
         const int substeps = 4;
-        const float time_step = 1.0f/60.0f/substeps;
+        const float dt = 1.0f/60.0f;
 
         if(B2_IS_NON_NULL(_d->world_id))
         {
-            b2World_Step(_d->world_id, time_step, substeps);
+            b2World_Step(_d->world_id, dt, substeps);
 
             // collect contact begin events for scripts to read next frame
             _d->contact_begins.clear();
@@ -227,11 +227,8 @@ bool physics2d::step(step_phase phase)
             }
         }
 
-        // check all bodies - unneeded?
-        //auto view = reg.view<cbody2d>();
-        //for(auto [id, body]:view.each())
-        //{
-        //}
+        // character movers
+        _step_characters(reg, dt);
     }
     else if(phase == step_phase::PRE_RENDER)
     {
@@ -247,7 +244,9 @@ bool physics2d::step(step_phase phase)
                     float cy = (extents.top+extents.bottom)/2.0f;
                     float sx = extents.width/extents.xspan;
                     float sy = extents.height/extents.yspan;
-                    physics2d_pre_debug_draw(_d->debug_draw, cx, cy, sx, sy, _d->world_scale, extents.ui_scale);
+                    const float scr_cx = extents.screen_x / extents.ui_scale + extents.width  / (2.f * extents.ui_scale);
+                    const float scr_cy = extents.screen_y / extents.ui_scale + extents.height / (2.f * extents.ui_scale);
+                    physics2d_pre_debug_draw(_d->debug_draw, cx, cy, sx, sy, _d->world_scale, extents.ui_scale, scr_cx, scr_cy);
                     b2World_Draw(_d->world_id, &_d->debug_draw);
                 }
             }
@@ -475,6 +474,142 @@ entt::entity physics2d::contact_begin_b(unsigned int idx) const
     return _d->contact_begins[idx].b;
 }
 
+struct character_plane_ctx
+{
+    static constexpr int MAX_PLANES = 64;
+    b2CollisionPlane planes[MAX_PLANES];
+    b2ShapeId        shape_ids[MAX_PLANES];
+    int count = 0;
+};
+
+static bool collect_plane(b2ShapeId shapeId, const b2PlaneResult* result, void* ctx)
+{
+    if (!result->hit) return true;
+    auto* pc = static_cast<character_plane_ctx*>(ctx);
+    if (pc->count < character_plane_ctx::MAX_PLANES)
+    {
+        int i = pc->count++;
+        b2CollisionPlane& cp = pc->planes[i];
+        cp.plane        = result->plane;
+        cp.pushLimit    = FLT_MAX;
+        cp.push         = 0.0f;
+        cp.clipVelocity = true;
+        pc->shape_ids[i] = shapeId;
+    }
+    return true;
+}
+
+void physics2d::_step_characters(entt::registry& reg, float dt)
+{
+    if (!B2_IS_NON_NULL(_d->world_id)) return;
+
+    const b2Vec2 world_gravity = b2World_GetGravity(_d->world_id);
+
+    auto view = reg.view<ccharacter2d, cspatial>();
+    for (auto [eid, ch, sp] : view.each())
+    {
+        // Apply gravity
+        ch.velocity.y += world_gravity.y * ch.gravity_scale * dt;
+
+        b2Capsule capsule;
+        capsule.center1 = { sp.pos.x, sp.pos.y - ch.capsule_half_height };
+        capsule.center2 = { sp.pos.x, sp.pos.y + ch.capsule_half_height };
+        capsule.radius  = ch.capsule_radius;
+
+        b2QueryFilter filter = b2DefaultQueryFilter();
+        filter.categoryBits = ch.category_bits;
+        filter.maskBits     = ch.mask_bits;
+
+        character_plane_ctx plane_ctx;
+        b2World_CollideMover(_d->world_id, &capsule, filter, collect_plane, &plane_ctx);
+
+        const b2Vec2 pre_clip_vel { ch.velocity.x, ch.velocity.y };
+        const b2Vec2 desired_delta { pre_clip_vel.x * dt, pre_clip_vel.y * dt };
+        b2PlaneSolverResult solved = b2SolvePlanes(desired_delta, plane_ctx.planes, plane_ctx.count);
+
+        b2Vec2 clipped = b2ClipVector(pre_clip_vel, plane_ctx.planes, plane_ctx.count);
+        ch.velocity = { clipped.x, clipped.y };
+
+        // Grounded when a plane with an upward-facing normal (y < 0 in y-down space) pushed us
+        ch.grounded = false;
+        for (int i = 0; i < plane_ctx.count; ++i)
+        {
+            if (plane_ctx.planes[i].plane.normal.y < -0.5f && plane_ctx.planes[i].push > 0.f)
+            {
+                ch.grounded = true;
+                break;
+            }
+        }
+
+        // Push dynamic bodies: transfer character velocity onto contacted body
+        if (ch.push_force > 0.f)
+        {
+            for (int i = 0; i < plane_ctx.count; ++i)
+            {
+                b2BodyId body_id = b2Shape_GetBody(plane_ctx.shape_ids[i]);
+                if (b2Body_GetType(body_id) != b2_dynamicBody) continue;
+
+                const b2Vec2& n = plane_ctx.planes[i].plane.normal;
+                float vel_into = -(pre_clip_vel.x * n.x + pre_clip_vel.y * n.y);
+                if (vel_into <= 0.f) continue;
+
+                b2Vec2 cur = b2Body_GetLinearVelocity(body_id);
+                // current velocity of body in the push direction (-n)
+                float cur_push = -(cur.x * n.x + cur.y * n.y);
+                float target_push = vel_into * ch.push_force;
+                if (target_push > cur_push)
+                {
+                    float delta = target_push - cur_push;
+                    b2Body_SetLinearVelocity(body_id, b2Vec2{
+                        cur.x - n.x * delta,
+                        cur.y - n.y * delta
+                    });
+                }
+            }
+        }
+
+        sp.pos.x += solved.translation.x;
+        sp.pos.y += solved.translation.y;
+        sp.apply();
+    }
+}
+
+bool physics2d::character_set_velocity(entt::entity ent, glm::vec2 vel)
+{
+    auto& reg = engine::instance().default_scene().registry();
+    auto* ch = reg.try_get<ccharacter2d>(ent);
+    if (!ch) return false;
+    ch->velocity = vel;
+    return true;
+}
+
+glm::vec2 physics2d::character_get_velocity(entt::entity ent) const
+{
+    auto& reg = engine::instance().default_scene().registry();
+    auto* ch = reg.try_get<ccharacter2d>(ent);
+    return ch ? ch->velocity : glm::vec2{0.f};
+}
+
+bool physics2d::character_is_grounded(entt::entity ent) const
+{
+    auto& reg = engine::instance().default_scene().registry();
+    auto* ch = reg.try_get<ccharacter2d>(ent);
+    return ch && ch->grounded;
+}
+
+bool physics2d::character_warp(entt::entity ent, glm::vec2 pos)
+{
+    auto& reg = engine::instance().default_scene().registry();
+    auto* sp = reg.try_get<cspatial>(ent);
+    if (!sp) return false;
+    sp->pos.x = pos.x;
+    sp->pos.y = pos.y;
+    sp->apply();
+    auto* ch = reg.try_get<ccharacter2d>(ent);
+    if (ch) ch->velocity = {0.f, 0.f};
+    return true;
+}
+
 // RTTI metadata
 extern "C" void _rtti_init_physics2d()
 {
@@ -501,11 +636,20 @@ extern "C" void _rtti_init_physics2d()
         .func<&nb::physics2d::contact_begin_a>("contact_begin_a"_hs)
             .custom<rtti::func_info>(rtti::func_info{"contact_begin_a"})
         .func<&nb::physics2d::contact_begin_b>("contact_begin_b"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"contact_begin_b"});
+            .custom<rtti::func_info>(rtti::func_info{"contact_begin_b"})
+        .func<&nb::physics2d::character_set_velocity>("character_set_velocity"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"character_set_velocity"})
+        .func<&nb::physics2d::character_get_velocity>("character_get_velocity"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"character_get_velocity"})
+        .func<&nb::physics2d::character_is_grounded>("character_is_grounded"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"character_is_grounded"})
+        .func<&nb::physics2d::character_warp>("character_warp"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"character_warp"});
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::physics2d>>()
         .conv<std::shared_ptr<nb::system>>();
 
     cbody2d::_ensure_rtti();
+    ccharacter2d::_ensure_rtti();
 }

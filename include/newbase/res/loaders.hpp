@@ -51,4 +51,9 @@ struct rloader_texfont {
     result_type operator()(entt::id_type) const;
 };
 
+struct rloader_tilemap {
+    using result_type = std::shared_ptr<rtilemap>;
+    result_type operator()(entt::id_type) const;
+};
+
 }

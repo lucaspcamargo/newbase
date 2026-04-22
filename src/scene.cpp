@@ -9,6 +9,8 @@
 #include <newbase/components/mesh2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/textext.hpp>
+#include <newbase/components/tilemap.hpp>
+#include <newbase/components/character2d.hpp>
 #include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
@@ -102,6 +104,16 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
                 auto &s = reg.emplace<nb::ctextext>(eid);
                 nb::build_textext(comp, s);
                 reg.emplace<nb::cmesh2d>(eid);
+            }
+            else if(compname == "tilemap")
+            {
+                auto &s = reg.emplace<nb::ctilemap>(eid);
+                nb::build_tilemap(comp, s);
+            }
+            else if(compname == "character2d")
+            {
+                auto &s = reg.emplace<nb::ccharacter2d>(eid);
+                nb::build_character2d(comp, s);
             }
             else
             {

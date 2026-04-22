@@ -35,6 +35,9 @@ public:
         float bottom;   // bottom border y, in world coordinates
 
         float ui_scale; // how much UI drawing will be scaled by, when using ImGui to draw
+
+        int screen_x;   // viewport top-left in physical pixels (0 when no docked panels)
+        int screen_y;
     };
 
     virtual ~renderer_service() = default;

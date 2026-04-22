@@ -5,5 +5,5 @@
 namespace nb
 {
     void physics2d_setup_debug_draw(b2DebugDraw &draw, void*context);
-    void physics2d_pre_debug_draw(b2DebugDraw &draw, float dx, float dy, float sx, float sy, float world_scale, float ui_scale);
+    void physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float sx, float sy, float world_scale, float ui_scale, float screen_center_x, float screen_center_y);
 }

@@ -566,13 +566,13 @@ bool script_lua::step(step_phase phase)
                         auto comp_type = entt::resolve(comp_id);
                         if (comp_type.info() == entt::type_id<void>())
                         {
-                            log::warn("[script_lua] unregistered component: %x", comp_id);
+                            log::verb("[script_lua] skipping unregistered storage: %x", comp_id);
                             continue;
                         }
                         const rtti::type_info *comp_info = comp_type.custom();
                         if (!comp_info)
                         {
-                            log::warn("[script_lua] component has no info: %x", comp_id);
+                            log::verb("[script_lua] skipping component with no rtti info: %x", comp_id);
                             continue;
                         }
 

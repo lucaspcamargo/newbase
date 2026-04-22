@@ -4,8 +4,8 @@ local dir_hs   = hs("dir")
 local spr_normal   = res_get_sprite(hs("res/asteroids/spr/ship.sprite"))
 local spr_thruster = res_get_sprite(hs("res/asteroids/spr/ship-t.sprite"))
 
-local ROT_TORQUE         = 15000000.0
-local THRUST             = 3000000
+local ROT_TORQUE         = 3750000.0
+local THRUST             = 750000
 local THRUST_ANGLE_DELTA = 180
 
 local SHOOT_SPEED    = 2400    -- approximate world units/s

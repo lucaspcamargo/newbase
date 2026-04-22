@@ -1,0 +1,41 @@
+{
+    "activeFile": "map/map_0.tmj",
+    "expandedProjectPaths": [
+        "spr",
+        "."
+    ],
+    "fileStates": {
+        "map/map_0.tmj": {
+            "scale": 0.5417,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 2908.4364039136053,
+                "y": 940.5575041535906
+            }
+        },
+        "spr/base_tiles.tsj": {
+            "scaleInDock": 0.5,
+            "scaleInEditor": 1
+        }
+    },
+    "last.imagePath": "/home/camargo/proj/newbase/demo/res/platformer/spr",
+    "map.lastUsedFormat": "json",
+    "map.tileHeight": 70,
+    "map.tileWidth": 70,
+    "map.width": 60,
+    "openFiles": [
+        "spr/base_tiles.tsj",
+        "map/map_0.tmj"
+    ],
+    "project": "tiled.tiled-project",
+    "recentFiles": [
+        "spr/base_tiles.tsj",
+        "map/map_0.tmj"
+    ],
+    "tileset.lastUsedFormat": "json",
+    "tileset.spacing": 2,
+    "tileset.tileSize": {
+        "height": 70,
+        "width": 70
+    }
+}

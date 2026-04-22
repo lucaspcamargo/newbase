@@ -6,6 +6,8 @@
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <memory>
+#include <cstdlib>
+#include <cstring>
 
 using entt::operator""_hs;
 
@@ -42,6 +44,12 @@ static const demo_entry s_demos[] = {
         "tumble inside a static container under gentle gravity. Enable physics debug draw "
         "from the Physics2D tool window to visualize collision shapes."
     },
+    {
+        "Platformer",
+        "res/platformer/scene.et.yaml"_hs,
+        "A classic platformer demo. Showcases tilemap loading and rendering via the Tiled "
+        "JSON format, tileset support with spacing/margin, and Box2D collision from tile layers."
+    },
 };
 static constexpr int s_demo_count = static_cast<int>(sizeof(s_demos) / sizeof(s_demos[0]));
 
@@ -62,6 +70,25 @@ static void load_demo(int idx)
 
 bool demo_system::init(ryml::ConstNodeRef)
 {
+    // Parse --demo <index> from command line
+    int initial_demo = 0;
+    bool demo_specified = false;
+    int argc = nb::engine::instance().argc();
+    char** argv = nb::engine::instance().argv();
+    for (int i = 1; i < argc; ++i)
+    {
+        if ((strcmp(argv[i], "--demo") == 0 || strcmp(argv[i], "-demo") == 0) && i + 1 < argc)
+        {
+            int idx = atoi(argv[i + 1]);
+            if (idx >= 0 && idx < s_demo_count)
+            {
+                initial_demo  = idx;
+                demo_specified = true;
+            }
+            break;
+        }
+    }
+
     auto* ui = entt::locator<nb::ui_manager*>::value();
     if (!ui) return true;
 
@@ -92,15 +119,15 @@ bool demo_system::init(ryml::ConstNodeRef)
 
         ImGui::End();
     });
-    ui->toggle_tool_window("demo");
+    if (!demo_specified)
+        ui->toggle_tool_window("demo");
 
     nb::engine::instance().debug_action_register("Demo Controls", []() {
         if (auto* u = entt::locator<nb::ui_manager*>::value())
             u->toggle_tool_window("demo");
     });
 
-    // Load the first demo immediately
-    load_demo(0);
+    load_demo(initial_demo);
 
     return true;
 }

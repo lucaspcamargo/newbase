@@ -9,6 +9,8 @@
 #include <newbase/res/yaml.hpp>
 #include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/texfont.hpp>
+#include <newbase/res/tilemap.hpp>
+#include <newbase/utility/strings.hpp>
 #include <newbase/yaml/glm.hpp>
 #include <newbase/log.hpp>
 #include <ryml_std.hpp>
@@ -617,6 +619,155 @@ namespace nb {
 
         log::info("[rloader_texfont] '%s' size=%d glyphs=%zu atlas=%dx%d",
                   ttf_path.c_str(), font_size, ret->glyphs.size(), pw, ph);
+        return ret;
+    }
+
+    // Resolve a relative path from the map file's directory. Tileset image paths
+    // in .tmj are relative to the .tsj / .tmj file location.
+    static std::string resolve_sibling(entt::id_type map_id, const std::string& rel_path)
+    {
+        const auto& handles = rman().handles();
+        auto it = handles.find(map_id);
+        if (it == handles.end() || it->second.path.empty())
+            return nb::util::path_normalize(rel_path);
+
+        const std::string& base = it->second.path;
+        auto slash = base.rfind('/');
+        if (slash == std::string::npos)
+            return nb::util::path_normalize(rel_path);
+        return nb::util::path_normalize(base.substr(0, slash + 1) + rel_path);
+    }
+
+    static bool load_tileset_data(ryml::ConstNodeRef ts_node, tilemap_tileset& ts,
+                                   entt::id_type map_id)
+    {
+        if (ts_node.has_child("firstgid"))
+            ts_node["firstgid"] >> ts.firstgid;
+
+        // External tileset: load .tsj file — keep data and tree alive for the rest of this call.
+        // image paths inside .tsj are relative to the .tsj, so track its id separately.
+        std::vector<char> tsj_data;
+        ryml::Tree        tsj_tree;
+        entt::id_type     image_base_id = map_id;
+        if (ts_node.has_child("source") && !ts_node.has_child("image"))
+        {
+            std::string src;
+            ts_node["source"] >> src;
+            const std::string full = resolve_sibling(map_id, src);
+            const auto tsj_id = entt::hashed_string{full.c_str()}.value();
+
+            if (!rman().read_all_sync(tsj_id, tsj_data, true))
+            {
+                log::error("[rloader_tilemap] cannot read tileset '%s'", full.c_str());
+                return false;
+            }
+            tsj_tree      = ryml::parse_json_in_place(c4::to_substr(tsj_data.data()));
+            ts_node       = tsj_tree.rootref();
+            image_base_id = tsj_id;
+        }
+
+        if (ts_node.has_child("tilewidth"))   ts_node["tilewidth"]   >> ts.tile_width;
+        if (ts_node.has_child("tileheight"))  ts_node["tileheight"]  >> ts.tile_height;
+        if (ts_node.has_child("columns"))     ts_node["columns"]     >> ts.columns;
+        if (ts_node.has_child("tilecount"))   ts_node["tilecount"]   >> ts.tilecount;
+        if (ts_node.has_child("spacing"))     ts_node["spacing"]     >> ts.spacing;
+        if (ts_node.has_child("margin"))      ts_node["margin"]      >> ts.margin;
+        if (ts_node.has_child("imagewidth"))  ts_node["imagewidth"]  >> ts.image_width;
+        if (ts_node.has_child("imageheight")) ts_node["imageheight"] >> ts.image_height;
+
+        if (ts_node.has_child("image"))
+        {
+            std::string img_path;
+            ts_node["image"] >> img_path;
+            const std::string full = resolve_sibling(image_base_id, img_path);
+            const auto tex_id = entt::hashed_string{full.c_str()}.value();
+            log::info("[rloader_tilemap] tileset image: '%s' -> '%s' (hash %x)", img_path.c_str(), full.c_str(), tex_id);
+            ts.tex = rman().get<rtexture>(tex_id);
+            if (!ts.tex)
+            {
+                log::error("[rloader_tilemap] cannot load tileset texture '%s'", full.c_str());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    rloader_tilemap::result_type rloader_tilemap::operator()(entt::id_type id) const
+    {
+        log::info("[rloader_tilemap] loading: %x", id);
+
+        std::vector<char> data;
+        if (!rman().read_all_sync(id, data, true))
+        {
+            log::error("[rloader_tilemap] cannot read: %x", id);
+            return nullptr;
+        }
+
+        auto tree = ryml::parse_json_in_place(c4::to_substr(data.data()));
+        auto root = tree.rootref();
+
+        auto ret = std::make_shared<rtilemap>(id);
+
+        if (root.has_child("width"))       root["width"]       >> ret->width;
+        if (root.has_child("height"))      root["height"]      >> ret->height;
+        if (root.has_child("tilewidth"))   root["tilewidth"]   >> ret->tile_width;
+        if (root.has_child("tileheight"))  root["tileheight"]  >> ret->tile_height;
+
+        if (root.has_child("tilesets"))
+        {
+            for (auto ts_node : root["tilesets"])
+            {
+                tilemap_tileset ts;
+                if (!load_tileset_data(ts_node, ts, id))
+                    return nullptr;
+                ret->tilesets.push_back(std::move(ts));
+            }
+        }
+
+        if (root.has_child("layers"))
+        {
+            for (auto ln : root["layers"])
+            {
+                tilemap_layer layer;
+
+                std::string type_str = "tilelayer";
+                if (ln.has_child("type")) ln["type"] >> type_str;
+
+                if (type_str == "objectgroup")
+                {
+                    layer.layer_type = tilemap_layer::type::OBJECT;
+                    if (ln.has_child("name"))    ln["name"]    >> layer.name;
+                    if (ln.has_child("visible")) ln["visible"] >> layer.visible;
+                    ret->layers.push_back(std::move(layer));
+                    continue;
+                }
+
+                // tilelayer
+                layer.layer_type = tilemap_layer::type::TILE;
+                if (ln.has_child("name"))    ln["name"]    >> layer.name;
+                if (ln.has_child("width"))   ln["width"]   >> layer.width;
+                if (ln.has_child("height"))  ln["height"]  >> layer.height;
+                if (ln.has_child("visible")) ln["visible"] >> layer.visible;
+                if (ln.has_child("opacity")) ln["opacity"] >> layer.opacity;
+
+                if (ln.has_child("data"))
+                {
+                    auto data_node = ln["data"];
+                    layer.tiles.reserve(data_node.num_children());
+                    for (auto tile_node : data_node)
+                    {
+                        int gid = 0;
+                        tile_node >> gid;
+                        layer.tiles.push_back(gid);
+                    }
+                }
+
+                ret->layers.push_back(std::move(layer));
+            }
+        }
+
+        log::info("[rloader_tilemap] loaded %dx%d map, %zu tilesets, %zu layers",
+                  ret->width, ret->height, ret->tilesets.size(), ret->layers.size());
         return ret;
     }
 }

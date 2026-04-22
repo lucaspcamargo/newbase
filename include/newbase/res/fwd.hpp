@@ -10,4 +10,5 @@ namespace nb {
     struct ryaml;
     struct rparticle_emitter;
     struct rtexfont;
+    struct rtilemap;
 }

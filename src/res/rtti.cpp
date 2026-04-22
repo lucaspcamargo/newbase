@@ -11,6 +11,7 @@
 #include <newbase/res/yaml.hpp>
 #include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/texfont.hpp>
+#include <newbase/res/tilemap.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include "IconsForkAwesome.h"
@@ -138,6 +139,17 @@ namespace nb::rtti {
                 }
             });
 
+        entt::meta_factory<rtilemap>{}
+            .type("rtilemap"_hs)
+            .custom<type_info>(type_info{
+                .identifier = "tilemap",
+                .type_class = TYPE_CLASS_RESOURCE,
+                .data = {.resource = {.editor_icon = ICON_FK_MAP, .extensions = "tmj"}},
+                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return rloader_tilemap{}(id);
+                }
+            });
+
         // shared_ptr<T> registrations — used by meta_any_editor to display resource fields
 #define NB_REG_RES_PTR(T, name_str) \
     entt::meta_factory<std::shared_ptr<T>>{} \
@@ -173,6 +185,7 @@ namespace nb::rtti {
         NB_REG_RES_PTR(retree,            "retree")
         NB_REG_RES_PTR(rparticle_emitter, "rparticle_emitter")
         NB_REG_RES_PTR(rtexfont,          "rtexfont")
+        NB_REG_RES_PTR(rtilemap,          "rtilemap")
 #undef NB_REG_RES_PTR
     }
 

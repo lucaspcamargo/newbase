@@ -15,6 +15,7 @@
 #cmakedefine NEWBASE_SGDK
 #cmakedefine NEWBASE_USE_XDG_DATA_DIRS
 #cmakedefine NEWBASE_STEAM
+#cmakedefine NEWBASE_TALKIE_PCM
 #ifndef NEWBASE_WII
 #cmakedefine NEWBASE_WII
 #endif

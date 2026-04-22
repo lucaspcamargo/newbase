@@ -69,6 +69,9 @@ struct nb::engine_p {
     std::map<int, std::string> dbg_action_names;
     std::map<int, std::function<void(void)>> dbg_action_callbacks;
     int dbg_action_next_idx = 0;
+
+    int    argc {0};
+    char** argv {nullptr};
 };
 
 engine::engine()
@@ -178,6 +181,8 @@ bool engine::init(int argc, char ** argv)
 {
     ZoneScoped;
     log::info("[engine] init");
+    _d->argc = argc;
+    _d->argv = argv;
 
     _register_default_services();
 
@@ -202,6 +207,9 @@ bool engine::init(int argc, char ** argv)
     log::info("[engine] initialized");
     return true;
 }
+
+int    engine::argc() const { return _d->argc; }
+char** engine::argv() const { return _d->argv; }
 
 bool engine::teardown()
 {

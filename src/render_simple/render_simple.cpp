@@ -525,7 +525,7 @@ bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
             extents = { vp.w, vp.h, span_x, span_y,
                 cx - span_x * 0.5f, cy - span_y * 0.5f,
                 cx + span_x * 0.5f, cy + span_y * 0.5f,
-                _scale };
+                _scale, vp.x, vp.y };
             return true;
         }
     }
@@ -539,10 +539,12 @@ bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
     float cy     = _fallback_spatial.pos.y;
     float span_x = dvp_w / zoom;
     float span_y = dvp_h / zoom;
+    int dvp_x = (dvp_it != _viewports.end()) ? dvp_it->second.x : 0;
+    int dvp_y = (dvp_it != _viewports.end()) ? dvp_it->second.y : 0;
     extents = { dvp_w, dvp_h, span_x, span_y,
         cx - span_x * 0.5f, cy - span_y * 0.5f,
         cx + span_x * 0.5f, cy + span_y * 0.5f,
-        _scale };
+        _scale, dvp_x, dvp_y };
     return true;
 }
 

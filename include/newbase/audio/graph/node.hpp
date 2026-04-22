@@ -1,5 +1,6 @@
 #pragma once
 
+#include <newbase/nb_config.h>
 #include <newbase/audio/types.hpp>
 #include <newbase/audio/buffer.hpp>
 #include <vector>
@@ -32,6 +33,9 @@ enum class node_type
     WAVESHAPER   = 17, // non-linear distortion via drive + shape curve
     PHASER       = 18, // all-pass cascade swept by an LFO
     PITCH        = 19, // pitch shifter via linear-interpolation resampling
+#ifdef NEWBASE_TALKIE_PCM
+    TALKIE_PCM_SOURCE = 20, // TalkiePCM LPC speech synthesis source
+#endif
 };
 
 class node

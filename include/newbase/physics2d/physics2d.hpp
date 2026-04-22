@@ -41,8 +41,15 @@ public:
     entt::entity contact_begin_a(unsigned int idx) const;
     entt::entity contact_begin_b(unsigned int idx) const;
 
+    // character mover helpers
+    bool character_set_velocity(entt::entity ent, glm::vec2 vel);
+    glm::vec2 character_get_velocity(entt::entity ent) const;
+    bool character_is_grounded(entt::entity ent) const;
+    bool character_warp(entt::entity ent, glm::vec2 pos);
+
 private:
     void _draw_tool_window(bool *close);
+    void _step_characters(entt::registry &reg, float dt);
 
     physics2d_p *_d;
 };

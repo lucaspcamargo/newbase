@@ -34,6 +34,9 @@ public:
     bool event(SDL_Event *);
     bool teardown();
 
+    int    argc() const;
+    char** argv() const;
+
     // scenes
     ::nb::scene& default_scene();
     // Returns a scene by id, or nullptr if not found.

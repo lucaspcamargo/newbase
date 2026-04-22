@@ -5,8 +5,11 @@
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/textext.hpp>
+#include <newbase/components/tilemap.hpp>
+#include <newbase/components/character2d.hpp>
 #include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/texfont.hpp>
+#include <newbase/res/tilemap.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/yaml/glm.hpp>
 #include <newbase/log.hpp>
@@ -116,6 +119,42 @@ bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
     }
     if (def.has_child("emitting"))
         def["emitting"] >> dst.emitting;
+    return true;
+}
+
+bool nb::build_tilemap(ryml::ConstNodeRef def, ctilemap &dst)
+{
+    if (def.has_child("res"))
+    {
+        std::string respath;
+        c4::from_chars(def["res"].val(), &respath);
+        dst.map = rman().get<rtilemap>(entt::hashed_string{respath.c_str()}.value());
+    }
+    if (def.has_child("collision_layer"))
+    {
+        std::string s;
+        def["collision_layer"] >> s;
+        dst.collision_layer = std::move(s);
+    }
+    if (def.has_child("visible"))
+        def["visible"] >> dst.visible;
+    return true;
+}
+
+bool nb::build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst)
+{
+    if (def.has_child("capsule_radius"))
+        def["capsule_radius"] >> dst.capsule_radius;
+    if (def.has_child("capsule_half_height"))
+        def["capsule_half_height"] >> dst.capsule_half_height;
+    if (def.has_child("gravity_scale"))
+        def["gravity_scale"] >> dst.gravity_scale;
+    if (def.has_child("category_bits"))
+        def["category_bits"] >> dst.category_bits;
+    if (def.has_child("mask_bits"))
+        def["mask_bits"] >> dst.mask_bits;
+    if (def.has_child("push_force"))
+        def["push_force"] >> dst.push_force;
     return true;
 }
 
