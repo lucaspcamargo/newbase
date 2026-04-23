@@ -3,6 +3,7 @@
 #include <newbase/editor/texture_editor_widget.hpp>
 #include <newbase/editor/audio_editor_widget.hpp>
 #include <newbase/editor/text_editor_widget.hpp>
+#include <newbase/editor/graphplan_editor_widget.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/res/texture.hpp>
@@ -10,6 +11,7 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/res/script.hpp>
 #include <newbase/res/yaml.hpp>
+#include <newbase/res/graphplan.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
 
@@ -31,6 +33,7 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
     _tex_widget.reset();
     _audio_widget.reset();
     _text_widget.reset();
+    _graphplan_widget.reset();
 
     // build a unique imgui window id: visible title + hidden id suffix
     _title = std::string(title) + "##resed_" + std::to_string(asset_id);
@@ -97,6 +100,15 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
             }
         }
 
+        // Graphplan
+        if (_resource->type_id() == "rgraphplan"_hs.value())
+        {
+            auto* rg = static_cast<rgraphplan*>(_resource.get());
+            _graphplan_widget = std::make_unique<graphplan_editor_widget>();
+            if (!_graphplan_widget->open(rg, asset_id))
+                _graphplan_widget.reset(); // domain not registered yet
+        }
+
         // Always build a meta_any too (shown as fallback or alongside)
         auto meta_type = entt::resolve(type_id);
         if (meta_type)
@@ -106,6 +118,7 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
 
 void res_editor_window::draw(bool* p_open)
 {
+    ImGui::SetNextWindowSizeConstraints(ImVec2(400.f, 300.f), ImVec2(FLT_MAX, FLT_MAX));
     if (!ImGui::Begin(_title.c_str(), p_open, ImGuiWindowFlags_NoSavedSettings))
     {
         ImGui::End();
@@ -156,6 +169,10 @@ void res_editor_window::draw(bool* p_open)
     else if (_text_widget)
     {
         _text_widget->draw();
+    }
+    else if (_graphplan_widget)
+    {
+        _graphplan_widget->draw();
     }
     else if (_ref)
         draw_meta_any_editor(type_name, _ref);

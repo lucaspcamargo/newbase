@@ -5,7 +5,7 @@
 #include <memory>
 #include <string_view>
 
-namespace nb { class resource; class texture_editor_widget; class audio_editor_widget; class text_editor_widget; }
+namespace nb { class resource; class texture_editor_widget; class audio_editor_widget; class text_editor_widget; class graphplan_editor_widget; }
 
 namespace nb {
 
@@ -26,9 +26,10 @@ private:
     std::string _title;
     std::shared_ptr<nb::resource> _resource;
     entt::meta_any _ref;
-    std::unique_ptr<texture_editor_widget> _tex_widget;
-    std::unique_ptr<audio_editor_widget>   _audio_widget;
-    std::unique_ptr<text_editor_widget>    _text_widget;
+    std::unique_ptr<texture_editor_widget>    _tex_widget;
+    std::unique_ptr<audio_editor_widget>     _audio_widget;
+    std::unique_ptr<text_editor_widget>      _text_widget;
+    std::unique_ptr<graphplan_editor_widget> _graphplan_widget;
 };
 
 } // namespace nb

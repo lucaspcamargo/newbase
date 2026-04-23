@@ -5,6 +5,11 @@ local WALK_SPEED    = 350.0
 local JUMP_VEL      = -620.0
 local JUMP_CUT_VEL  = -250.0   -- upward speed clamped to on early release
 
+local MAP_W  = 60 * 70
+local MAP_H  = 20 * 70
+local VIEW_W = 1920
+local VIEW_H = 1080
+
 local update_handle = clock_update_add(function(delta)
     local dir = input_action_direction(dir_hs)
     local ch  = c_character2d()
@@ -25,8 +30,12 @@ local update_handle = clock_update_add(function(delta)
 
     physics2d_character_set_velocity(eid, vec2.new(vx, vy))
 
-    -- Camera follow
-    render_simple_cam_2d_setup(sp.pos.x, sp.pos.y, 1920, 1080)
+    -- Camera follow, clamped so the viewport never shows outside the map
+    local half_w = VIEW_W * 0.5
+    local half_h = VIEW_H * 0.5
+    local cam_x = math.max(half_w, math.min(MAP_W - half_w, sp.pos.x))
+    local cam_y = math.max(half_h, math.min(MAP_H - half_h, sp.pos.y))
+    render_simple_cam_2d_setup(cam_x, cam_y, VIEW_W, VIEW_H)
 end)
 
 script_on_destroy(function()

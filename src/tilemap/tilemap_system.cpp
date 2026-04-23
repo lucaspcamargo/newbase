@@ -9,6 +9,7 @@
 #include <newbase/reflection/data.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
+#include <utility>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -54,6 +55,9 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh)
             if (raw_gid == 0) continue;
 
             // Strip Tiled flip flags from the upper three bits
+            const bool flip_h = (raw_gid & 0x80000000) != 0;
+            const bool flip_v = (raw_gid & 0x40000000) != 0;
+            const bool flip_d = (raw_gid & 0x20000000) != 0;
             const int gid = raw_gid & 0x1FFFFFFF;
 
             const tilemap_tileset* tileset = map.find_tileset(gid);
@@ -72,14 +76,20 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh)
             const float u1 = (ox + tw) / atlas_w;
             const float v1 = (oy + th) / atlas_h;
 
+            // Apply Tiled flip flags to UV corners (order: diagonal → horizontal → vertical)
+            glm::vec2 uv_tl{u0, v0}, uv_tr{u1, v0}, uv_bl{u0, v1}, uv_br{u1, v1};
+            if (flip_d) std::swap(uv_tr, uv_bl);
+            if (flip_h) { std::swap(uv_tl, uv_tr); std::swap(uv_bl, uv_br); }
+            if (flip_v) { std::swap(uv_tl, uv_bl); std::swap(uv_tr, uv_br); }
+
             const float px = static_cast<float>(col) * tw;
             const float py = static_cast<float>(row) * th;
 
             geom->push_quad(
-                {{ px,      py      }, { u0, v0 }, color },
-                {{ px + tw, py      }, { u1, v0 }, color },
-                {{ px,      py + th }, { u0, v1 }, color },
-                {{ px + tw, py + th }, { u1, v1 }, color }
+                {{ px,      py      }, uv_tl, color },
+                {{ px + tw, py      }, uv_tr, color },
+                {{ px,      py + th }, uv_bl, color },
+                {{ px + tw, py + th }, uv_br, color }
             );
         }
     }

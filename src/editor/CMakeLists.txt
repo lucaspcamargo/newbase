@@ -12,5 +12,6 @@ newbase_add_system(NAME editor SOURCES
     ./texture_editor_widget.cpp
     ./audio_editor_widget.cpp
     ./text_editor_widget.cpp
+    ./graphplan_editor_widget.cpp
 )
 newbase_commit_systems()
