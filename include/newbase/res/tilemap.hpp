@@ -3,8 +3,10 @@
 #include <newbase/res/resource.hpp>
 #include <newbase/res/texture.hpp>
 #include <entt/entt.hpp>
+#include <glm/vec2.hpp>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace nb {
@@ -20,6 +22,13 @@ struct tilemap_tileset {
     int image_width  { 0 };
     int image_height { 0 };
     std::shared_ptr<rtexture> tex;
+
+    // Per-tile collision shapes from Tiled's tile collision editor.
+    // Key: local tile ID (gid - firstgid).
+    // Value: list of convex polygons, each a flat list of (x,y) pairs in tile-local coords.
+    // Key present, empty outer vector → tile has an objectgroup with no shapes (passthrough).
+    // Key absent → no objectgroup → tile is solid by default (full rectangle).
+    std::unordered_map<int, std::vector<std::vector<glm::vec2>>> tile_shapes;
 };
 
 struct tilemap_layer {

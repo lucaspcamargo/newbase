@@ -23,7 +23,7 @@ bool tilemap_system::init(ryml::ConstNodeRef /*cfg*/) { return true; }
 // Helpers
 // ---------------------------------------------------------------------------
 
-static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh)
+static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh, const std::string& render_layer)
 {
     if (map.tilesets.empty()) return;
     const tilemap_tileset& ts = map.tilesets[0];
@@ -42,6 +42,7 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh)
     {
         if (layer.layer_type != tilemap_layer::type::TILE) continue;
         if (!layer.visible) continue;
+        if (!render_layer.empty() && layer.name != render_layer) continue;
 
         const glm::vec4 color { 1.f, 1.f, 1.f, layer.opacity };
 
@@ -100,6 +101,23 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh)
     mesh.visible    = true;
 }
 
+// Apply Tiled flip flags to a point in tile-local coordinates.
+// Order matches the UV transform: diagonal first, then horizontal, then vertical.
+// For non-square tiles, flip_d reflects across the normalised anti-diagonal.
+static glm::vec2 transform_tile_point(glm::vec2 p, float tw, float th,
+                                       bool flip_h, bool flip_v, bool flip_d)
+{
+    if (flip_d)
+    {
+        // Reflect across the anti-diagonal in normalised space: (u,v) → (v,u).
+        const float u = p.x / tw, v = p.y / th;
+        p = { v * tw, u * th };
+    }
+    if (flip_h) p.x = tw - p.x;
+    if (flip_v) p.y = th - p.y;
+    return p;
+}
+
 static void build_collision_body(const rtilemap& map, const std::string& layer_name, cbody2d& body)
 {
     const tilemap_layer* layer = nullptr;
@@ -120,13 +138,68 @@ static void build_collision_body(const rtilemap& map, const std::string& layer_n
     body.fix_rotation = true;
     body.dirty        = true;
 
-    auto solid = [&](int row, int col) -> bool {
+    // Returns the tileset and local tile ID for a grid cell, or nullptr if empty.
+    auto tile_at = [&](int row, int col) -> std::pair<const tilemap_tileset*, int>
+    {
         const int idx = row * layer->width + col;
-        if (idx >= static_cast<int>(layer->tiles.size())) return false;
-        return (layer->tiles[idx] & 0x1FFFFFFF) != 0;
+        if (idx >= static_cast<int>(layer->tiles.size())) return {nullptr, 0};
+        const int raw_gid = layer->tiles[idx];
+        if ((raw_gid & 0x1FFFFFFF) == 0) return {nullptr, 0};
+        const int gid = raw_gid & 0x1FFFFFFF;
+        const tilemap_tileset* ts = map.find_tileset(gid);
+        if (!ts) return {nullptr, 0};
+        return {ts, gid - ts->firstgid};
     };
 
-    // Merge consecutive solid tiles in each row into a single wide shape.
+    // Pass 1: emit custom-shaped tiles (those with a tile_shapes objectgroup entry).
+    for (int row = 0; row < layer->height; ++row)
+    for (int col = 0; col < layer->width;  ++col)
+    {
+        const int idx = row * layer->width + col;
+        if (idx >= static_cast<int>(layer->tiles.size())) continue;
+        const int raw_gid = layer->tiles[idx];
+        if (raw_gid == 0) continue;
+
+        const bool flip_h = (raw_gid & 0x80000000) != 0;
+        const bool flip_v = (raw_gid & 0x40000000) != 0;
+        const bool flip_d = (raw_gid & 0x20000000) != 0;
+
+        auto [ts, local_id] = tile_at(row, col);
+        if (!ts) continue;
+
+        auto it = ts->tile_shapes.find(local_id);
+        if (it == ts->tile_shapes.end()) continue; // solid by default — handled in pass 2
+        // Empty outer vector = objectgroup with no shapes = passthrough, skip.
+        if (it->second.empty()) continue;
+
+        const float px = col * tw;
+        const float py = row * th;
+
+        for (const auto& poly : it->second)
+        {
+            shape2d s;
+            s.shape_type = shape2d_type::POLY;
+            s.shape_data.reserve(poly.size() * 2);
+            for (const glm::vec2& pt : poly)
+            {
+                const glm::vec2 tp = transform_tile_point(pt, tw, th, flip_h, flip_v, flip_d);
+                s.shape_data.push_back(px + tp.x);
+                s.shape_data.push_back(py + tp.y);
+            }
+            body.shapes.push_back(std::move(s));
+        }
+    }
+
+    // Pass 2: run-merge fully solid tiles (no tile_shapes entry at all).
+    // Tiles with a tile_shapes entry (even empty) are excluded — they were either
+    // handled above or are intentionally passthrough.
+    auto solid = [&](int row, int col) -> bool
+    {
+        auto [ts, local_id] = tile_at(row, col);
+        if (!ts) return false;
+        return ts->tile_shapes.find(local_id) == ts->tile_shapes.end();
+    };
+
     for (int row = 0; row < layer->height; ++row)
     {
         int col = 0;
@@ -134,12 +207,11 @@ static void build_collision_body(const rtilemap& map, const std::string& layer_n
         {
             if (!solid(row, col)) { ++col; continue; }
 
-            int run_start = col;
+            const int run_start = col;
             while (col < layer->width && solid(row, col)) ++col;
-            int run_end = col; // exclusive
 
             const float x0 = run_start * tw;
-            const float x1 = run_end   * tw;
+            const float x1 = col       * tw;
             const float y0 = row       * th;
             const float y1 = (row + 1) * th;
 
@@ -174,7 +246,7 @@ bool tilemap_system::step(step_phase phase)
 
         // Visual mesh
         auto& mesh = reg.get_or_emplace<cmesh2d>(eid);
-        build_tile_mesh(*tm.map, mesh);
+        build_tile_mesh(*tm.map, mesh, tm.render_layer);
         mesh.visible = tm.visible;
         mesh.pixel_snap = true;
 

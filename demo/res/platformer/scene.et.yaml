@@ -3,7 +3,17 @@
     script:
       lua: "res/platformer/scene.lua"
 
-- name: tilemap
+- name: tilemap_bg
+  comps:
+    spatial:
+      pos: [0, 0, 1]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    tilemap:
+      res: "res/platformer/map/map_0.tmj"
+      render_layer: "bg"
+
+- name: tilemap_fg
   comps:
     spatial:
       pos: [0, 0, 0]
@@ -11,6 +21,7 @@
       scale: [1, 1, 1]
     tilemap:
       res: "res/platformer/map/map_0.tmj"
+      render_layer: "fg"
       collision_layer: "fg"
 
 - name: player

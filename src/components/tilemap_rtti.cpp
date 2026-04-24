@@ -26,6 +26,8 @@ void ctilemap::_ensure_rtti()
                 .subtype          = rtti::DATA_SUBTYPE_RESOURCE,
                 .resource_type_id = "rtilemap"_hs.value()
             })
+        .data<&ctilemap::render_layer>("render_layer"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"render_layer"})
         .data<&ctilemap::collision_layer>("collision_layer"_hs)
             .custom<rtti::data_info>(rtti::data_info{"collision_layer"})
         .data<&ctilemap::visible>("visible"_hs)

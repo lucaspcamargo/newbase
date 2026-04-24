@@ -692,6 +692,79 @@ namespace nb {
                 return false;
             }
         }
+
+        // Per-tile collision shapes.
+        if (ts_node.has_child("tiles"))
+        {
+            for (auto tile_node : ts_node["tiles"])
+            {
+                int tile_id = 0;
+                if (!tile_node.has_child("id")) continue;
+                tile_node["id"] >> tile_id;
+                if (!tile_node.has_child("objectgroup")) continue;
+
+                // Mark tile as having an objectgroup (empty vector = passthrough).
+                auto& shapes = ts.tile_shapes[tile_id];
+
+                auto og = tile_node["objectgroup"];
+                if (!og.has_child("objects")) continue;
+
+                for (auto obj : og["objects"])
+                {
+                    float ox = 0.f, oy = 0.f, ow = 0.f, oh = 0.f, rot_deg = 0.f;
+                    if (obj.has_child("x"))        obj["x"]        >> ox;
+                    if (obj.has_child("y"))        obj["y"]        >> oy;
+                    if (obj.has_child("width"))    obj["width"]    >> ow;
+                    if (obj.has_child("height"))   obj["height"]   >> oh;
+                    if (obj.has_child("rotation")) obj["rotation"] >> rot_deg;
+
+                    if (obj.has_child("ellipse"))
+                    {
+                        log::warn("[rloader_tilemap] tile %d: ellipse collision shape unsupported, skipped", tile_id);
+                        continue;
+                    }
+
+                    std::vector<glm::vec2> poly;
+                    if (obj.has_child("polygon"))
+                    {
+                        for (auto pt : obj["polygon"])
+                        {
+                            float px = 0.f, py = 0.f;
+                            if (pt.has_child("x")) pt["x"] >> px;
+                            if (pt.has_child("y")) pt["y"] >> py;
+                            poly.push_back({px, py});
+                        }
+                    }
+                    else
+                    {
+                        // Rectangle → 4-vertex polygon.
+                        poly = {{0.f, 0.f}, {ow, 0.f}, {ow, oh}, {0.f, oh}};
+                    }
+
+                    // Apply object-local rotation (Tiled: clockwise degrees, y-down screen space).
+                    if (rot_deg != 0.f)
+                    {
+                        const float rad = rot_deg * (3.14159265f / 180.f);
+                        const float c = std::cos(rad), s = std::sin(rad);
+                        for (auto& p : poly)
+                        {
+                            float nx = p.x * c - p.y * s;
+                            float ny = p.x * s + p.y * c;
+                            p = {nx, ny};
+                        }
+                    }
+
+                    // Translate by object origin within the tile.
+                    for (auto& p : poly) { p.x += ox; p.y += oy; }
+
+                    if (!poly.empty())
+                        shapes.push_back(std::move(poly));
+                }
+            }
+            log::info("[rloader_tilemap] tileset: loaded collision shapes for %zu tiles",
+                      ts.tile_shapes.size());
+        }
+
         return true;
     }
 

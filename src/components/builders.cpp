@@ -132,6 +132,12 @@ bool nb::build_tilemap(ryml::ConstNodeRef def, ctilemap &dst)
         c4::from_chars(def["res"].val(), &respath);
         dst.map = rman().get<rtilemap>(entt::hashed_string{respath.c_str()}.value());
     }
+    if (def.has_child("render_layer"))
+    {
+        std::string s;
+        def["render_layer"] >> s;
+        dst.render_layer = std::move(s);
+    }
     if (def.has_child("collision_layer"))
     {
         std::string s;
