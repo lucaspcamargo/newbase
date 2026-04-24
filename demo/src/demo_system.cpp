@@ -2,10 +2,13 @@
 #include <newbase/engine.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/audio/audio.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/ui/markdown.hpp>
 #include <entt/locator/locator.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <memory>
+#include <string>
 #include <cstdlib>
 #include <cstring>
 
@@ -14,42 +17,15 @@ using entt::operator""_hs;
 struct demo_entry {
     const char*   name;
     entt::id_type scene_id;
-    const char*   description;
+    entt::id_type readme_id;
 };
 
 static const demo_entry s_demos[] = {
-    {
-        "Hello World",
-        "res/hello_world/scene.et.yaml"_hs,
-        "A minimal scene that sets up a camera, shows a sprite, and runs a Lua script. "
-        "Good starting point for understanding how entities, components, and systems fit together."
-        "\n\n"
-        "At any point during this demo, you may press [F1] to bring up the editor tools. This will "
-        "allow you to inspect the scene, view and edit entity/component data, inspect resources, and more. Try it out!"
-        "\n\n"
-        "You can also bring out the console with the tilde (`) key. This will show log messages for now."
-    },
-    {
-        "Asteroids",
-        "res/asteroids/title.et.yaml"_hs,
-        "A classic Asteroids clone built on top of newbase. Showcases physics, particle "
-        "systems, sprites, audio, Lua scripting, and scene management all working together."
-        "\n\n"
-        "Use arrow keys (or joystick analog) to control the ship, and press the [a] key (or X joystick button) to fire."
-    },
-    {
-        "Physics 2D",
-        "res/physics2d_demo/scene.et.yaml"_hs,
-        "A rigid-body simulation using the Box2D v3 backend. A mix of circles and boxes "
-        "tumble inside a static container under gentle gravity. Enable physics debug draw "
-        "from the Physics2D tool window to visualize collision shapes."
-    },
-    {
-        "Platformer",
-        "res/platformer/scene.et.yaml"_hs,
-        "A classic platformer demo. Showcases tilemap loading and rendering via the Tiled "
-        "JSON format, tileset support with spacing/margin, and Box2D collision from tile layers."
-    },
+    { "Hello World", "res/hello_world/scene.et.yaml"_hs,   "res/hello_world/README.md"_hs   },
+    { "Asteroids",   "res/asteroids/title.et.yaml"_hs,     "res/asteroids/README.md"_hs     },
+    { "Physics 2D",  "res/physics2d_demo/scene.et.yaml"_hs,"res/physics2d_demo/README.md"_hs},
+    { "Platformer",  "res/platformer/scene.et.yaml"_hs,    "res/platformer/README.md"_hs    },
+    { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,  "res/fast_rodent/README.md"_hs   },
 };
 static constexpr int s_demo_count = static_cast<int>(sizeof(s_demos) / sizeof(s_demos[0]));
 
@@ -115,7 +91,19 @@ bool demo_system::init(ryml::ConstNodeRef)
         ImGui::SetWindowFontScale(1.0f);
 
         ImGui::Separator();
-        ImGui::TextWrapped("%s", s_demos[s_current].description);
+
+        // Load README on first access for each demo (cached as std::string)
+        static std::string s_readmes[s_demo_count];
+        if (s_readmes[s_current].empty())
+        {
+            std::vector<char> buf;
+            if (nb::rman().read_all_sync(s_demos[s_current].readme_id, buf, true))
+                s_readmes[s_current] = buf.data();
+        }
+        if (!s_readmes[s_current].empty())
+            nb::ui::Markdown(s_readmes[s_current]);
+        else
+            ImGui::TextDisabled("(no description)");
 
         ImGui::End();
     });

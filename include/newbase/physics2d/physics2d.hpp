@@ -47,6 +47,9 @@ public:
     bool character_is_grounded(entt::entity ent) const;
     bool character_warp(entt::entity ent, glm::vec2 pos);
 
+    // world-space raycast; returns vec4(fraction, nx, ny, 0) or vec4(-1,0,0,0) on miss
+    glm::vec4 raycast(float x1, float y1, float x2, float y2, uint64_t mask) const;
+
 private:
     void _draw_tool_window(bool *close);
     void _step_characters(entt::registry &reg, float dt);

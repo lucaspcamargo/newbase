@@ -612,6 +612,16 @@ bool physics2d::character_warp(entt::entity ent, glm::vec2 pos)
     return true;
 }
 
+glm::vec4 physics2d::raycast(float x1, float y1, float x2, float y2, uint64_t mask) const
+{
+    if (B2_IS_NULL(_d->world_id)) return {-1.f, 0.f, 0.f, 0.f};
+    b2QueryFilter filter = b2DefaultQueryFilter();
+    filter.maskBits = mask;
+    b2RayResult r = b2World_CastRayClosest(_d->world_id, {x1, y1}, {x2 - x1, y2 - y1}, filter);
+    if (!r.hit) return {-1.f, 0.f, 0.f, 0.f};
+    return {r.fraction, r.normal.x, r.normal.y, 0.f};
+}
+
 // RTTI metadata
 extern "C" void _rtti_init_physics2d()
 {
@@ -646,7 +656,9 @@ extern "C" void _rtti_init_physics2d()
         .func<&nb::physics2d::character_is_grounded>("character_is_grounded"_hs)
             .custom<rtti::func_info>(rtti::func_info{"character_is_grounded"})
         .func<&nb::physics2d::character_warp>("character_warp"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"character_warp"});
+            .custom<rtti::func_info>(rtti::func_info{"character_warp"})
+        .func<&nb::physics2d::raycast>("raycast"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"raycast"});
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::physics2d>>()

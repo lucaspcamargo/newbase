@@ -1,0 +1,37 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/fast_rodent/scene.lua"
+
+- name: tilemap_bg
+  comps:
+    spatial:
+      pos: [0, 0, 1]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    tilemap:
+      res: "res/platformer/map/map_0.tmj"
+      render_layer: "bg"
+
+- name: tilemap_fg
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    tilemap:
+      res: "res/platformer/map/map_0.tmj"
+      render_layer: "fg"
+      collision_layer: "fg"
+
+- name: player
+  comps:
+    spatial:
+      pos: [490, 100, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/physics2d_demo/circle.sprite
+      pixel_snap: true
+    script:
+      lua: "res/fast_rodent/player.lua"

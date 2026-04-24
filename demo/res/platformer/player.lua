@@ -10,11 +10,21 @@ local MAP_H  = 20 * 70
 local VIEW_W = 1920
 local VIEW_H = 1080
 
+local SPAWN_X = 490
+local SPAWN_Y = 100
+
 local update_handle = clock_update_add(function(delta)
     local dir = input_action_direction(dir_hs)
     local ch  = c_character2d()
     local sp  = c_spatial()
     if not ch or not sp then return end
+
+    -- Snap back to spawn if the player exits the map
+    if sp.pos.x < 0 or sp.pos.x > MAP_W or sp.pos.y < 0 or sp.pos.y > MAP_H then
+        physics2d_character_warp(eid, vec2.new(SPAWN_X, SPAWN_Y))
+        physics2d_character_set_velocity(eid, vec2.new(0, 0))
+        return
+    end
 
     local vx = dir.x * WALK_SPEED
     local vy = ch.velocity.y  -- preserve vertical (gravity accumulated by system)
