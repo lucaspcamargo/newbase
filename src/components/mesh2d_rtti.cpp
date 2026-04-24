@@ -27,6 +27,8 @@ void cmesh2d::_ensure_rtti()
                 .resource_type_id = "rtexture"_hs.value()
             })
         .data<&cmesh2d::visible>("visible"_hs)
-            .custom<rtti::data_info>(rtti::data_info{"visible"});
+            .custom<rtti::data_info>(rtti::data_info{"visible"})
+        .data<&cmesh2d::pixel_snap>("pixel_snap"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"pixel_snap"});
     log::info("[cmesh2d] registered");
 }

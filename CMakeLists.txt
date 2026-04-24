@@ -112,6 +112,10 @@ add_library(newbase STATIC
     src/graphplan/plan.cpp
     src/graphplan/editor.cpp
 
+    # i18n
+    src/i18n/i18n.cpp
+    src/i18n/locale_detect.cpp
+
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp

@@ -27,6 +27,7 @@
 #include <ryml_std.hpp>
 #include <tracy/Tracy.hpp>
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -400,6 +401,7 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
             if (!tex->uploaded && tex->surf)
             {
                 tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
+                SDL_SetTextureScaleMode(tex->tex, SDL_SCALEMODE_NEAREST);
                 tex->uploaded = true;
                 SDL_DestroySurface(tex->surf);
                 tex->surf = nullptr;
@@ -424,9 +426,13 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
             const glm::vec4 loc_right {spatial.world * glm::vec4{ anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
             const glm::vec4 loc_down  {spatial.world * glm::vec4{-anchor_delta.x,  anchor_delta.y, 0.f, 1.f}};
 
-            const SDL_FPoint origin{(viewproj * loc_origin).x, (viewproj * loc_origin).y};
-            const SDL_FPoint right {(viewproj * loc_right ).x, (viewproj * loc_right ).y};
-            const SDL_FPoint down  {(viewproj * loc_down  ).x, (viewproj * loc_down  ).y};
+            auto snap = [&](float v) { return sprite->pixel_snap ? std::roundf(v) : v; };
+            const glm::vec4 vp_origin = viewproj * loc_origin;
+            const glm::vec4 vp_right  = viewproj * loc_right;
+            const glm::vec4 vp_down   = viewproj * loc_down;
+            const SDL_FPoint origin{snap(vp_origin.x), snap(vp_origin.y)};
+            const SDL_FPoint right {snap(vp_right .x), snap(vp_right .y)};
+            const SDL_FPoint down  {snap(vp_down  .x), snap(vp_down  .y)};
 
             SDL_SetTextureColorModFloat(tex->tex, sprite->color.r, sprite->color.g, sprite->color.b);
             SDL_SetTextureAlphaModFloat(tex->tex, sprite->color.a);
@@ -446,6 +452,7 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
                 if (!tex->uploaded && tex->surf)
                 {
                     tex->tex = SDL_CreateTextureFromSurface(_render, tex->surf);
+                    SDL_SetTextureScaleMode(tex->tex, SDL_SCALEMODE_NEAREST);
                     tex->uploaded = true;
                     SDL_DestroySurface(tex->surf);
                     tex->surf = nullptr;
@@ -460,7 +467,8 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
                 const auto& v = src[i];
                 const glm::vec4 wp = viewproj * (spatial.world * glm::vec4(v.pos.x, v.pos.y, 0.f, 1.f));
                 _xform_buf[i] = SDL_Vertex{
-                    .position  = {wp.x, wp.y},
+                    .position  = {mesh->pixel_snap ? std::roundf(wp.x) : wp.x,
+                                  mesh->pixel_snap ? std::roundf(wp.y) : wp.y},
                     .color     = {v.color.r, v.color.g, v.color.b, v.color.a},
                     .tex_coord = {v.uv.x, v.uv.y},
                 };

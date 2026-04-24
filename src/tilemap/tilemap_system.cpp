@@ -176,6 +176,7 @@ bool tilemap_system::step(step_phase phase)
         auto& mesh = reg.get_or_emplace<cmesh2d>(eid);
         build_tile_mesh(*tm.map, mesh);
         mesh.visible = tm.visible;
+        mesh.pixel_snap = true;
 
         // Collision body
         if (!tm.collision_layer.empty())

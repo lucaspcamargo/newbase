@@ -13,6 +13,7 @@ struct cmesh2d {
     std::shared_ptr<rtexture>           tex;        // nullptr = untextured (vertex colors only)
     blend_mode_2d                       blend_mode  { blend_mode_2d::ALPHA };
     bool                                visible     { true };
+    bool                                pixel_snap  { false };
 
     static void _ensure_rtti();
 };

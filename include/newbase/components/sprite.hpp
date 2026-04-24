@@ -8,8 +8,9 @@
 namespace nb {
     struct csprite {
         std::shared_ptr<rsprite> spr;
-        bool      visible { true };
-        glm::vec4 color   { 1.f, 1.f, 1.f, 1.f };
+        bool      visible    { true };
+        bool      pixel_snap { false };
+        glm::vec4 color      { 1.f, 1.f, 1.f, 1.f };
 
         // Animation state — managed by sprite_anim system
         std::string sequence;        // empty = first sequence

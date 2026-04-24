@@ -36,6 +36,9 @@ enum class node_type
 #ifdef NEWBASE_TALKIE_PCM
     TALKIE_PCM_SOURCE = 20, // TalkiePCM LPC speech synthesis source
 #endif
+    GROUP        = 21, // subgraph node referencing an rgraphplan resource
+    GROUP_INPUT  = 22, // audio entry point within a group subgraph
+    GROUP_OUTPUT = 23, // audio exit point within a group subgraph
 };
 
 class node

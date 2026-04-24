@@ -229,10 +229,11 @@ bool particle_system::step(step_phase phase)
         // Keep sibling cmesh2d in sync; auto-create if missing
         auto* mesh = reg.try_get<cmesh2d>(eid);
         if (!mesh) mesh = &reg.emplace<cmesh2d>(eid);
-        mesh->geom       = emitter.geom;
-        mesh->tex        = emitter.res->tex;
-        mesh->blend_mode = (emitter.res->blend_mode == particle_blend_mode::ADD)
-                           ? blend_mode_2d::ADD : blend_mode_2d::ALPHA;
+        mesh->geom        = emitter.geom;
+        mesh->tex         = emitter.res->tex;
+        mesh->blend_mode  = (emitter.res->blend_mode == particle_blend_mode::ADD)
+                            ? blend_mode_2d::ADD : blend_mode_2d::ALPHA;
+        mesh->pixel_snap  = emitter.pixel_snap;
     }
 
     return true;

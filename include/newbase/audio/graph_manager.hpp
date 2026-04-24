@@ -69,9 +69,15 @@ private:
     struct impl;
     impl* _d {nullptr};
 
+    struct group_expand_result {
+        int input_ag_id  {-1};
+        int output_ag_id {-1};
+    };
+
     static void _reset_plan_caches(impl*);
     static void _apply_rgraphplan(impl*, const struct rgraphplan&);
     static void _load_plan_from_file(impl*, const char* path);
+    static group_expand_result _expand_group_impl(impl*, audio_graph::graph&, const struct rgraphplan&, int depth);
 };
 
 } // namespace nb

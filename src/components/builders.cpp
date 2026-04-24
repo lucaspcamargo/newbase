@@ -46,6 +46,8 @@ bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
         load_vec4(def["color"], dst.color);
     if(def.has_child("visible"))
         def["visible"] >> dst.visible;
+    if(def.has_child("pixel_snap"))
+        def["pixel_snap"] >> dst.pixel_snap;
     return true;
 }
 

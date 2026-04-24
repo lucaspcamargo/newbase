@@ -254,6 +254,15 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                       { prop_def{"volume", entt::meta_any{1.f}} },
                       true, CAT_SOURCE},
 #endif
+        node_type_def{static_cast<int>(audio_graph::node_type::GROUP), "Group",
+                      {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
+                      { prop_def{"res_id", entt::meta_any{entt::id_type{0}}, false,
+                                 entt::hashed_string{"rgraphplan"}.value()} },
+                      true, CAT_ROUTING},
+        node_type_def{static_cast<int>(audio_graph::node_type::GROUP_INPUT),  "Group Input",
+                      {}, {AUDIO_PIN_STREAM}, {}, false, CAT_ROUTING},
+        node_type_def{static_cast<int>(audio_graph::node_type::GROUP_OUTPUT), "Group Output",
+                      {AUDIO_PIN_STREAM}, {}, {}, false, CAT_ROUTING},
     };
 
     auto set_color = [&](audio_graph::node_type nt, ImVec4 color) {
@@ -295,6 +304,9 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
 #ifdef NEWBASE_TALKIE_PCM
     set_color(audio_graph::node_type::TALKIE_PCM_SOURCE, SOURCE_COLOR);
 #endif
+    set_color(audio_graph::node_type::GROUP,        CORE_COLOR);
+    set_color(audio_graph::node_type::GROUP_INPUT,  BUS_COLOR);
+    set_color(audio_graph::node_type::GROUP_OUTPUT, BUS_COLOR);
 
     // Vorbis custom draw.
     auto vbr_it = std::find_if(d.node_types.begin(), d.node_types.end(),
@@ -872,6 +884,232 @@ bool audio_graph_manager::draw_editor()
     return _d->editor->draw();
 }
 
+// ---------------------------------------------------------------------------
+// Group subgraph expansion helper
+// ---------------------------------------------------------------------------
+
+static constexpr int MAX_GROUP_DEPTH = 8;
+
+audio_graph_manager::group_expand_result audio_graph_manager::_expand_group_impl(
+    impl* d,
+    audio_graph::graph& new_graph,
+    const rgraphplan& subgp,
+    int depth)
+{
+    audio_graph_manager::group_expand_result result;
+    if (depth > MAX_GROUP_DEPTH)
+    {
+        log::error("[audio] group nesting depth limit reached (%d)", depth);
+        return result;
+    }
+
+    const auto* dom = graphplan::find_domain("audio_graph");
+    if (!dom)
+    {
+        log::error("[audio] audio_graph domain not registered during group expansion");
+        return result;
+    }
+
+    using NT = audio_graph::node_type;
+    const int GRPI_TYPE  = static_cast<int>(NT::GROUP_INPUT);
+    const int GRPO_TYPE  = static_cast<int>(NT::GROUP_OUTPUT);
+    const int GROUP_TYPE = static_cast<int>(NT::GROUP);
+
+    auto pf = [](const rgraphplan::node_desc& nd, const char* k, float def) -> float {
+        auto it = nd.properties.find(k);
+        if (it == nd.properties.end()) return def;
+        if (const float* v = it->second.try_cast<float>()) return *v;
+        return def;
+    };
+    auto pb = [](const rgraphplan::node_desc& nd, const char* k, bool def) -> bool {
+        auto it = nd.properties.find(k);
+        if (it == nd.properties.end()) return def;
+        if (const bool* v = it->second.try_cast<bool>()) return *v;
+        return def;
+    };
+    auto pid = [](const rgraphplan::node_desc& nd, const char* k) -> entt::id_type {
+        auto it = nd.properties.find(k);
+        if (it == nd.properties.end()) return 0;
+        if (const entt::id_type* v = it->second.try_cast<entt::id_type>()) return *v;
+        return 0;
+    };
+
+    std::unordered_map<uint64_t, audio_graph::node_id> sub_id_map;
+    std::unordered_map<uint64_t, audio_graph::node_id> sub_group_input_map;
+
+    for (const auto& nd : subgp.nodes)
+    {
+        const auto* tdef = dom->find_type_by_name(nd.type_name.c_str());
+        if (!tdef)
+        {
+            log::warn("[audio] group: unknown node type '%s' — skipped", nd.type_name.c_str());
+            continue;
+        }
+        const int type_id = tdef->type_id;
+
+        std::shared_ptr<audio_graph::node> node_ptr;
+
+        if (type_id == GRPI_TYPE)
+        {
+            node_ptr = std::make_shared<audio_graph::mixer_node>(d->next_ag_id++);
+            result.input_ag_id = node_ptr->id();
+        }
+        else if (type_id == GRPO_TYPE)
+        {
+            node_ptr = std::make_shared<audio_graph::mixer_node>(d->next_ag_id++);
+            result.output_ag_id = node_ptr->id();
+        }
+        else if (type_id == GROUP_TYPE)
+        {
+            entt::id_type res_id = pid(nd, "res_id");
+            if (!res_id) { log::warn("[audio] group: nested GROUP has no res_id"); continue; }
+            auto sub_res = rman().get<rgraphplan>(res_id);
+            if (!sub_res)
+            {
+                log::warn("[audio] group: nested GROUP rgraphplan %x not found", res_id);
+                continue;
+            }
+            auto r = _expand_group_impl(d, new_graph, *sub_res, depth + 1);
+            if (r.output_ag_id >= 0) sub_id_map[nd.id]           = r.output_ag_id;
+            if (r.input_ag_id  >= 0) sub_group_input_map[nd.id]  = r.input_ag_id;
+            continue;
+        }
+        else if (type_id == static_cast<int>(NT::GAIN))
+        {
+            node_ptr = std::make_shared<audio_graph::gain_node>(d->next_ag_id++, pf(nd, "gain_db", 0.f));
+        }
+        else if (type_id == static_cast<int>(NT::REVERB))
+        {
+            node_ptr = std::make_shared<audio_graph::reverb_node>(d->next_ag_id++,
+                pf(nd, "room_size", 0.5f), pf(nd, "damping", 0.5f), pf(nd, "wet", 0.33f));
+        }
+        else if (type_id == static_cast<int>(NT::COMPRESSOR))
+        {
+            node_ptr = std::make_shared<audio_graph::compressor_node>(d->next_ag_id++,
+                pf(nd, "threshold_db", -18.f), pf(nd, "ratio", 4.f),
+                pf(nd, "attack_ms", 10.f), pf(nd, "release_ms", 100.f), pf(nd, "makeup_db", 0.f));
+        }
+        else if (type_id == static_cast<int>(NT::EQ5))
+        {
+            auto en = std::make_shared<audio_graph::eq5_node>(d->next_ag_id++);
+            char key[32];
+            for (int b = 0; b < 5; ++b)
+            {
+                snprintf(key, sizeof(key), "band%d_freq",    b); float freq = pf(nd, key, 0.f);
+                snprintf(key, sizeof(key), "band%d_gain_db", b); float gain = pf(nd, key, 0.f);
+                snprintf(key, sizeof(key), "band%d_q",       b); float q    = pf(nd, key, 0.707f);
+                en->set_band(static_cast<size_t>(b), freq, gain, q);
+            }
+            node_ptr = std::move(en);
+        }
+        else if (type_id == static_cast<int>(NT::BITCRUSHER))
+        {
+            node_ptr = std::make_shared<audio_graph::bitcrusher_node>(d->next_ag_id++,
+                pf(nd, "bits", 8.f), pf(nd, "downsample", 1.f));
+        }
+        else if (type_id == static_cast<int>(NT::DELAY))
+        {
+            node_ptr = std::make_shared<audio_graph::delay_node>(d->next_ag_id++,
+                pf(nd, "delay_ms", 250.f), pf(nd, "feedback", 0.4f), pf(nd, "mix", 0.5f));
+        }
+        else if (type_id == static_cast<int>(NT::RING_MOD))
+        {
+            node_ptr = std::make_shared<audio_graph::ring_mod_node>(d->next_ag_id++,
+                pf(nd, "carrier_hz", 200.f), pf(nd, "mix", 1.f));
+        }
+        else if (type_id == static_cast<int>(NT::CHORUS))
+        {
+            node_ptr = std::make_shared<audio_graph::chorus_node>(d->next_ag_id++,
+                pf(nd, "rate_hz", 0.5f), pf(nd, "depth_ms", 8.f),
+                pf(nd, "voices", 2.f),   pf(nd, "mix", 0.5f));
+        }
+        else if (type_id == static_cast<int>(NT::WAVESHAPER))
+        {
+            node_ptr = std::make_shared<audio_graph::waveshaper_node>(d->next_ag_id++,
+                pf(nd, "drive", 5.f), pf(nd, "shape", 0.f), pf(nd, "mix", 1.f));
+        }
+        else if (type_id == static_cast<int>(NT::PHASER))
+        {
+            node_ptr = std::make_shared<audio_graph::phaser_node>(d->next_ag_id++,
+                pf(nd, "rate_hz", 0.5f), pf(nd, "depth", 0.8f),
+                pf(nd, "stages", 4.f),   pf(nd, "feedback", 0.5f), pf(nd, "mix", 0.5f));
+        }
+        else if (type_id == static_cast<int>(NT::PITCH))
+        {
+            node_ptr = std::make_shared<audio_graph::pitch_node>(d->next_ag_id++,
+                pf(nd, "pitch_ratio", 1.f));
+        }
+        else if (type_id == static_cast<int>(NT::MIXER))
+        {
+            node_ptr = std::make_shared<audio_graph::mixer_node>(d->next_ag_id++);
+        }
+        else if (type_id == static_cast<int>(NT::VORBIS_SOURCE))
+        {
+            entt::id_type res_id = pid(nd, "res_id");
+            if (!res_id) continue;
+            auto vres = rman().get<rvorbis>(res_id);
+            if (!vres || !vres->valid) { log::warn("[audio] group vorbis: resource %x not found", res_id); continue; }
+            auto vp = std::make_unique<audio_producer_vorbis>(vres);
+            if (!vp->is_valid()) { log::warn("[audio] group vorbis: producer init failed"); continue; }
+            bool loop = pb(nd, "loop", false);
+            auto prod = std::make_unique<audio_producer_looper>(
+                std::shared_ptr<audio_producer>(std::move(vp)), 0, loop ? 0 : 1);
+            node_ptr = std::make_shared<audio_graph::source_node>(d->next_ag_id++, std::move(prod));
+        }
+        else if (type_id == static_cast<int>(NT::SINE_SOURCE))
+        {
+            node_ptr = std::make_shared<audio_graph::source_node>(d->next_ag_id++,
+                std::make_unique<audio_producer_sine>(new_graph.spec(),
+                    pf(nd, "frequency", 440.f), pf(nd, "amplitude", 0.5f)));
+        }
+        else if (type_id == static_cast<int>(NT::NOISE_SOURCE))
+        {
+            node_ptr = std::make_shared<audio_graph::source_node>(d->next_ag_id++,
+                std::make_unique<audio_producer_noise>(new_graph.spec(),
+                    pf(nd, "amplitude", 0.5f)));
+        }
+        else
+        {
+            log::warn("[audio] group: node type %d ('%s') not supported in subgraphs — skipped",
+                      type_id, nd.type_name.c_str());
+            continue;
+        }
+
+        if (node_ptr)
+        {
+            new_graph.add_node(node_ptr);
+            sub_id_map[nd.id] = node_ptr->id();
+        }
+    }
+
+    for (const auto& ld : subgp.links)
+    {
+        auto from_it = sub_id_map.find(ld.from_node);
+        if (from_it == sub_id_map.end()) continue;
+
+        audio_graph::node_id ag_dst;
+        auto gin_it = sub_group_input_map.find(ld.to_node);
+        if (gin_it != sub_group_input_map.end())
+            ag_dst = gin_it->second;
+        else
+        {
+            auto to_it = sub_id_map.find(ld.to_node);
+            if (to_it == sub_id_map.end()) continue;
+            ag_dst = to_it->second;
+        }
+        new_graph.connect(from_it->second, ag_dst);
+    }
+
+    if (result.input_ag_id < 0)
+        log::warn("[audio] group subgraph has no Group Input node");
+    if (result.output_ag_id < 0)
+        log::warn("[audio] group subgraph has no Group Output node");
+
+    log::verb("[audio] expanded group depth=%d: input_ag=%d output_ag=%d nodes=%zu",
+              depth, result.input_ag_id, result.output_ag_id, subgp.nodes.size());
+    return result;
+}
+
 void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx)
 {
     assert(_d->gplan);
@@ -899,6 +1137,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
 #ifdef NEWBASE_TALKIE_PCM
     const int TALKIE_PCM_TYPE  = static_cast<int>(audio_graph::node_type::TALKIE_PCM_SOURCE);
 #endif
+    const int GROUP_TYPE       = static_cast<int>(audio_graph::node_type::GROUP);
 
     auto prop_f = [](const graphplan::node_data& nd, const char* key, float def) -> float {
         auto it = nd.properties.find(key);
@@ -949,6 +1188,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     };
 
     std::unordered_map<uint64_t, audio_graph::node_id> id_map;
+    std::unordered_map<uint64_t, audio_graph::node_id> group_input_map;
 
     audio_graph::graph new_graph;
     new_graph.set_spec(live_graph.spec());
@@ -998,6 +1238,27 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             auto it = active_buses.find(bus_id);
             if (it != active_buses.end())
                 id_map[gp_id] = it->second->id();
+            continue;
+        }
+
+        if (nd.type == GROUP_TYPE)
+        {
+            entt::id_type res_id = prop_id(nd, "res_id");
+            if (!res_id) { log::warn("[audio] GROUP node %llu has no res_id", gp_id); continue; }
+            auto sub_res = rman().get<rgraphplan>(res_id);
+            if (!sub_res)
+            {
+                log::warn("[audio] GROUP node %llu: rgraphplan resource %x not found", gp_id, res_id);
+                continue;
+            }
+            auto r = _expand_group_impl(_d, new_graph, *sub_res, 1);
+            if (r.output_ag_id >= 0)
+            {
+                id_map[gp_id] = r.output_ag_id;
+                _d->node_cache[gp_id] = new_graph.nodes().at(r.output_ag_id);
+            }
+            if (r.input_ag_id >= 0)
+                group_input_map[gp_id] = r.input_ag_id;
             continue;
         }
 
@@ -1435,13 +1696,25 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 ag_src = src_it->second;
             }
 
-            auto dst_it = id_map.find(dst_gp_id);
-            if (dst_it == id_map.end())
+            audio_graph::node_id ag_dst;
             {
-                log::warn("[audio] graphplan link %llu dst node unmapped — skipped", link_id);
-                continue;
+                auto gin_it = group_input_map.find(dst_gp_id);
+                if (gin_it != group_input_map.end())
+                {
+                    ag_dst = gin_it->second;
+                }
+                else
+                {
+                    auto dst_it = id_map.find(dst_gp_id);
+                    if (dst_it == id_map.end())
+                    {
+                        log::warn("[audio] graphplan link %llu dst node unmapped — skipped", link_id);
+                        continue;
+                    }
+                    ag_dst = dst_it->second;
+                }
             }
-            new_graph.connect(ag_src, dst_it->second);
+            new_graph.connect(ag_src, ag_dst);
         }
     }
 

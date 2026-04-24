@@ -21,6 +21,7 @@
       scale: [1, 1, 1]
     sprite:
       res: res/physics2d_demo/circle.sprite
+      pixel_snap: true
     character2d:
       capsule_radius: 16.0
       capsule_half_height: 19.0

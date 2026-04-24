@@ -9,6 +9,7 @@
 #include <newbase/engine.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/i18n/i18n.hpp>
 #include <newbase/log.hpp>
 #include <entt/entt.hpp>
 #include <unordered_map>
@@ -478,6 +479,34 @@ void script_lua::bind_global_api()
         return 0;
     });
     lua_setglobal(_d->L, "scene_load");
+
+    // tr(msg) -> string: translate a message using the active i18n dictionary
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        const char *msg = luaL_checkstring(L, 1);
+        auto result = nb::i18n::tr(msg);
+        lua_pushstring(L, result.c_str());
+        return 1;
+    });
+    lua_setglobal(_d->L, "tr");
+
+    // ntr(msg, msg_plural, n) -> string: translate with plural form
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        const char *msg        = luaL_checkstring(L, 1);
+        const char *msg_plural = luaL_checkstring(L, 2);
+        int n                  = static_cast<int>(luaL_checkinteger(L, 3));
+        auto result = nb::i18n::ntr(msg, msg_plural, n);
+        lua_pushstring(L, result.c_str());
+        return 1;
+    });
+    lua_setglobal(_d->L, "ntr");
+
+    // set_language(lang) -- override active language, e.g. "pt_BR"
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        const char *lang = luaL_checkstring(L, 1);
+        nb::i18n::set_language(lang);
+        return 0;
+    });
+    lua_setglobal(_d->L, "set_language");
 }
 
 bool script_lua::step(step_phase phase)

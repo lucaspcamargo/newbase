@@ -8,6 +8,7 @@
 #include <newbase/reflection/coercions.hpp>
 #include <newbase/reflection/lib_glm.hpp>
 #include <newbase/res/rtti.hpp>
+#include <newbase/i18n/i18n.hpp>
 #include <newbase/log.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/services/rtti_info.hpp>
@@ -137,6 +138,8 @@ engine::engine()
         exit(1);
     }
 
+    nb::i18n::init(_d->cfg.rootref());
+
     auto systems = _d->cfg["systems"];
     for(ryml::ConstNodeRef n : systems.children())
     {
@@ -216,6 +219,7 @@ bool engine::teardown()
     // destroy all system shared_ptrs
     _d->_systems.clear();
     _d->_systems_meta.clear();
+    nb::i18n::shutdown();
     ::nb::rman().clear();
     return true;
 }

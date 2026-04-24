@@ -28,6 +28,8 @@ void cparticle_emitter::_ensure_rtti()
             })
         .data<&cparticle_emitter::emitting>("emitting"_hs)
             .custom<rtti::data_info>(rtti::data_info{"emitting"})
+        .data<&cparticle_emitter::pixel_snap>("pixel_snap"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"pixel_snap"})
         .data<&cparticle_emitter::emit_rate_override>("emit_rate_override"_hs)
             .custom<rtti::data_info>(rtti::data_info{"emit_rate_override"});
     log::info("[cparticle_emitter] registered");

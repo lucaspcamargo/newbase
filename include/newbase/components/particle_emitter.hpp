@@ -38,6 +38,7 @@ struct particle_pool {
 struct cparticle_emitter {
     std::shared_ptr<rparticle_emitter>  res;
     bool                                emitting           { true  };
+    bool                                pixel_snap         { false };
     float                               emit_rate_override { -1.f  }; // < 0 = use resource rate
 
     // Runtime state — managed by particle_system
