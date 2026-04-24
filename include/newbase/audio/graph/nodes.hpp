@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/nb_config.h>
+#include <newbase/audio/dsp_utils.hpp>
 #include <newbase/audio/graph/node.hpp>
 #include <newbase/audio/producer.hpp>
 #include <newbase/audio/converter.hpp>
@@ -241,7 +242,7 @@ public:
                 {
                     auto& d   = cl.comb[i];
                     float buf_sample = d.buf[d.pos];
-                    d.filter_store = buf_sample * (1.f - damping_) + d.filter_store * damping_;
+                    d.filter_store = dsp::kill_denorm(buf_sample * (1.f - damping_) + d.filter_store * damping_);
                     d.buf[d.pos]   = x + d.filter_store * room_size_;
                     d.pos = (d.pos + 1) % d.buf.size();
                     rev  += buf_sample;
@@ -573,7 +574,7 @@ private:
         const auto& c = coeffs_[band];
         float y = c.b0*x + c.b1*s.x1 + c.b2*s.x2 - c.a1*s.y1 - c.a2*s.y2;
         s.x2 = s.x1; s.x1 = x;
-        s.y2 = s.y1; s.y1 = y;
+        s.y2 = s.y1; s.y1 = dsp::kill_denorm(y);
         return y;
     }
 };

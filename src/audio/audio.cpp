@@ -18,6 +18,7 @@
 #include "imgui.h"
 #include <newbase/ui/imgui_icons.hpp>
 
+#include <newbase/audio/dsp_utils.hpp>
 #include <algorithm>
 #include <cassert>
 
@@ -73,6 +74,10 @@ struct nb::audio_p {
 static void audio_out_cb(void* userdata, SDL_AudioStream* stream, int additional_amount, int)
 {
     if (!additional_amount) return;
+
+    static thread_local bool s_ftz_set = false;
+    if (!s_ftz_set) { nb::dsp::set_ftz(); s_ftz_set = true; }
+
     auto* d = static_cast<audio_p*>(userdata);
 
     audio_format dev_fmt = audio_format::UNKNOWN;
