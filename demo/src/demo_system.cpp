@@ -18,6 +18,7 @@ struct demo_entry {
     const char*   name;
     entt::id_type scene_id;
     entt::id_type readme_id;
+    bool          hidden { false }; // hidden from combo; still reachable via --demo <index>
 };
 
 static const demo_entry s_demos[] = {
@@ -25,7 +26,7 @@ static const demo_entry s_demos[] = {
     { "Asteroids",   "res/asteroids/title.et.yaml"_hs,     "res/asteroids/README.md"_hs     },
     { "Physics 2D",  "res/physics2d_demo/scene.et.yaml"_hs,"res/physics2d_demo/README.md"_hs},
     { "Platformer",  "res/platformer/scene.et.yaml"_hs,    "res/platformer/README.md"_hs    },
-    { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,  "res/fast_rodent/README.md"_hs   },
+    { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,   "res/fast_rodent/README.md"_hs,  true },
 };
 static constexpr int s_demo_count = static_cast<int>(sizeof(s_demos) / sizeof(s_demos[0]));
 
@@ -78,15 +79,32 @@ bool demo_system::init(ryml::ConstNodeRef)
         ImGui::Separator();
         ImGui::Text("Current demo:");
 
-        static const char* names[s_demo_count];
+        // Build a filtered list of visible demos (hidden entries are excluded).
+        static int  visible_to_real[s_demo_count];
+        static const char* visible_names[s_demo_count];
+        int visible_count = 0;
         for (int i = 0; i < s_demo_count; ++i)
-            names[i] = s_demos[i].name;
+        {
+            if (!s_demos[i].hidden)
+            {
+                visible_to_real[visible_count] = i;
+                visible_names[visible_count]   = s_demos[i].name;
+                ++visible_count;
+            }
+        }
+
+        // Map current real index → visible index for the combo (-1 if hidden).
+        int combo_sel = -1;
+        for (int v = 0; v < visible_count; ++v)
+            if (visible_to_real[v] == s_current) { combo_sel = v; break; }
+
+        if (combo_sel < 0)
+            ImGui::TextDisabled("(hidden: %s)", s_demos[s_current].name);
 
         ImGui::SetWindowFontScale(1.5f);
         ImGui::PushItemWidth(-1);
-        int sel = s_current;
-        if (ImGui::Combo("##combo", &sel, names, s_demo_count) && sel != s_current)
-            load_demo(sel);
+        if (ImGui::Combo("##combo", &combo_sel, visible_names, visible_count) && combo_sel >= 0)
+            load_demo(visible_to_real[combo_sel]);
         ImGui::PopItemWidth();
         ImGui::SetWindowFontScale(1.0f);
 

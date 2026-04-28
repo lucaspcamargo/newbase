@@ -31,7 +31,9 @@
       rot: [0, 0, 0]
       scale: [1, 1, 1]
     sprite:
-      res: res/physics2d_demo/circle.sprite
+      res: res/fast_rodent/sonic-cd-xbr4x.sprite
       pixel_snap: true
+    sprite_anim:
+      sequence: standing
     script:
       lua: "res/fast_rodent/player.lua"

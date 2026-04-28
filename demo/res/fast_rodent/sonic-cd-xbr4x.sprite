@@ -1,0 +1,187 @@
+texture: res/fast_rodent/sonic-cd-xbr4x.png
+
+# All coordinates are DWS source values × 4 (sprite sheet is the xBR-4x upscale).
+# Frame size in atlas: 192×192 px (48×48 × 4).
+
+sequences:
+  - name: standing
+    loop: true
+    strip:
+      x: 1152
+      y: 0
+      w: 192
+      h: 192
+      count: 1
+      duration: 999
+
+  - name: going_idle
+    loop: false
+    next: idle
+    strip:
+      x: 1344
+      y: 0
+      w: 192
+      h: 192
+      count: 2
+      duration: 2.304
+
+  - name: idle
+    loop: true
+    strip:
+      x: 1728
+      y: 0
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.384
+
+  - name: walking
+    loop: true
+    strip:
+      x: 0
+      y: 0
+      w: 192
+      h: 192
+      count: 6
+      duration: 0.384
+
+  - name: running
+    loop: true
+    strip:
+      x: 0
+      y: 192
+      w: 192
+      h: 192
+      count: 4
+      duration: 0.03
+
+  - name: crouched
+    loop: true
+    strip:
+      x: 960
+      y: 192
+      w: 192
+      h: 192
+      count: 1
+      duration: 999
+
+  - name: balancing_back
+    loop: true
+    strip:
+      x: 1152
+      y: 192
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.266667
+
+  - name: peelout
+    loop: true
+    strip:
+      x: 0
+      y: 384
+      w: 192
+      h: 192
+      count: 4
+      duration: 0.033333
+
+  - name: looking_up
+    loop: true
+    strip:
+      x: 960
+      y: 384
+      w: 192
+      h: 192
+      count: 1
+      duration: 999
+
+  - name: balancing_front
+    loop: true
+    strip:
+      x: 1152
+      y: 384
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.266667
+
+  - name: rolling
+    loop: true
+    strip:
+      x: 0
+      y: 576
+      w: 192
+      h: 192
+      count: 8
+      duration: 0.016667
+
+  - name: falling
+    loop: true
+    strip:
+      x: 1536
+      y: 576
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.05
+
+  - name: dead
+    loop: false
+    strip:
+      x: 960
+      y: 768
+      w: 192
+      h: 192
+      count: 1
+      duration: 999
+
+  - name: pushing
+    loop: true
+    strip:
+      x: 1152
+      y: 768
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.533333
+
+  - name: spring
+    loop: false
+    strip:
+      x: 0
+      y: 784
+      w: 192
+      h: 192
+      count: 5
+      duration: 0.066667
+
+  - name: hurt
+    loop: false
+    strip:
+      x: 1152
+      y: 960
+      w: 192
+      h: 192
+      count: 1
+      duration: 999
+
+  - name: braking
+    loop: false
+    next: standing
+    strip:
+      x: 1344
+      y: 960
+      w: 192
+      h: 192
+      count: 2
+      duration: 0.03
+
+  - name: spindash
+    loop: true
+    strip:
+      x: 0
+      y: 1152
+      w: 192
+      h: 192
+      count: 5
+      duration: 0.033333

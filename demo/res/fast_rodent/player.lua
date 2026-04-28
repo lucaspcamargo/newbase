@@ -49,7 +49,7 @@ local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 -- Surface angle from a Box2D raycast normal (y-down space, result in [0, 2π)).
 -- Mapping: (0,-1)→0 (floor), (1,0)→π/2 (left wall), (0,1)→π (ceiling), (-1,0)→3π/2 (right wall).
 local function normal_to_angle(nx, ny)
-    local a = math.atan2(nx, -ny)
+    local a = math.atan(nx, -ny)
     return a < 0 and a + TAU or a
 end
 
@@ -149,6 +149,37 @@ local facing   = 1      -- 1=right, -1=left
 
 local dir_hs  = hs("dir")
 local jump_hs = hs("btn_south")
+
+-- Animation thresholds (match roughly to original Sonic speeds)
+local ANIM_WALK_MIN = spd(0.1)
+local ANIM_RUN_MIN  = spd(4.0)
+local ANIM_BRAKE_THRESHOLD = spd(1.0)  -- reversing fast enough to show skid
+
+local function set_anim(name)
+    local spr = c_sprite()
+    if spr and spr.sequence ~= name then
+        spr.sequence = name
+    end
+end
+
+local function update_anim()
+    if not grounded then
+        set_anim("falling")
+    else
+        local speed = math.abs(gSpeed)
+        if     speed < ANIM_WALK_MIN then set_anim("standing")
+        elseif speed < ANIM_RUN_MIN  then set_anim("walking")
+        else                              set_anim("running")
+        end
+    end
+
+    -- Horizontal flip via spatial scale (no flip_h field on csprite)
+    local sp = c_spatial()
+    if sp then
+        sp.scale.x = facing  -- 1 = right (normal), -1 = left (mirrored)
+        sp.apply()
+    end
+end
 
 local function respawn()
     px, py   = SPAWN_X, SPAWN_Y
@@ -298,6 +329,8 @@ local update_handle = clock_update_add(function(dt)
             end
         end
     end
+
+    update_anim()
 
     -- Apply position to entity
     physics2d_character_warp(eid, vec2.new(px, py))
