@@ -1,0 +1,504 @@
+texture: res/platformer/spr/aliens.png
+sequences:
+  - name: alienBeige
+    loop: true
+    strip:
+      x: 478
+      y: 363
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBeige_climb1
+    loop: true
+    strip:
+      x: 478
+      y: 175
+      w: 66
+      h: 95
+      count: 1
+      duration: 1.0
+  - name: alienBeige_climb2
+    loop: true
+    strip:
+      x: 610
+      y: 368
+      w: 66
+      h: 95
+      count: 1
+      duration: 1.0
+  - name: alienBeige_duck
+    loop: true
+    strip:
+      x: 278
+      y: 92
+      w: 67
+      h: 72
+      count: 1
+      duration: 1.0
+  - name: alienBeige_hurt
+    loop: true
+    strip:
+      x: 278
+      y: 0
+      w: 67
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBeige_jump
+    loop: true
+    strip:
+      x: 479
+      y: 0
+      w: 66
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienBeige_stand
+    loop: true
+    strip:
+      x: 676
+      y: 276
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBeige_swim1
+    loop: true
+    strip:
+      x: 209
+      y: 95
+      w: 69
+      h: 98
+      count: 1
+      duration: 1.0
+  - name: alienBeige_swim2
+    loop: true
+    strip:
+      x: 70
+      y: 0
+      w: 70
+      h: 100
+      count: 1
+      duration: 1.0
+  - name: alienBeige_walk
+    loop: true
+    frames:
+      - source_rect: [209, 193, 68, 93]
+        duration: 0.2
+      - source_rect: [70, 284, 70, 96]
+        duration: 0.2
+  - name: alienBeige_walk1
+    loop: true
+    strip:
+      x: 209
+      y: 193
+      w: 68
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienBeige_walk2
+    loop: true
+    strip:
+      x: 70
+      y: 284
+      w: 70
+      h: 96
+      count: 1
+      duration: 1.0
+  - name: alienBlue
+    loop: true
+    strip:
+      x: 412
+      y: 175
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBlue_climb1
+    loop: true
+    strip:
+      x: 412
+      y: 359
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBlue_climb2
+    loop: true
+    strip:
+      x: 412
+      y: 267
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBlue_duck
+    loop: true
+    strip:
+      x: 345
+      y: 271
+      w: 67
+      h: 72
+      count: 1
+      duration: 1.0
+  - name: alienBlue_hurt
+    loop: true
+    strip:
+      x: 345
+      y: 0
+      w: 67
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBlue_jump
+    loop: true
+    strip:
+      x: 478
+      y: 270
+      w: 66
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienBlue_stand
+    loop: true
+    strip:
+      x: 676
+      y: 368
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienBlue_swim1
+    loop: true
+    strip:
+      x: 139
+      y: 380
+      w: 69
+      h: 95
+      count: 1
+      duration: 1.0
+  - name: alienBlue_swim2
+    loop: true
+    strip:
+      x: 70
+      y: 100
+      w: 70
+      h: 97
+      count: 1
+      duration: 1.0
+  - name: alienBlue_walk1
+    loop: true
+    strip:
+      x: 544
+      y: 267
+      w: 66
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienBlue_walk2
+    loop: true
+    strip:
+      x: 345
+      y: 175
+      w: 67
+      h: 96
+      count: 1
+      duration: 1.0
+  - name: alienGreen
+    loop: true
+    strip:
+      x: 610
+      y: 276
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienGreen_climb1
+    loop: true
+    strip:
+      x: 611
+      y: 0
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienGreen_climb2
+    loop: true
+    strip:
+      x: 676
+      y: 92
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienGreen_duck
+    loop: true
+    strip:
+      x: 208
+      y: 424
+      w: 69
+      h: 71
+      count: 1
+      duration: 1.0
+  - name: alienGreen_hurt
+    loop: true
+    strip:
+      x: 140
+      y: 261
+      w: 69
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienGreen_jump
+    loop: true
+    strip:
+      x: 345
+      y: 343
+      w: 67
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienGreen_stand
+    loop: true
+    strip:
+      x: 676
+      y: 184
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienGreen_swim1
+    loop: true
+    strip:
+      x: 209
+      y: 0
+      w: 69
+      h: 95
+      count: 1
+      duration: 1.0
+  - name: alienGreen_swim2
+    loop: true
+    strip:
+      x: 0
+      y: 193
+      w: 70
+      h: 97
+      count: 1
+      duration: 1.0
+  - name: alienGreen_walk1
+    loop: true
+    strip:
+      x: 277
+      y: 276
+      w: 68
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienGreen_walk2
+    loop: true
+    strip:
+      x: 0
+      y: 290
+      w: 70
+      h: 96
+      count: 1
+      duration: 1.0
+  - name: alienPink
+    loop: true
+    strip:
+      x: 610
+      y: 184
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienPink_climb1
+    loop: true
+    strip:
+      x: 610
+      y: 92
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienPink_climb2
+    loop: true
+    strip:
+      x: 545
+      y: 0
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienPink_duck
+    loop: true
+    strip:
+      x: 208
+      y: 353
+      w: 69
+      h: 71
+      count: 1
+      duration: 1.0
+  - name: alienPink_hurt
+    loop: true
+    strip:
+      x: 70
+      y: 380
+      w: 69
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienPink_jump
+    loop: true
+    strip:
+      x: 412
+      y: 0
+      w: 67
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienPink_stand
+    loop: true
+    strip:
+      x: 544
+      y: 93
+      w: 66
+      h: 92
+      count: 1
+      duration: 1.0
+  - name: alienPink_swim1
+    loop: true
+    strip:
+      x: 140
+      y: 0
+      w: 69
+      h: 95
+      count: 1
+      duration: 1.0
+  - name: alienPink_swim2
+    loop: true
+    strip:
+      x: 0
+      y: 0
+      w: 70
+      h: 97
+      count: 1
+      duration: 1.0
+  - name: alienPink_walk1
+    loop: true
+    strip:
+      x: 277
+      y: 369
+      w: 68
+      h: 93
+      count: 1
+      duration: 1.0
+  - name: alienPink_walk2
+    loop: true
+    strip:
+      x: 0
+      y: 97
+      w: 70
+      h: 96
+      count: 1
+      duration: 1.0
+  - name: alienYellow
+    loop: true
+    strip:
+      x: 478
+      y: 93
+      w: 66
+      h: 82
+      count: 1
+      duration: 1.0
+  - name: alienYellow_climb1
+    loop: true
+    strip:
+      x: 544
+      y: 360
+      w: 66
+      h: 82
+      count: 1
+      duration: 1.0
+  - name: alienYellow_climb2
+    loop: true
+    strip:
+      x: 544
+      y: 185
+      w: 66
+      h: 82
+      count: 1
+      duration: 1.0
+  - name: alienYellow_duck
+    loop: true
+    strip:
+      x: 209
+      y: 286
+      w: 68
+      h: 67
+      count: 1
+      duration: 1.0
+  - name: alienYellow_hurt
+    loop: true
+    strip:
+      x: 140
+      y: 180
+      w: 69
+      h: 81
+      count: 1
+      duration: 1.0
+  - name: alienYellow_jump
+    loop: true
+    strip:
+      x: 345
+      y: 92
+      w: 67
+      h: 83
+      count: 1
+      duration: 1.0
+  - name: alienYellow_stand
+    loop: true
+    strip:
+      x: 412
+      y: 93
+      w: 66
+      h: 82
+      count: 1
+      duration: 1.0
+  - name: alienYellow_swim1
+    loop: true
+    strip:
+      x: 140
+      y: 95
+      w: 69
+      h: 85
+      count: 1
+      duration: 1.0
+  - name: alienYellow_swim2
+    loop: true
+    strip:
+      x: 70
+      y: 197
+      w: 70
+      h: 87
+      count: 1
+      duration: 1.0
+  - name: alienYellow_walk1
+    loop: true
+    strip:
+      x: 277
+      y: 193
+      w: 68
+      h: 83
+      count: 1
+      duration: 1.0
+  - name: alienYellow_walk2
+    loop: true
+    strip:
+      x: 0
+      y: 386
+      w: 70
+      h: 86
+      count: 1
+      duration: 1.0

@@ -7,6 +7,7 @@
 #include <newbase/log.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/res/manager.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
 #include <utility>
@@ -264,18 +265,73 @@ bool tilemap_system::step(step_phase phase)
 }
 
 // ---------------------------------------------------------------------------
+// Object layer queries
+// ---------------------------------------------------------------------------
+
+static const nb::tilemap_layer* find_layer(const nb::rtilemap* map, const std::string& name)
+{
+    if (!map) return nullptr;
+    for (const auto& layer : map->layers)
+        if (layer.layer_type == nb::tilemap_layer::type::OBJECT && layer.name == name)
+            return &layer;
+    return nullptr;
+}
+
+unsigned int nb::tilemap_system::get_layer_object_count(entt::id_type map_id, std::string layer_name) const
+{
+    auto res = nb::rman().get<nb::rtilemap>(map_id);
+    const auto* layer = find_layer(res.get(), layer_name);
+    return layer ? static_cast<unsigned int>(layer->objects.size()) : 0u;
+}
+
+nb::tilemap_object nb::tilemap_system::get_layer_object(entt::id_type map_id, std::string layer_name, unsigned int idx) const
+{
+    auto res = nb::rman().get<nb::rtilemap>(map_id);
+    const auto* layer = find_layer(res.get(), layer_name);
+    if (!layer || idx >= layer->objects.size()) return {};
+    return layer->objects[idx];
+}
+
+// ---------------------------------------------------------------------------
 // RTTI
 // ---------------------------------------------------------------------------
 
 extern "C" void _rtti_init_tilemap_system()
 {
+    entt::meta_factory<nb::tilemap_object>{}
+        .type("tilemap_object"_hs)
+        .ctor<>()
+        .data<&nb::tilemap_object::id>("id"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"id"})
+        .data<&nb::tilemap_object::name>("name"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"name"})
+        .data<&nb::tilemap_object::type>("type"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"type"})
+        .data<&nb::tilemap_object::shape>("shape"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"shape"})
+        .data<&nb::tilemap_object::x>("x"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"x"})
+        .data<&nb::tilemap_object::y>("y"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"y"})
+        .data<&nb::tilemap_object::width>("width"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"width"})
+        .data<&nb::tilemap_object::height>("height"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"height"})
+        .data<&nb::tilemap_object::gid>("gid"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"gid"});
+
     entt::meta_factory<nb::tilemap_system>{}
         .type("tilemap_system"_hs)
         .custom<rtti::type_info>(rtti::type_info{
             .identifier = "tilemap_system",
             .type_class = rtti::TYPE_CLASS_SYSTEM
         })
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&nb::tilemap_system::get_layer_object_count>("get_layer_object_count"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"get_layer_object_count"})
+        .func<&nb::tilemap_system::get_layer_object>("get_layer_object"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"get_layer_object"});
+
     entt::meta_factory<std::shared_ptr<nb::tilemap_system>>{rtti::ctx_systems()}
         .type("tilemap_system_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::tilemap_system>>()

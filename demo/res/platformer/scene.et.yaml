@@ -24,24 +24,6 @@
       render_layer: "fg"
       collision_layer: "fg"
 
-- name: player
-  comps:
-    spatial:
-      pos: [490, 100, 0]
-      rot: [0, 0, 0]
-      scale: [1, 1, 1]
-    sprite:
-      res: res/physics2d_demo/circle.sprite
-      pixel_snap: true
-    character2d:
-      capsule_radius: 16.0
-      capsule_half_height: 19.0
-      gravity_scale: 1.0
-      category_bits: 2
-      mask_bits: 1
-    script:
-      lua: "res/platformer/player.lua"
-
 - name: box0
   comps:
     spatial:

@@ -25,16 +25,16 @@ public:
     // top-level control
     void out_mute(bool muted);
     void out_gain(float gain);
+    void set_global_pitch(float ratio);
 
     // background music
+    void bgm_gain(float db);
     bool bgm_play(entt::id_type res_id);
     bool bgm_playing();
     bool bgm_stop();
-    void bgm_gain(float db);
-    void set_global_pitch(float ratio);
-    void sfx_gain(float db);
 
     // sound effects
+    void sfx_gain(float db);
     bool sfx_play(entt::id_type res_id, float gain_db);
     bool sfx_play_pitched(entt::id_type res_id, float gain_db, float pitch_ratio);
 

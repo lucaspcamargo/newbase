@@ -1,6 +1,8 @@
 #pragma once
 
 #include <newbase/system.hpp>
+#include <newbase/res/tilemap.hpp>
+#include <string>
 
 namespace nb {
 
@@ -16,6 +18,9 @@ public:
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase phase) override;
     bool event(SDL_Event*) override { return true; }
+
+    unsigned int get_layer_object_count(entt::id_type map_id, std::string layer_name) const;
+    tilemap_object get_layer_object(entt::id_type map_id, std::string layer_name, unsigned int idx) const;
 };
 
 } // namespace nb

@@ -1,0 +1,533 @@
+sequences:
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '432'
+    - '432'
+    - '70'
+    - '70'
+  loop: true
+  name: bomb
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '432'
+    - '360'
+    - '70'
+    - '70'
+  loop: true
+  name: bombFlash
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '346'
+    - '144'
+    - '70'
+    - '70'
+  loop: true
+  name: bush
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '288'
+    - '504'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonBlue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '419'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonBlue_pressed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '419'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonGreen
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '418'
+    - '144'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonGreen_pressed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '360'
+    - '504'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '360'
+    - '432'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonRed_pressed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '360'
+    - '360'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonYellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '360'
+    - '288'
+    - '70'
+    - '70'
+  loop: true
+  name: buttonYellow_pressed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '360'
+    - '216'
+    - '70'
+    - '70'
+  loop: true
+  name: cactus
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '347'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: chain
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '146'
+    - '128'
+    - '71'
+  loop: true
+  name: cloud1
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '73'
+    - '129'
+    - '71'
+  loop: true
+  name: cloud2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '0'
+    - '129'
+    - '71'
+  loop: true
+  name: cloud3
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '288'
+    - '432'
+    - '70'
+    - '70'
+  loop: true
+  name: coinBronze
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '288'
+    - '360'
+    - '70'
+    - '70'
+  loop: true
+  name: coinGold
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '288'
+    - '288'
+    - '70'
+    - '70'
+  loop: true
+  name: coinSilver
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '435'
+    - '70'
+    - '70'
+  loop: true
+  name: fireball
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '275'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: flagBlue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '275'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: flagBlue2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '216'
+    - '504'
+    - '70'
+    - '70'
+  loop: true
+  name: flagBlueHanging
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '216'
+    - '432'
+    - '70'
+    - '70'
+  loop: true
+  name: flagGreen
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '216'
+    - '360'
+    - '70'
+    - '70'
+  loop: true
+  name: flagGreen2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '216'
+    - '288'
+    - '70'
+    - '70'
+  loop: true
+  name: flagGreenHanging
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '274'
+    - '144'
+    - '70'
+    - '70'
+  loop: true
+  name: flagRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '216'
+    - '216'
+    - '70'
+    - '70'
+  loop: true
+  name: flagRed2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '203'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: flagRedHanging
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '203'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: flagYellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '202'
+    - '144'
+    - '70'
+    - '70'
+  loop: true
+  name: flagYellow2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '144'
+    - '434'
+    - '70'
+    - '70'
+  loop: true
+  name: flagYellowHanging
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '144'
+    - '362'
+    - '70'
+    - '70'
+  loop: true
+  name: gemBlue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '144'
+    - '290'
+    - '70'
+    - '70'
+  loop: true
+  name: gemGreen
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '144'
+    - '218'
+    - '70'
+    - '70'
+  loop: true
+  name: gemRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '131'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: gemYellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '131'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: keyBlue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '130'
+    - '146'
+    - '70'
+    - '70'
+  loop: true
+  name: keyGreen
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '72'
+    - '435'
+    - '70'
+    - '70'
+  loop: true
+  name: keyRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '72'
+    - '363'
+    - '70'
+    - '70'
+  loop: true
+  name: keyYellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '72'
+    - '291'
+    - '70'
+    - '70'
+  loop: true
+  name: mushroomBrown
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '72'
+    - '219'
+    - '70'
+    - '70'
+  loop: true
+  name: mushroomRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '553'
+    - '19'
+    - '14'
+  loop: true
+  name: particleBrick1a
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '530'
+    - '21'
+    - '21'
+  loop: true
+  name: particleBrick1b
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '21'
+    - '553'
+    - '19'
+    - '14'
+  loop: true
+  name: particleBrick2a
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '507'
+    - '21'
+    - '21'
+  loop: true
+  name: particleBrick2b
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '363'
+    - '70'
+    - '70'
+  loop: true
+  name: plant
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '291'
+    - '70'
+    - '70'
+  loop: true
+  name: plantPurple
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '219'
+    - '70'
+    - '70'
+  loop: true
+  name: rock
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '288'
+    - '216'
+    - '70'
+    - '70'
+  loop: true
+  name: snowhill
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '347'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: spikes
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '432'
+    - '288'
+    - '70'
+    - '70'
+  loop: true
+  name: springboardDown
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '432'
+    - '216'
+    - '70'
+    - '70'
+  loop: true
+  name: springboardUp
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '504'
+    - '288'
+    - '70'
+    - '70'
+  loop: true
+  name: star
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '504'
+    - '216'
+    - '70'
+    - '70'
+  loop: true
+  name: switchLeft
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '491'
+    - '72'
+    - '70'
+    - '70'
+  loop: true
+  name: switchMid
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '491'
+    - '0'
+    - '70'
+    - '70'
+  loop: true
+  name: switchRight
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '490'
+    - '144'
+    - '70'
+    - '70'
+  loop: true
+  name: weight
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '432'
+    - '504'
+    - '70'
+    - '70'
+  loop: true
+  name: weightChained
+texture: res/platformer/spr/items.png

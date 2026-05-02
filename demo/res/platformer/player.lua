@@ -1,23 +1,38 @@
 local dir_hs  = hs("dir")
 local jump_hs = hs("btn_south")
 
+local sfx_jump = res_get_vorbis(hs("res/platformer/sfx/jump.ogg"))
+local sfx_land = res_get_vorbis(hs("res/platformer/sfx/land.ogg"))
+
+local COLOR = "Beige"
+local SEQ_STAND = "alien" .. COLOR .. "_stand"
+local SEQ_WALK = "alien" .. COLOR .. "_walk"
+local SEQ_JUMP = "alien" .. COLOR .. "_jump"
+
 local WALK_SPEED    = 350.0
 local JUMP_VEL      = -620.0
 local JUMP_CUT_VEL  = -250.0   -- upward speed clamped to on early release
+local TERMINAL_FALL_VEL = 500.0
 
 local MAP_W  = 60 * 70
 local MAP_H  = 20 * 70
 local VIEW_W = 1920
 local VIEW_H = 1080
 
-local SPAWN_X = 490
-local SPAWN_Y = 100
+-- Capture spawn position from wherever scene.lua placed us
+local _sp0    = c_spatial()
+local SPAWN_X = _sp0 and _sp0.pos.x or 0
+local SPAWN_Y = _sp0 and _sp0.pos.y or 0
+
+local was_grounded = false
 
 local update_handle = clock_update_add(function(delta)
     local dir = input_action_direction(dir_hs)
     local ch  = c_character2d()
     local sp  = c_spatial()
-    if not ch or not sp then return end
+    local spr = c_sprite()
+
+    if not ch or not sp or not spr then return end
 
     -- Snap back to spawn if the player exits the map
     if sp.pos.x < 0 or sp.pos.x > MAP_W or sp.pos.y < 0 or sp.pos.y > MAP_H then
@@ -29,16 +44,44 @@ local update_handle = clock_update_add(function(delta)
     local vx = dir.x * WALK_SPEED
     local vy = ch.velocity.y  -- preserve vertical (gravity accumulated by system)
 
+    -- Limit vertical velocity
+    if vy > TERMINAL_FALL_VEL and not ch.grounded then
+        vy = TERMINAL_FALL_VEL
+    end
+
     -- Variable jump height: cut upward velocity when button released early
     if vy < JUMP_CUT_VEL and not input_action_is_pressed(jump_hs) then
         vy = JUMP_CUT_VEL
     end
 
-    if ch.grounded and input_action_was_pressed(jump_hs) then
-        vy = JUMP_VEL
+    if ch.grounded and not was_grounded then
+        audio_sfx_play(hs("res/platformer/sfx/land.ogg"), 1.0)
     end
 
+    if ch.grounded and input_action_was_pressed(jump_hs) then
+        vy = JUMP_VEL
+        audio_sfx_play(hs("res/platformer/sfx/jump.ogg"), 1.0)
+    end
+
+    was_grounded = ch.grounded
+
     physics2d_character_set_velocity(eid, vec2.new(vx, vy))
+
+    -- update sprite
+    if ch.grounded then
+        if dir.x == 0.0 then
+            spr.sequence = SEQ_STAND
+        else
+            spr.sequence = SEQ_WALK
+            if dir.x < 0.0 then
+                sp.scale = vec3.new(-1.0, 1.0, 1.0)
+            else
+                sp.scale = vec3.new(1.0, 1.0, 1.0)
+            end
+        end
+    else
+        spr.sequence = SEQ_JUMP
+    end
 
     -- Camera follow, clamped so the viewport never shows outside the map
     local half_w = VIEW_W * 0.5

@@ -1,0 +1,18 @@
+- name: player
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/platformer/spr/aliens.sprite
+      pixel_snap: true
+      animating: true
+    character2d:
+      capsule_radius: 16.0
+      capsule_half_height: 30.0
+      gravity_scale: 1.0
+      category_bits: 2
+      mask_bits: 1
+    script:
+      lua: "res/platformer/player.lua"

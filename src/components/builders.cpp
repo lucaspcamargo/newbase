@@ -48,6 +48,14 @@ bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
         def["visible"] >> dst.visible;
     if(def.has_child("pixel_snap"))
         def["pixel_snap"] >> dst.pixel_snap;
+    if(def.has_child("animating"))
+        def["animating"] >> dst.animating;
+    if(def.has_child("sequence"))
+    {
+        std::string seq;
+        c4::from_chars(def["sequence"].val(), &seq);
+        dst.sequence = seq;
+    }
     return true;
 }
 
@@ -102,6 +110,17 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
                 shape.shape_type = shape2d_type::POLY;
 
             sdef["data"] >> shape.shape_data;
+
+            if(sdef.has_child("sensor"))
+                sdef["sensor"] >> shape.sensor;
+            if(sdef.has_child("sensor_events"))
+                sdef["sensor_events"] >> shape.sensor_events;
+            if(sdef.has_child("contact_events"))
+                sdef["contact_events"] >> shape.contact_events;
+            if(sdef.has_child("category_bits"))
+                sdef["category_bits"] >> shape.category_bits;
+            if(sdef.has_child("mask_bits"))
+                sdef["mask_bits"] >> shape.mask_bits;
 
             dst.shapes.push_back(shape);
         }

@@ -31,6 +31,21 @@ struct tilemap_tileset {
     std::unordered_map<int, std::vector<std::vector<glm::vec2>>> tile_shapes;
 };
 
+struct tilemap_object {
+    enum shape_type : int { SHAPE_POINT = 0, SHAPE_RECTANGLE = 1, SHAPE_TILE = 2 };
+
+    int         id     { 0 };
+    std::string name;
+    std::string type;   // Tiled "class" field (or legacy "type")
+    int         shape  { SHAPE_POINT };
+    float       x      { 0.f };
+    float       y      { 0.f };
+    float       width  { 0.f };
+    float       height { 0.f };
+    int         gid    { 0 };   // tile objects only
+    std::unordered_map<std::string, std::string> properties;
+};
+
 struct tilemap_layer {
     enum class type { TILE, OBJECT };
 
@@ -41,6 +56,7 @@ struct tilemap_layer {
     bool             visible { true };
     float            opacity { 1.f };
     type             layer_type { type::TILE };
+    std::vector<tilemap_object> objects; // only for OBJECT layers
 };
 
 struct rtilemap : public resource {

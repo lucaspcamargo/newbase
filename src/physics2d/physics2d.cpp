@@ -94,6 +94,17 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
 {
     log::info("[physics2d] init");
 
+    int argc = nb::engine::instance().argc();
+    char** argv = nb::engine::instance().argv();
+    for (int i = 1; i < argc; ++i)
+    {
+        if (!strcmp(argv[i], "--physics2d-debug-draw"))
+        {
+            _d->debug_draw_enabled = true;
+            break;
+        }
+    }
+
     if(cfg.invalid() || cfg.empty())
     {
         log::info("[physics2d] no config, using defaults");
@@ -573,6 +584,32 @@ void physics2d::_step_characters(entt::registry& reg, float dt)
         sp.pos.x += solved.translation.x;
         sp.pos.y += solved.translation.y;
         sp.apply();
+
+        // Detect sensor overlaps: find sensor bodies the character capsule overlaps after movement
+        struct sensor_overlap_ctx {
+            entt::entity character_eid;
+            const std::unordered_map<b2BodyId, entt::entity>& body_entt;
+            std::vector<nb::physics2d_p::contact_pair>& contact_begins;
+            static bool callback(b2ShapeId shape_id, void* raw) {
+                if (!b2Shape_IsSensor(shape_id)) return true;
+                auto* c = static_cast<sensor_overlap_ctx*>(raw);
+                b2BodyId body_id = b2Shape_GetBody(shape_id);
+                auto it = c->body_entt.find(body_id);
+                if (it != c->body_entt.end())
+                    c->contact_begins.push_back({c->character_eid, it->second});
+                return true;
+            }
+        };
+        b2Vec2 pts[2] = {
+            {sp.pos.x, sp.pos.y - ch.capsule_half_height},
+            {sp.pos.x, sp.pos.y + ch.capsule_half_height}
+        };
+        b2ShapeProxy proxy = b2MakeProxy(pts, 2, ch.capsule_radius);
+        b2QueryFilter sensor_filter = b2DefaultQueryFilter();
+        sensor_filter.categoryBits = ch.category_bits;
+        sensor_filter.maskBits     = ch.mask_bits;
+        sensor_overlap_ctx sctx { eid, _d->body_entt, _d->contact_begins };
+        b2World_OverlapShape(_d->world_id, &proxy, sensor_filter, sensor_overlap_ctx::callback, &sctx);
     }
 }
 

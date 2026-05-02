@@ -814,6 +814,42 @@ namespace nb {
                     layer.layer_type = tilemap_layer::type::OBJECT;
                     if (ln.has_child("name"))    ln["name"]    >> layer.name;
                     if (ln.has_child("visible")) ln["visible"] >> layer.visible;
+                    if (ln.has_child("objects"))
+                    {
+                        for (auto on : ln["objects"])
+                        {
+                            tilemap_object obj;
+                            if (on.has_child("id"))     on["id"]     >> obj.id;
+                            if (on.has_child("name"))   { c4::from_chars(on["name"].val(),   &obj.name); }
+                            if (on.has_child("x"))      on["x"]      >> obj.x;
+                            if (on.has_child("y"))      on["y"]      >> obj.y;
+                            if (on.has_child("width"))  on["width"]  >> obj.width;
+                            if (on.has_child("height")) on["height"] >> obj.height;
+                            // "class" is Tiled 1.9+; fall back to legacy "type"
+                            if      (on.has_child("class")) { c4::from_chars(on["class"].val(), &obj.type); }
+                            else if (on.has_child("type"))  { c4::from_chars(on["type"].val(),  &obj.type); }
+                            // shape detection: tile > point > rectangle
+                            if (on.has_child("gid")) {
+                                on["gid"] >> obj.gid;
+                                obj.shape = tilemap_object::SHAPE_TILE;
+                            } else if (on.has_child("point")) {
+                                obj.shape = tilemap_object::SHAPE_POINT;
+                            } else {
+                                obj.shape = tilemap_object::SHAPE_RECTANGLE;
+                            }
+                            if (on.has_child("properties"))
+                            {
+                                for (auto pn : on["properties"])
+                                {
+                                    std::string pname, pval;
+                                    if (pn.has_child("name"))  c4::from_chars(pn["name"].val(),  &pname);
+                                    if (pn.has_child("value")) c4::from_chars(pn["value"].val(), &pval);
+                                    if (!pname.empty()) obj.properties[pname] = pval;
+                                }
+                            }
+                            layer.objects.push_back(std::move(obj));
+                        }
+                    }
                     ret->layers.push_back(std::move(layer));
                     continue;
                 }
