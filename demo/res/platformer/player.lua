@@ -1,8 +1,9 @@
 local dir_hs  = hs("dir")
 local jump_hs = hs("btn_south")
 
-local sfx_jump = res_get_vorbis(hs("res/platformer/sfx/jump.ogg"))
-local sfx_land = res_get_vorbis(hs("res/platformer/sfx/land.ogg"))
+local sfx_jump   = res_get_vorbis(hs("res/platformer/sfx/jump.ogg"))
+local sfx_land   = res_get_vorbis(hs("res/platformer/sfx/land.ogg"))
+local sfx_damage = res_get_vorbis(hs("res/platformer/sfx/damage.ogg"))
 
 local COLOR = "Beige"
 local SEQ_STAND = "alien" .. COLOR .. "_stand"
@@ -37,7 +38,7 @@ function hurt()
     if is_invulnerable then return end
     is_invulnerable = true
     invuln_timer    = INVULN_DURATION
-    -- knock player back upward
+    audio_sfx_play(hs("res/platformer/sfx/damage.ogg"), 1.0)
     local ch = c_character2d()
     local vx = ch and -ch.velocity.x * 0.5 or 0
     physics2d_character_set_velocity(eid, vec2.new(vx, -380.0))
