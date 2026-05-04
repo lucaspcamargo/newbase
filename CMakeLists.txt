@@ -98,6 +98,7 @@ add_library(newbase STATIC
     src/components/builders.cpp
     src/components/script_rtti.cpp
     src/components/spatial_rtti.cpp
+    src/components/structure_rtti.cpp
     src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
     src/components/camera_rtti.cpp
@@ -172,6 +173,7 @@ add_subdirectory(src/textext)
 add_subdirectory(src/render_simple)
 add_subdirectory(src/script_lua)
 add_subdirectory(src/sgdk)
+add_subdirectory(src/spatial)
 add_subdirectory(src/tilemap)
 
 # OPTIONAL SYSTEMS

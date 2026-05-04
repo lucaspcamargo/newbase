@@ -39,10 +39,14 @@ bool clock::step(step_phase phase)
     else if(phase == step_phase::GENERAL_UPDATE)
     {
         const float scaled_dt = m_real_dt * m_time_scale;
+        m_iterating = true;
         for(auto& it: m_update)
             it.second(scaled_dt);
         for(auto& it: m_update_monotonic)
             it.second(m_real_dt);
+        m_iterating = false;
+        for(int h : m_pending_erase) { m_update.erase(h); m_update_monotonic.erase(h); }
+        m_pending_erase.clear();
     }
 
     return true;

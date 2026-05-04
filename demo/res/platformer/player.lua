@@ -26,6 +26,29 @@ local SPAWN_Y = _sp0 and _sp0.pos.y or 0
 
 local was_grounded = false
 
+-- expose eid globally so enemy scripts can find the player
+_G.PLAYER_EID = eid
+
+local INVULN_DURATION = 1.5
+is_invulnerable       = false   -- in env: readable by enemy scripts
+local invuln_timer    = 0.0
+
+function hurt()
+    if is_invulnerable then return end
+    is_invulnerable = true
+    invuln_timer    = INVULN_DURATION
+    -- knock player back upward
+    local ch = c_character2d()
+    local vx = ch and -ch.velocity.x * 0.5 or 0
+    physics2d_character_set_velocity(eid, vec2.new(vx, -380.0))
+end
+
+function bounce()
+    physics2d_character_set_velocity(eid, vec2.new(
+        c_character2d() and c_character2d().velocity.x or 0,
+        -420.0))
+end
+
 local update_handle = clock_update_add(function(delta)
     local dir = input_action_direction(dir_hs)
     local ch  = c_character2d()
@@ -33,6 +56,12 @@ local update_handle = clock_update_add(function(delta)
     local spr = c_sprite()
 
     if not ch or not sp or not spr then return end
+
+    -- Invulnerability countdown
+    if is_invulnerable then
+        invuln_timer = invuln_timer - delta
+        if invuln_timer <= 0 then is_invulnerable = false end
+    end
 
     -- Snap back to spawn if the player exits the map
     if sp.pos.x < 0 or sp.pos.x > MAP_W or sp.pos.y < 0 or sp.pos.y > MAP_H then

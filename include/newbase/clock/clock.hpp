@@ -2,6 +2,7 @@
 
 #include <newbase/system.hpp>
 #include <newbase/utility/meta_callback.hpp>
+#include <vector>
 
 namespace nb {
 
@@ -33,6 +34,7 @@ public:
 
     void update_remove(int handle)
     {
+        if (m_iterating) { m_pending_erase.push_back(handle); return; }
         m_update.erase(handle);
         m_update_monotonic.erase(handle);
     }
@@ -52,6 +54,8 @@ public:
 private:
     std::map<int, meta_callback> m_update;
     std::map<int, meta_callback> m_update_monotonic;
+    std::vector<int> m_pending_erase;
+    bool     m_iterating      {false};
     int      m_update_counter {0};
     float    m_time_scale     {1.0f};
     float    m_real_dt        {0.0f};

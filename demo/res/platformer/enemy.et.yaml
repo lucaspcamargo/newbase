@@ -1,0 +1,19 @@
+- name: enemy
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/platformer/spr/enemies.sprite
+      sequence: slimeGreen_anim
+      pixel_snap: true
+      animating: true
+    character2d:
+      capsule_radius: 12.0
+      capsule_half_height: 6.0
+      gravity_scale: 1.0
+      category_bits: 4
+      mask_bits: 1
+    script:
+      lua: "res/platformer/enemy.lua"

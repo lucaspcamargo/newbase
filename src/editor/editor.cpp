@@ -16,6 +16,7 @@
 #include <newbase/log.hpp>
 #include <newbase/sdl/logging_handler.hpp>
 #include <newbase/utility/glm.hpp>
+#include <newbase/components/structure.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
@@ -87,46 +88,95 @@ bool editor::step(step_phase phase)
 
         ImGui::Begin(ICON_FK_TABLE " Entities");
 
-            std::vector<std::string> columns;
-            columns.push_back("id");
-            columns.push_back("components");
-            if(ImGui::BeginTable("##entitiestable", columns.size(), ImGuiTableFlags_ScrollY, {-FLT_MIN, -FLT_MIN}, 0))
+            // Draw component icon strip for an entity into the current column
+            auto draw_icons = [&](entt::entity id) {
+                for (auto&& curr : reg.storage()) {
+                    if (auto& storage = curr.second; storage.contains(id)) {
+                        auto comp_type = entt::resolve(curr.first);
+                        if (comp_type.info() == entt::type_id<void>()) continue;
+                        rtti::type_info *info = comp_type.custom();
+                        if (!info || info->type_class != rtti::TYPE_CLASS_COMPONENT) continue;
+                        ImGui::SameLine();
+                        ImGui::TextUnformatted(info->data.component.editor_icon ? info->data.component.editor_icon : "?");
+                    }
+                }
+            };
+
+            // Emit a selectable row; returns true if this entity should expand its tree node
+            auto draw_row = [&](entt::entity id, bool has_children, int depth) -> bool {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::PushID(static_cast<int>(entt::to_integral(id)));
+
+                // Build label: name if available, else hex id
+                char label[64];
+                auto *s = reg.try_get<cstructure>(id);
+                if (s && s->has_name())
+                    std::snprintf(label, sizeof(label), "%s", s->name);
+                else
+                    std::snprintf(label, sizeof(label), "%x", entt::to_integral(id));
+
+                ImGuiTreeNodeFlags node_flags =
+                    ImGuiTreeNodeFlags_OpenOnArrow |
+                    ImGuiTreeNodeFlags_SpanFullWidth |
+                    (_selected_entity == id ? ImGuiTreeNodeFlags_Selected : 0);
+                if (!has_children)
+                    node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+                bool open = ImGui::TreeNodeEx(label, node_flags);
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+                    _selected_entity = id;
+
+                ImGui::TableNextColumn();
+                draw_icons(id);
+                ImGui::PopID();
+                return open && has_children;
+            };
+
+            // Recursive hierarchy draw
+            std::function<void(entt::entity)> draw_tree = [&](entt::entity id) {
+                auto *s = reg.try_get<cstructure>(id);
+                bool has_children = s && s->first_child != entt::null;
+                bool open = draw_row(id, has_children, 0);
+                if (open) {
+                    entt::entity child = s->first_child;
+                    while (child != entt::null && reg.valid(child)) {
+                        draw_tree(child);
+                        child = reg.get<cstructure>(child).next_sibling;
+                    }
+                    ImGui::TreePop();
+                }
+            };
+
+            if (ImGui::BeginTable("##entitiestable", 2,
+                ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg,
+                {-FLT_MIN, -FLT_MIN}))
             {
-                for(auto col: columns)
-                ImGui::TableSetupColumn(col.c_str(), 0, 0);
+                ImGui::TableSetupColumn("entity", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("components", ImGuiTableColumnFlags_WidthFixed, fnt_size_unit * 8.f);
                 ImGui::TableHeadersRow();
-                for(auto id: reg.view<entt::entity>())
-                {
+
+                // --- Structured entities: hierarchy roots first ---
+                for (auto [id, s] : reg.view<cstructure>().each()) {
+                    if (s.parent == entt::null)
+                        draw_tree(id);
+                }
+
+                // --- Separator + unstructured entities ---
+                bool any_unstructured = false;
+                for (auto id : reg.view<entt::entity>(entt::exclude<cstructure>))
+                    { any_unstructured = true; break; }
+
+                if (any_unstructured) {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    ImGui::PushID(static_cast<int>(entt::to_integral(id)));
-
-                    bool selected = (_selected_entity == id);
-                    if (ImGui::Selectable("##row", selected,
-                        ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap,
-                        ImVec2(0.0f, 0.0f)))
-                    {
-                        _selected_entity = id;
-                    }
-                    ImGui::SameLine();
-                    ImGui::Text("%x", entt::to_integral(id));
-
+                    ImGui::Separator();
                     ImGui::TableNextColumn();
-                    for(auto&& curr : reg.storage())
-                    {
-                        if(auto& storage = curr.second; storage.contains(id))
-                        {
-                            auto comp_type = entt::resolve(curr.first);
-                            if(comp_type.info() == entt::type_id<void>()) continue;
-                            rtti::type_info *info = comp_type.custom();
-                            if(!info || info->type_class != rtti::TYPE_CLASS_COMPONENT) continue;
-                            ImGui::SameLine();
-                            ImGui::TextUnformatted(info->data.component.editor_icon ? info->data.component.editor_icon : "?");
-                        }
-                    }
-
-                    ImGui::PopID();
+                    ImGui::Separator();
+                    for (auto id : reg.view<entt::entity>(entt::exclude<cstructure>))
+                        draw_row(id, false, 0);
                 }
+
                 ImGui::EndTable();
             }
         ImGui::End();
@@ -134,7 +184,11 @@ bool editor::step(step_phase phase)
         ImGui::Begin(ICON_FK_PENCIL " Properties");
         if (_selected_entity != entt::null && reg.valid(_selected_entity))
         {
-            ImGui::TextDisabled("entity %x", entt::to_integral(_selected_entity));
+            auto *_sel_s = reg.try_get<cstructure>(_selected_entity);
+            if (_sel_s && _sel_s->has_name())
+                ImGui::TextDisabled("%s  [%x]", _sel_s->name, entt::to_integral(_selected_entity));
+            else
+                ImGui::TextDisabled("entity %x", entt::to_integral(_selected_entity));
             ImGui::Separator();
             for(auto&& curr : reg.storage())
             {

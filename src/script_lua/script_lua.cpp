@@ -4,6 +4,7 @@
 #include <newbase/script_lua/bindings_glm.hpp>
 #include <newbase/script_lua/utility.hpp>
 #include <newbase/components/script.hpp>
+#include <newbase/components/structure.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/engine.hpp>
@@ -471,6 +472,109 @@ void script_lua::bind_global_api()
         return 1;
     });
     lua_setglobal(_d->L, "script_get_env");
+
+    // entity_find(name) -> eid or nil — first entity whose cstructure.name matches
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        const char *name = luaL_checkstring(L, 1);
+        auto &reg = engine::instance().default_scene().registry();
+        for (auto [e, s] : reg.view<cstructure>().each()) {
+            if (std::strncmp(s.name, name, cstructure::NAME_CAP) == 0) {
+                lua_pushinteger(L, static_cast<lua_Integer>(entt::to_integral(e)));
+                return 1;
+            }
+        }
+        lua_pushnil(L);
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_find");
+
+    // entity_get_name(eid) -> string or nil
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
+        auto &reg = engine::instance().default_scene().registry();
+        auto *s = reg.try_get<cstructure>(eid);
+        if (!s || !s->has_name()) { lua_pushnil(L); return 1; }
+        lua_pushstring(L, s->name);
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_get_name");
+
+    // entity_set_name(eid, name)
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid  = static_cast<entt::entity>(lua_tointeger(L, 1));
+        const char *name = luaL_checkstring(L, 2);
+        auto &reg = engine::instance().default_scene().registry();
+        reg.get_or_emplace<cstructure>(eid).set_name(std::string(name));
+        return 0;
+    });
+    lua_setglobal(_d->L, "entity_set_name");
+
+    // entity_get_parent(eid) -> eid or nil
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
+        auto &reg = engine::instance().default_scene().registry();
+        auto *s = reg.try_get<cstructure>(eid);
+        if (!s || s->parent == entt::null) { lua_pushnil(L); return 1; }
+        lua_pushinteger(L, static_cast<lua_Integer>(entt::to_integral(s->parent)));
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_get_parent");
+
+    // entity_set_parent(child, parent_or_nil)
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto child = static_cast<entt::entity>(lua_tointeger(L, 1));
+        entt::entity parent = lua_isnoneornil(L, 2)
+            ? entt::null
+            : static_cast<entt::entity>(lua_tointeger(L, 2));
+        auto &reg = engine::instance().default_scene().registry();
+        auto &cs = reg.get_or_emplace<cstructure>(child);
+
+        // Remove from old parent's list
+        if (cs.parent != entt::null && reg.valid(cs.parent)) {
+            auto *ps = reg.try_get<cstructure>(cs.parent);
+            if (ps) {
+                if (ps->first_child == child) {
+                    ps->first_child = cs.next_sibling;
+                } else {
+                    entt::entity cur = ps->first_child;
+                    while (cur != entt::null && reg.valid(cur)) {
+                        auto &sib = reg.get<cstructure>(cur);
+                        if (sib.next_sibling == child) { sib.next_sibling = cs.next_sibling; break; }
+                        cur = sib.next_sibling;
+                    }
+                }
+            }
+        }
+        cs.next_sibling = entt::null;
+        cs.parent = parent;
+
+        // Prepend to new parent's list
+        if (parent != entt::null && reg.valid(parent)) {
+            auto &ps = reg.get_or_emplace<cstructure>(parent);
+            cs.next_sibling = ps.first_child;
+            ps.first_child  = child;
+        }
+        return 0;
+    });
+    lua_setglobal(_d->L, "entity_set_parent");
+
+    // entity_children(eid) -> table (array of eids)
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
+        auto &reg = engine::instance().default_scene().registry();
+        lua_newtable(L);
+        auto *s = reg.try_get<cstructure>(eid);
+        if (!s) return 1;
+        int i = 1;
+        entt::entity cur = s->first_child;
+        while (cur != entt::null && reg.valid(cur)) {
+            lua_pushinteger(L, static_cast<lua_Integer>(entt::to_integral(cur)));
+            lua_rawseti(L, -2, i++);
+            cur = reg.get<cstructure>(cur).next_sibling;
+        }
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_children");
 
     // scene_load(etree_id) -- queue a scene change; takes effect at start of next step
     lua_pushcfunction(_d->L, [](lua_State *L) -> int {

@@ -120,6 +120,19 @@
                  "width":0,
                  "x":144.698763483294,
                  "y":1212.83872665088
+                }, 
+                {
+                 "height":0,
+                 "id":6,
+                 "name":"",
+                 "opacity":1,
+                 "point":true,
+                 "rotation":0,
+                 "type":"enemy",
+                 "visible":true,
+                 "width":0,
+                 "x":1097.07971586425,
+                 "y":1252.30202578269
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -128,7 +141,7 @@
          "y":0
         }],
  "nextlayerid":5,
- "nextobjectid":6,
+ "nextobjectid":7,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.1",

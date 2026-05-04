@@ -6,6 +6,7 @@
 #include <newbase/components/mesh2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/spatial.hpp>
+#include <newbase/components/structure.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
 #include <newbase/res/sprite.hpp>
@@ -655,6 +656,7 @@ extern "C" void _rtti_init_render_simple()
         .conv<std::shared_ptr<nb::system>>();
 
     cspatial::_ensure_rtti();
+    cstructure::_ensure_rtti();
     csprite::_ensure_rtti();
     cmesh2d::_ensure_rtti();
     cparticle_emitter::_ensure_rtti();

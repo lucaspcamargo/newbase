@@ -522,6 +522,13 @@ sequences:
       h: 13
       count: 1
       duration: 1.0
+  - name: slimeGreen_anim
+    loop: true
+    frames:
+      - source_rect: [140, 65, 49, 34]
+        duration: 0.25
+      - source_rect: [257, 84, 57, 30]
+        duration: 0.25
   - name: slimeGreen
     loop: false
     strip:

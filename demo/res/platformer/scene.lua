@@ -13,13 +13,16 @@ audio_bgm_play(hs("res/platformer/bgm/Grasslands Theme.ogg"))
 local MAP_RES      = hs("res/platformer/map/map_0.tmj")
 local COIN_ETREE   = hs("res/platformer/coin.et.yaml")
 local PLAYER_ETREE = hs("res/platformer/player.et.yaml")
+local ENEMY_ETREE  = hs("res/platformer/enemy.et.yaml")
 
 local _res_coin   = res_get_etree(COIN_ETREE)
 local _res_player = res_get_etree(PLAYER_ETREE)
+local _res_enemy  = res_get_etree(ENEMY_ETREE)
 
 local etree_for_type = {
     coin   = COIN_ETREE,
     player = PLAYER_ETREE,
+    enemy  = ENEMY_ETREE,
 }
 
 local ts = sys_tilemap_system

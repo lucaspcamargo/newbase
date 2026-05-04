@@ -11,6 +11,7 @@
 #include <newbase/components/textext.hpp>
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/character2d.hpp>
+#include <newbase/components/structure.hpp>
 #include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
@@ -69,6 +70,9 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
         if(first == entt::null) first = eid;
 
         log::info("[scene] build_etree: ent %s (%x)", entname.c_str(), static_cast<uint32_t>(eid));
+        if (!entname.empty()) {
+            reg.get_or_emplace<cstructure>(eid).set_name(entname);
+        }
         for(auto comp: ent["comps"])
         {
             std::string compname;
