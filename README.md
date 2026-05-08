@@ -6,7 +6,7 @@
 <!-- repo not yet public, may be in the future, then badge can be added : ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)-->
 
-A *new base* for making games and interactive stuff. Under heavy construction.
+A *new base* for making games and interactive stuff. Early release — usable, but evolving.
 
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom
@@ -136,7 +136,6 @@ These are core systems of the engine, that implement standard data flows that ot
 - [rapidyaml](https://github.com/biojppm/rapidyaml) - A fast and complete YAML library
 - [lua](https://www.lua.org/) - The embeddable scripting language and runtime 
     + (it may be possible to use [LuaJIT](https://luajit.org/) for even faster speeds, but this is not yet tested)
-- [sol3](https://github.com/ThePhD/sol2) - A fast, metaprogrammed Lua <-> C++ bindings library
 - [ImGui](https://github.com/ocornut/imgui) - A lean C++ GUI library with flexible platform support
 - [stb](https://github.com/nothings/stb) - Single-header C++ libraries for specific uses (OGG decoding, TTF fonts)  
 - [tracy](https://github.com/wolfpld/tracy) - A frame profiler for CPU and interactive graphics workloads 
@@ -236,7 +235,6 @@ Look into the Emscripten documentation for more details.
 
 - `NEWBASE_LTO`: enable link-time optimization. Defaults to OFF.
 - `NEWBASE_SDL_STATIC`: whether to build and use SDL statically. Defaults to ON.
-- `NEWBASE_BUILD_TESTS`: build unit and integration tests. Defaults to OFF.
 - `NEWBASE_TRACING`: enable Tracy profiler integration. Defaults to OFF.
 - `NEWBASE_FDO_FILES`: generate and install the XDG .desktop files, required for Flatpak builds. Defaults to OFF.
 - `NEWBASE_NATIVE_RES_PREFIX`: specify the relative path where resources will be installed and searched for. Defaults to "nb".
