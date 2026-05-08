@@ -23,6 +23,7 @@ public:
     bool event(SDL_Event*) override;
 
     void set_gravity(glm::vec2 grav);
+    void reset_gravity();
 
     // apply forces and torques
     bool body_force(entt::entity ent, glm::vec2 force, glm::vec2 world_point, bool awake = true);

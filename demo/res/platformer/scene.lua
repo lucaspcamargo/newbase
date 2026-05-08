@@ -6,6 +6,9 @@ local MAP_H = 20 * 70
 render_simple_cam_2d_setup(MAP_W * 0.5, MAP_H * 0.5, MAP_W, MAP_H)
 render_simple_set_clear_color(0.82, 0.96, 0.97)
 
+-- default gravity
+physics2d_reset_gravity()
+
 -- Play bgm, looped
 audio_bgm_play(hs("res/platformer/bgm/Grasslands Theme.ogg"))
 

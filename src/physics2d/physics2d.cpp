@@ -332,6 +332,11 @@ void physics2d::set_gravity(glm::vec2 grav)
     }
 }
 
+void physics2d::reset_gravity()
+{
+    set_gravity(glm::vec2{0.0f, 9.81f * _d->world_scale});
+}
+
 bool physics2d::body_force(entt::entity ent, glm::vec2 force, glm::vec2 world_point, bool awake)
 {
     // apply force to body at point
@@ -667,7 +672,9 @@ extern "C" void _rtti_init_physics2d()
         .custom<rtti::type_info>(rtti::type_info{"physics2d", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
         .func<&nb::physics2d::set_gravity>("set_gravity"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"set_gravity"})
+        .custom<rtti::func_info>(rtti::func_info{"set_gravity"})
+        .func<&nb::physics2d::reset_gravity>("reset_gravity"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"reset_gravity"})
         .func<&nb::physics2d::body_force>("body_force"_hs)
             .custom<rtti::func_info>(rtti::func_info{"body_force"})
         .func<&nb::physics2d::body_force_center>("body_force_center"_hs)

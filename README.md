@@ -28,17 +28,19 @@ ENGBR_SECTION-->
 
 ## Features
 
-*TODO:* fill this up as it grows
+Target feature set for the first release is still in flux.
 
 For now, we have:
-- SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
-- ~~SDL\_GPU-based renderer for 2D and 3D (uses Vulkan, DX12, or Metal depending on the platform)~~
-    + later goal, for now the basic 2D renderer suffices 
-- Resource manager
 - Data-driven Entity-Component-System architecture
-- Physics and collision handling
-- ~~Particle system~~ (WIP)
-- Integrated editor
+- Integrated editor (WIP)
+- Lua scripting
+- SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
+- Graph-based audio playback and processing engine
+- 2D Physics and collision handling
+- Particle system
+- Resource management
+- RTTI system
+- Some extras: tilemaps, textured text, 
 
 ## Platforms
 
@@ -100,9 +102,9 @@ Mouse input and multiple players are not yet supported, but is planned for the f
 
 ### script_lua
 
-This system provides Lua scripting support for the engine, leveraging the sol3 bindings library.
+This system provides Lua scripting support for the engine, written from the bottom-up using our RTTI system.
 
-The initial idea was to allow for different scripting engines to be implementable, and this is still doable if a project requires it. But Lua has shown itself to be capable and performant enough, especially when paired with sol3. So it remains the one and only scripting interface supported by the engine.
+The initial idea was to allow for different scripting engines to be implementable, and this is still doable if a project requires it. But Lua has shown itself to be capable and performant enough. So it remains the one and only scripting interface supported by the engine.
 
 ### physics2d
 
@@ -124,12 +126,9 @@ Games are compiled to native code, and no CPUs from the original system are emul
 
 These are core systems of the engine, that implement standard data flows that other systems rely upon. The engine can run without them, but otherwise expected functionality may not work correctly.
 
-spatial updates hierarchical transforms (...) 
-
 ## Dependencies
 
-`newbase` aims to be as portable as possible, and not reinvent the wheel.
-It stands on the shoulder of giants by leveraging the following technologies:
+`newbase` aims to be as portable as possible, and not reinvent the wheel. Therefore, we leverage the following:
 
 - [SDL3](https://libsdl.org/) - Main platform abstraction library, with many facilities for games 
 - [entt](https://github.com/skypjack/entt) - Data structures and utilities for ECS systems
@@ -148,7 +147,7 @@ These dependencies were carefully chosen for a good mix of power, flexibility, a
 
 ### Optional Dependencies
 
-steamapi, sgdk, etc...
+**TODO:** steamapi, other stuff... Most of those are just skeleton systems.
 
 ### Build-time dependencies
 
@@ -250,5 +249,5 @@ This project is licensed under the BSD 3-Clause license, for now. Future develop
 
 ## Get in Touch
 
-For questions, suggestions, or bug reports, please open an issue or contact the maintainer.
+For questions, suggestions, or bug reports, just contact me :)
 
