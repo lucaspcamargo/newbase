@@ -1,7 +1,12 @@
 #include <newbase/sdl/engine_hooks.h>
 #include <newbase/engine.hpp>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include <cassert>
+
 
 EXTRNC bool _nb_engine_init(void **userptr, int argc, char **argv)
 {
@@ -23,10 +28,11 @@ EXTRNC bool _nb_engine_event(void *userptr, SDL_Event *event)
     return eng->event(event);
 }
 
+EXTRNC
 #ifdef __EMSCRIPTEN__
 EMSCRIPTEN_KEEPALIVE
 #endif
-EXTRNC void _nb_engine_request_exit(void *userptr)
+void _nb_engine_request_exit(void *userptr)
 {
     nb::engine *eng = reinterpret_cast<nb::engine*>(userptr);
     eng->request_exit();
