@@ -21,6 +21,7 @@ If a picture is worth a thousand words, can you imagine what a demo is worth? We
     :caption: $FILENAME_NO_EXT$ ($DATE$)
     :aspect-ratio: 16/9
     :idbfs-mount: /libsdl
+    :stop-func: _nb_engine_request_exit
 ```
 
 *Nice. (I hope? Please let me know is something is amiss. Works on my machine :)*

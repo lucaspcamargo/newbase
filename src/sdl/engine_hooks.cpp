@@ -23,6 +23,15 @@ EXTRNC bool _nb_engine_event(void *userptr, SDL_Event *event)
     return eng->event(event);
 }
 
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+EXTRNC void _nb_engine_request_exit(void *userptr)
+{
+    nb::engine *eng = reinterpret_cast<nb::engine*>(userptr);
+    eng->request_exit();
+}
+
 EXTRNC bool _nb_engine_teardown(void *userptr, SDL_AppResult result)
 {
     nb::engine *eng = reinterpret_cast<nb::engine*>(userptr);
