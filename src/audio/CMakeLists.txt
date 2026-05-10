@@ -6,6 +6,7 @@ newbase_add_system(NAME audio SOURCES
     ./buffer.cpp
     ./converter.cpp
     ./producer/buffer.cpp
+    ./producer/lpc.cpp
     ./producer/vorbis.cpp
     ./types.cpp
 )

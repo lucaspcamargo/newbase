@@ -39,6 +39,7 @@ enum class node_type
     GROUP        = 21, // subgraph node referencing an rgraphplan resource
     GROUP_INPUT  = 22, // audio entry point within a group subgraph
     GROUP_OUTPUT = 23, // audio exit point within a group subgraph
+    LPC_SOURCE   = 24, // built-in TMS5220-compatible LPC speech synthesis source
 };
 
 class node

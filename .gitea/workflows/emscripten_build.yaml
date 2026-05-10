@@ -50,4 +50,8 @@ jobs:
           curl -L -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip butler.zip
           chmod +x linux-amd64/butler
+          echo "Butler version:"
+          linux-amd64/butler version
+          echo "API key length: ${#BUTLER_API_KEY}"
+          echo "API key prefix: ${BUTLER_API_KEY:0:6}..."
           linux-amd64/butler push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
