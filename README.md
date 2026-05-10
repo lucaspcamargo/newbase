@@ -14,7 +14,7 @@ A *new base* for making games and interactive stuff. Early release — usable, b
 <!--ENGBR_SECTION
 ## Demo
 
-If a picture is worth a thousand words, can you imagine what a demo is worth? Well, let's see for ourselves:
+Here's a build of the engine's `demo` app, that you can run right away:
 
 ```{emscripten} newbase_emscripten_*.zip
     :entry: demo/newbase_demo.js
