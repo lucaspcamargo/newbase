@@ -212,6 +212,9 @@ configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONL
 target_include_directories(newbase PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
 
+# TOOLS (host-only utilities; skipped automatically when cross-compiling)
+add_subdirectory(tools)
+
 # BINARIES
 add_subdirectory(demo)    # our demo game/app
 add_subdirectory(runner)  # an application made to run games that don't need additional code

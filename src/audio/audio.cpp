@@ -475,8 +475,11 @@ void audio::_draw_tool_window(bool* close)
 // ---------------------------------------------------------------------------
 // RTTI
 // ---------------------------------------------------------------------------
+void _rtti_init_audio_rlpcvocab(); // defined in res/rlpcvocab.cpp
+
 extern "C" void _rtti_init_audio()
 {
+    _rtti_init_audio_rlpcvocab();
     entt::meta_factory<nb::audio>{}
         .type("audio"_hs)
         .custom<rtti::type_info>(rtti::type_info{"audio", rtti::TYPE_CLASS_SYSTEM})

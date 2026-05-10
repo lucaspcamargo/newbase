@@ -8,6 +8,7 @@ newbase_add_system(NAME audio SOURCES
     ./producer/buffer.cpp
     ./producer/lpc.cpp
     ./producer/vorbis.cpp
+    ./res/rlpcvocab.cpp
     ./types.cpp
 )
 newbase_commit_systems()

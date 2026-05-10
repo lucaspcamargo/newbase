@@ -8,6 +8,7 @@
 #include <newbase/audio/visualizer_feedback.hpp>
 #include <newbase/audio/producer/lpc.hpp>
 #include <newbase/audio/lpc_vocab.hpp>
+#include <newbase/audio/res/rlpcvocab.hpp>
 #include <newbase/log.hpp>
 #include <memory>
 #include <cassert>
@@ -1269,25 +1270,27 @@ public:
         pending_.insert(pending_.end(), frames, int16_t{0});
     }
 
-    // Speak a natural-language phrase against the LPC vocabulary. Game thread only.
+    // Set the vocabulary resource used by say_phrase(). Call from game thread only.
+    void set_vocab(std::shared_ptr<rlpcvocab> vocab) { vocab_ = std::move(vocab); }
+
+    // Speak a natural-language phrase against the loaded vocabulary. Game thread only.
     void say_phrase(const char* phrase)
     {
-        size_t word_count = 0;
-        const nb::lpc_vocab_entry* vocab = nb::lpc_vocab_all(word_count);
+        if (!vocab_ || !vocab_->valid || vocab_->words.empty()) return;
 
-        auto find_word = [&](const char* word) -> const nb::lpc_vocab_entry*
+        auto find_word = [&](const char* word) -> const rlpcvocab_word*
         {
-            for (size_t i = 0; i < word_count; i++)
+            for (const auto& entry : vocab_->words)
             {
                 const char* a = word;
-                const char* b = vocab[i].word;
+                const char* b = entry.name.c_str();
                 while (*a && *b)
                 {
                     if (std::toupper(static_cast<unsigned char>(*a)) !=
                         std::toupper(static_cast<unsigned char>(*b))) break;
                     ++a; ++b;
                 }
-                if (*a == '\0' && *b == '\0') return &vocab[i];
+                if (*a == '\0' && *b == '\0') return &entry;
             }
             return nullptr;
         };
@@ -1301,7 +1304,10 @@ public:
                 if (!token.empty())
                 {
                     if (const auto* e = find_word(token.c_str()))
-                        say(e->variants[0], e->variant_lengths[0]);
+                    {
+                        const auto& v = e->variants[0];
+                        say(v.data.data(), v.data.size());
+                    }
                     token.clear();
                 }
                 if (*p == ',')      { silence_ms(150); silence_ms(150); }
@@ -1349,6 +1355,7 @@ private:
     std::unique_ptr<nb::audio_converter>  converter_;
     audio_spec                            converter_out_spec_;
     float                                 volume_ {1.f};
+    std::shared_ptr<rlpcvocab>            vocab_;
 
     void ensure_converter(audio_spec out_spec)
     {
@@ -1363,7 +1370,8 @@ private:
 // UI feedback/state for the lpc_node editor widget.
 struct lpc_feedback
 {
-    std::weak_ptr<lpc_node> node_wptr;
+    std::weak_ptr<lpc_node>      node_wptr;
+    std::shared_ptr<rlpcvocab>   vocab;        // currently loaded vocabulary resource
 
     int  ui_word_idx    {0};
     int  ui_variant_idx {0};

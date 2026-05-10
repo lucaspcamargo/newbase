@@ -54,11 +54,13 @@ jobs:
           linux-amd64/butler version
           echo "API key length: ${#BUTLER_API_KEY}"
           echo "API key prefix: ${BUTLER_API_KEY:0:6}..."
-          echo "Runner IP:"
-          curl -s https://api.ipify.org
+          echo "Runner IPv4:"
+          curl -4 -s https://api.ipify.org || echo "(no IPv4)"
           echo ""
-          echo "Probing wharf API directly:"
-          curl -s -X POST "https://upload.itch.io/wharf/builds?target=camarguinho/newbase-demo:webgl&userVersion=citest" \
-            -H "Authorization: Bearer ${BUTLER_API_KEY}"
+          echo "Runner IPv6:"
+          curl -6 -s https://api6.ipify.org || echo "(no IPv6)"
+          echo ""
+          echo "upload.itch.io resolves to:"
+          getent hosts upload.itch.io || host upload.itch.io || nslookup upload.itch.io
           echo ""
           linux-amd64/butler --verbose push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}

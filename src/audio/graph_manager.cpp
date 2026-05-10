@@ -1,4 +1,5 @@
 #include <newbase/audio/graph_manager.hpp>
+#include <newbase/audio/res/rlpcvocab.hpp>
 #include <newbase/audio/vorbis_feedback.hpp>
 #include <newbase/audio/visualizer_feedback.hpp>
 #include <newbase/audio/producer/looper.hpp>
@@ -68,6 +69,7 @@ struct nb::audio_graph_manager::impl {
     std::unordered_map<uint64_t, std::shared_ptr<audio_graph::talkie_pcm_feedback>> talkie_pcm_fb_cache;
 #endif
     std::unordered_map<uint64_t, std::shared_ptr<audio_graph::lpc_feedback>> lpc_fb_cache;
+    std::unordered_map<uint64_t, std::shared_ptr<rlpcvocab>>                 lpc_vocab_cache;
 
     // Fan-out buffer cache: graphplan node id → internally-injected fan_out_node.
     // Keyed by (gp_id, output_pin_index) packed as gp_id*16 + pin_index.
@@ -257,7 +259,9 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
 #endif
         node_type_def{static_cast<int>(audio_graph::node_type::LPC_SOURCE), "LPC Speech",
                       {}, {AUDIO_PIN_STREAM},
-                      { prop_def{"volume", entt::meta_any{1.f}} },
+                      { prop_def{"volume",       entt::meta_any{1.f}},
+                        prop_def{"vocab_res_id", entt::meta_any{entt::id_type{0}}, false,
+                                 entt::hashed_string{"rlpcvocab"}.value()} },
                       true, CAT_SOURCE},
         node_type_def{static_cast<int>(audio_graph::node_type::GROUP), "Group",
                       {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
@@ -623,13 +627,13 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
             auto node = fb->node_wptr.lock();
             if (!node) { ImGui::TextDisabled("(no live node)"); return false; }
 
-            // --- Word selector ---
-            size_t word_count = 0;
-            const nb::lpc_vocab_entry* words = nb::lpc_vocab_all(word_count);
+            const nb::rlpcvocab* vocab = fb->vocab && fb->vocab->valid ? fb->vocab.get() : nullptr;
+            const size_t word_count = vocab ? vocab->words.size() : 0;
 
+            // --- Word selector ---
             if (word_count == 0)
             {
-                ImGui::TextDisabled("(empty vocabulary)");
+                ImGui::TextDisabled("(no vocabulary loaded)");
             }
             else
             {
@@ -640,33 +644,36 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::Combo("##lpcword", &fb->ui_word_idx,
                     [](void* data, int idx, const char** out) -> bool {
-                        *out = static_cast<const nb::lpc_vocab_entry*>(data)[idx].word;
+                        *out = static_cast<const nb::rlpcvocab*>(data)->words[idx].name.c_str();
                         return true;
                     },
-                    const_cast<void*>(static_cast<const void*>(words)),
+                    const_cast<void*>(static_cast<const void*>(vocab)),
                     static_cast<int>(word_count));
 
-                const nb::lpc_vocab_entry& entry = words[fb->ui_word_idx];
-                if (fb->ui_variant_idx < 0 ||
-                    fb->ui_variant_idx >= static_cast<int>(entry.variant_count))
+                const nb::rlpcvocab_word& entry = vocab->words[fb->ui_word_idx];
+                const size_t var_count = entry.variants.size();
+                if (fb->ui_variant_idx < 0 || fb->ui_variant_idx >= static_cast<int>(var_count))
                     fb->ui_variant_idx = 0;
 
-                if (entry.variant_count > 1)
+                if (var_count > 1)
                 {
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(50.f);
                     ImGui::Combo("##lpcvar", &fb->ui_variant_idx,
                         [](void* data, int idx, const char** out) -> bool {
-                            *out = static_cast<const char* const*>(data)[idx];
+                            *out = static_cast<const nb::rlpcvocab_word*>(data)
+                                       ->variants[idx].name.c_str();
                             return true;
                         },
-                        const_cast<void*>(static_cast<const void*>(entry.variant_names)),
-                        static_cast<int>(entry.variant_count));
+                        const_cast<void*>(static_cast<const void*>(&entry)),
+                        static_cast<int>(var_count));
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(ICON_FK_PLAY "##lpcsayword"))
-                    node->say(entry.variants[fb->ui_variant_idx],
-                              entry.variant_lengths[fb->ui_variant_idx]);
+                {
+                    const auto& v = entry.variants[fb->ui_variant_idx];
+                    node->say(v.data.data(), v.data.size());
+                }
             }
 
             // --- Silence ---
@@ -678,12 +685,14 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                 node->silence_ms(static_cast<uint16_t>(fb->ui_silence_ms));
 
             // --- Phrase ---
+            ImGui::BeginDisabled(word_count == 0);
             ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say phrase");
             ImGui::SetNextItemWidth(200.f);
             ImGui::InputText("##lpcphrase", fb->ui_phrase, sizeof(fb->ui_phrase));
             ImGui::SameLine();
             if (ImGui::Button(ICON_FK_PLAY "##lpcsayphrase"))
                 node->say_phrase(fb->ui_phrase);
+            ImGui::EndDisabled();
 
             return false;
         };
@@ -872,6 +881,7 @@ void audio_graph_manager::_reset_plan_caches(impl* d)
     d->talkie_pcm_fb_cache.clear();
 #endif
     d->lpc_fb_cache.clear();
+    d->lpc_vocab_cache.clear();
     if (auto* rs = entt::locator<renderer_service*>::has_value()
                    ? entt::locator<renderer_service*>::value() : nullptr)
     {
@@ -1251,6 +1261,18 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
         return 0;
     };
 
+    auto load_lpc_vocab = [&](const graphplan::node_data& nd, uint64_t gp_id)
+        -> std::shared_ptr<rlpcvocab>
+    {
+        entt::id_type res_id = prop_id(nd, "vocab_res_id");
+        if (res_id == 0) { _d->lpc_vocab_cache[gp_id] = nullptr; return nullptr; }
+        auto vres = rman().get<rlpcvocab>(res_id);
+        _d->lpc_vocab_cache[gp_id] = vres;
+        if (!vres || !vres->valid)
+            log::warn("[audio] lpc_node %llu: vocab resource not found", gp_id);
+        return vres;
+    };
+
     auto make_vorbis_producer = [&](const graphplan::node_data& nd, uint64_t gp_id)
         -> std::unique_ptr<audio_producer>
     {
@@ -1537,9 +1559,12 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             {
                 auto* ln = static_cast<audio_graph::lpc_node*>(node_ptr.get());
                 ln->set_volume(prop_f(nd, "volume", 1.f));
+                auto vocab = load_lpc_vocab(nd, gp_id);
+                ln->set_vocab(vocab);
                 auto& fb_ptr = _d->lpc_fb_cache[gp_id];
                 if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::lpc_feedback>();
                 fb_ptr->node_wptr = std::static_pointer_cast<audio_graph::lpc_node>(node_ptr);
+                fb_ptr->vocab     = vocab;
                 _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
             }
 
@@ -1680,9 +1705,12 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             {
                 auto ln = std::make_shared<audio_graph::lpc_node>(ag_id);
                 ln->set_volume(prop_f(nd, "volume", 1.f));
+                auto vocab = load_lpc_vocab(nd, gp_id);
+                ln->set_vocab(vocab);
                 auto& fb_ptr = _d->lpc_fb_cache[gp_id];
                 if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::lpc_feedback>();
                 fb_ptr->node_wptr = ln;
+                fb_ptr->vocab     = vocab;
                 _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
                 node_ptr = std::move(ln);
             }
@@ -1711,6 +1739,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             _d->talkie_pcm_fb_cache.erase(it->first);
 #endif
             _d->lpc_fb_cache.erase(it->first);
+            _d->lpc_vocab_cache.erase(it->first);
             auto vit = _d->vis_fb_cache.find(it->first);
             if (vit != _d->vis_fb_cache.end())
             {
