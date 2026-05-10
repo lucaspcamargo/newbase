@@ -50,17 +50,7 @@ jobs:
           curl -L -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip butler.zip
           chmod +x linux-amd64/butler
-          echo "Butler version:"
-          linux-amd64/butler version
-          echo "API key length: ${#BUTLER_API_KEY}"
-          echo "API key prefix: ${BUTLER_API_KEY:0:6}..."
-          echo "Runner IPv4:"
-          curl -4 -s https://api.ipify.org || echo "(no IPv4)"
-          echo ""
-          echo "Runner IPv6:"
-          curl -6 -s https://api6.ipify.org || echo "(no IPv6)"
-          echo ""
-          echo "upload.itch.io resolves to:"
-          getent hosts upload.itch.io || host upload.itch.io || nslookup upload.itch.io
-          echo ""
-          linux-amd64/butler --verbose push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
+          ITCH_IPV4=$(curl -4 -s "https://dns.google/resolve?name=upload.itch.io&type=A" | grep -o '"data":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "upload.itch.io IPv4: $ITCH_IPV4"
+          echo "$ITCH_IPV4 upload.itch.io" | sudo tee -a /etc/hosts
+          linux-amd64/butler push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
