@@ -276,48 +276,68 @@ bool physics2d::event(SDL_Event*)
 
 void physics2d::_draw_tool_window(bool *close)
 {
-    ImGui::Begin(ICON_FK_SQUARE " Physics 2D Tools");
-    ImGui::Checkbox("debug draw", &_d->debug_draw_enabled);
-    ImGui::Text("World scale: %f", _d->world_scale);
-    ImGui::Checkbox("drawShapes", &_d->debug_draw.drawShapes);
-    ImGui::Checkbox("drawJoints", &_d->debug_draw.drawJoints);
-    ImGui::Checkbox("drawJointExtras", &_d->debug_draw.drawJointExtras);
-    ImGui::Checkbox("drawBounds", &_d->debug_draw.drawBounds);
-    ImGui::Checkbox("drawMass", &_d->debug_draw.drawMass);
-    ImGui::Checkbox("drawBodyNames", &_d->debug_draw.drawBodyNames);
-    ImGui::Checkbox("drawContacts", &_d->debug_draw.drawContacts);
-    ImGui::Checkbox("drawGraphColors", &_d->debug_draw.drawGraphColors);
-    ImGui::Checkbox("drawContactNormals", &_d->debug_draw.drawContactNormals);
-    ImGui::Checkbox("drawContactForces", &_d->debug_draw.drawContactForces);
-    ImGui::Checkbox("drawContactFeatures", &_d->debug_draw.drawContactFeatures);
-    ImGui::Checkbox("drawFrictionImpulses", &_d->debug_draw.drawFrictionForces);
-    ImGui::Checkbox("drawIslands", &_d->debug_draw.drawIslands);
-    if(ImGui::Button("Hello Box2D!"))
+    if (!ImGui::Begin(ICON_FK_SQUARE " Physics 2D", close))
     {
-        static bool ground_added = false;
-        if(!ground_added)
-        {
-            b2BodyDef groundBodyDef = b2DefaultBodyDef();
-            groundBodyDef.position.x = 0.0f;
-            groundBodyDef.position.y = 10.0f;
-            b2BodyId groundId = b2CreateBody(_d->world_id, &groundBodyDef);
-            b2Polygon groundBox = b2MakeBox(50.0f, 10.0f);
-            b2ShapeDef groundShapeDef = b2DefaultShapeDef();
-            b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
-            ground_added = true;
-        }
-
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = b2_dynamicBody;
-        bodyDef.position.x = 0.0f;
-        bodyDef.position.y = -75.0f;
-        b2BodyId bodyId = b2CreateBody(_d->world_id, &bodyDef);
-        b2Polygon dynamicBox = b2MakeBox(10.0f, 10.0f);
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = 1.0f;
-        shapeDef.material.friction = 0.3f;
-        b2CreatePolygonShape(bodyId, &shapeDef, &dynamicBox);
+        ImGui::End();
+        return;
     }
+
+    // World stats
+    ImGui::TextDisabled("Scale: %.3f px/m", _d->world_scale);
+    if (B2_IS_NON_NULL(_d->world_id))
+    {
+        b2Counters counters = b2World_GetCounters(_d->world_id);
+        ImGui::TextDisabled("Bodies: %d  Contacts: %d  Joints: %d",
+            counters.bodyCount, counters.contactCount, counters.jointCount);
+    }
+
+    ImGui::Separator();
+
+    // Gravity
+    if (B2_IS_NON_NULL(_d->world_id))
+    {
+        b2Vec2 g = b2World_GetGravity(_d->world_id);
+        float gv[2] = {g.x, g.y};
+        ImGui::TextUnformatted("Gravity");
+        ImGui::SameLine();
+        float btn_w = ImGui::CalcTextSize("Reset").x + ImGui::GetStyle().FramePadding.x * 2;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - btn_w - ImGui::GetStyle().ItemSpacing.x);
+        if (ImGui::DragFloat2("##gravity", gv, 1.0f))
+            b2World_SetGravity(_d->world_id, {gv[0], gv[1]});
+        ImGui::SameLine();
+        if (ImGui::Button("Reset"))
+            set_gravity({0.0f, 9.81f * _d->world_scale});
+    }
+
+    ImGui::Separator();
+
+    // Debug draw
+    ImGui::Checkbox("Debug draw", &_d->debug_draw_enabled);
+    if (!_d->debug_draw_enabled) ImGui::BeginDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Draw features" ICON_FK_CARET_DOWN))
+        ImGui::OpenPopup("##drawfeatures");
+    if (ImGui::BeginPopup("##drawfeatures"))
+    {
+        ImGui::Checkbox("Shapes",            &_d->debug_draw.drawShapes);
+        ImGui::Checkbox("Joints",            &_d->debug_draw.drawJoints);
+        ImGui::Checkbox("Joint extras",      &_d->debug_draw.drawJointExtras);
+        ImGui::Checkbox("Bounds",            &_d->debug_draw.drawBounds);
+        ImGui::Checkbox("Mass",              &_d->debug_draw.drawMass);
+        ImGui::Checkbox("Body names",        &_d->debug_draw.drawBodyNames);
+        ImGui::Checkbox("Islands",           &_d->debug_draw.drawIslands);
+        ImGui::Separator();
+        ImGui::Checkbox("Contacts",          &_d->debug_draw.drawContacts);
+        ImGui::Checkbox("Contact normals",   &_d->debug_draw.drawContactNormals);
+        ImGui::Checkbox("Contact forces",    &_d->debug_draw.drawContactForces);
+        ImGui::Checkbox("Contact features",  &_d->debug_draw.drawContactFeatures);
+        ImGui::Checkbox("Friction impulses", &_d->debug_draw.drawFrictionForces);
+        ImGui::Separator();
+        ImGui::Checkbox("Graph colors",      &_d->debug_draw.drawGraphColors);
+        ImGui::EndPopup();
+    }
+    if (!_d->debug_draw_enabled) ImGui::EndDisabled();
+
     ImGui::End();
 }
 

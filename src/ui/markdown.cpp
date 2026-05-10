@@ -14,6 +14,7 @@ void Markdown(std::string_view text)
         /* headingFormats  */ { { nullptr, true }, { nullptr, true }, { nullptr, false } },
         /* userData        */ nullptr,
         /* formatCallback  */ ImGui::defaultMarkdownFormatCallback,
+        /* formatFlags     */ ImGuiMarkdownFormatFlags_GithubStyle,
     };
 
     ImGui::Markdown(text.data(), text.size(), config);

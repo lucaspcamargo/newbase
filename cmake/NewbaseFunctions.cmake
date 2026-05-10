@@ -85,7 +85,7 @@ function(newbase_prepare_executable)
     endif()
 
     if(DEFINED EMSCRIPTEN)
-        set(target_opts -sALLOW_MEMORY_GROWTH -sEXPORTED_FUNCTIONS=_main,_free,__nb_engine_request_exit -sENVIRONMENT=web -lidbfs.js -sPTHREAD_POOL_SIZE=8)
+        set(target_opts -sALLOW_MEMORY_GROWTH -sEXIT_RUNTIME=1 -sEXPORTED_FUNCTIONS=_main,_free,__nb_engine_request_exit -sENVIRONMENT=web -lidbfs.js -sPTHREAD_POOL_SIZE=8)
         if(NEWBASE_EMSCRIPTEN_HTML)
             set(shell_file "${NEWBASE_ROOT}/res/_nb_core/emscripten/shell.html")
             list(APPEND target_opts "--shell-file=${shell_file}")
