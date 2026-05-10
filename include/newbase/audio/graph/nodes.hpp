@@ -6,6 +6,8 @@
 #include <newbase/audio/producer.hpp>
 #include <newbase/audio/converter.hpp>
 #include <newbase/audio/visualizer_feedback.hpp>
+#include <newbase/audio/producer/lpc.hpp>
+#include <newbase/audio/lpc_vocab.hpp>
 #include <newbase/log.hpp>
 #include <memory>
 #include <cassert>
@@ -1214,6 +1216,159 @@ private:
         if (!scratch_ || scratch_->spec() != spec || scratch_->frames() != frames)
             scratch_ = std::make_unique<audio_buffer>(spec, frames, nullptr);
     }
+};
+
+
+// ---------------------------------------------------------------------------
+// lpc_node — built-in TMS5220-compatible LPC speech synthesis
+// ---------------------------------------------------------------------------
+
+// Audio graph source node backed by the built-in TMS5220-compatible LPC synthesizer.
+// call say() from the game thread to enqueue synthesized speech;
+// pull() is called from the audio thread and converts from S16 8kHz mono.
+class lpc_node : public node
+{
+    static constexpr int LPC_RATE = 8000;
+    static inline const audio_spec LPC_SPEC { audio_format::S16, 1, LPC_RATE };
+
+public:
+    explicit lpc_node(node_id id) : node(id) {}
+
+    // Enqueue a word (TMS5220 bitstream). Call from game thread only.
+    // Synthesis runs synchronously here so the audio thread only drains samples.
+    void say(const uint8_t* data, size_t length)
+    {
+        audio_producer_lpc lpc(data, length);
+        const size_t total = lpc.total_frames();
+        if (total == 0) return;
+
+        audio_buffer tmp(LPC_SPEC, total, nullptr);
+        lpc.frames_pull(tmp.as_span(), total);
+
+        const int16_t* src = reinterpret_cast<const int16_t*>(tmp.data().data());
+
+        std::lock_guard<std::mutex> lk(mutex_);
+        if (volume_ != 1.f)
+        {
+            pending_.reserve(pending_.size() + total);
+            for (size_t i = 0; i < total; ++i)
+                pending_.push_back(static_cast<int16_t>(
+                    std::clamp(static_cast<float>(src[i]) * volume_, -32768.f, 32767.f)));
+        }
+        else
+        {
+            pending_.insert(pending_.end(), src, src + total);
+        }
+    }
+
+    // Enqueue silence. Call from game thread only.
+    void silence_ms(uint16_t ms)
+    {
+        const size_t frames = (static_cast<size_t>(ms) * LPC_RATE) / 1000;
+        std::lock_guard<std::mutex> lk(mutex_);
+        pending_.insert(pending_.end(), frames, int16_t{0});
+    }
+
+    // Speak a natural-language phrase against the LPC vocabulary. Game thread only.
+    void say_phrase(const char* phrase)
+    {
+        size_t word_count = 0;
+        const nb::lpc_vocab_entry* vocab = nb::lpc_vocab_all(word_count);
+
+        auto find_word = [&](const char* word) -> const nb::lpc_vocab_entry*
+        {
+            for (size_t i = 0; i < word_count; i++)
+            {
+                const char* a = word;
+                const char* b = vocab[i].word;
+                while (*a && *b)
+                {
+                    if (std::toupper(static_cast<unsigned char>(*a)) !=
+                        std::toupper(static_cast<unsigned char>(*b))) break;
+                    ++a; ++b;
+                }
+                if (*a == '\0' && *b == '\0') return &vocab[i];
+            }
+            return nullptr;
+        };
+
+        std::string token;
+        for (const char* p = phrase; ; ++p)
+        {
+            const unsigned char c = static_cast<unsigned char>(*p);
+            if (*p == ',' || *p == '.' || *p == '\0' || std::isspace(c))
+            {
+                if (!token.empty())
+                {
+                    if (const auto* e = find_word(token.c_str()))
+                        say(e->variants[0], e->variant_lengths[0]);
+                    token.clear();
+                }
+                if (*p == ',')      { silence_ms(150); silence_ms(150); }
+                else if (*p == '.') { silence_ms(150); silence_ms(150); silence_ms(150); }
+                if (*p == '\0') break;
+            }
+            else
+            {
+                token += static_cast<char>(c);
+            }
+        }
+    }
+
+    void set_volume(float vol) { volume_ = vol; }
+
+    void pull(audio_buffer::span& dst, uint64_t /*gen*/) override
+    {
+        const audio_spec graph_spec = dst.buffer_ref().spec();
+        ensure_converter(graph_spec);
+
+        {
+            std::lock_guard<std::mutex> lk(mutex_);
+            if (!pending_.empty())
+            {
+                audio_buffer tmp(LPC_SPEC, pending_.size(),
+                    reinterpret_cast<const std::byte*>(pending_.data()));
+                auto sp = tmp.as_span();
+                converter_->put(sp);
+                pending_.clear();
+            }
+        }
+
+        size_t got = converter_->take(audio_buffer::span(dst));
+        if (got < dst.frames())
+        {
+            const size_t stride = audio_format_size(graph_spec.format)
+                                  * static_cast<size_t>(graph_spec.channels);
+            std::fill(dst.begin() + got * stride, dst.end(), std::byte{0});
+        }
+    }
+
+private:
+    std::vector<int16_t>                  pending_;
+    std::mutex                            mutex_;
+    std::unique_ptr<nb::audio_converter>  converter_;
+    audio_spec                            converter_out_spec_;
+    float                                 volume_ {1.f};
+
+    void ensure_converter(audio_spec out_spec)
+    {
+        if (!converter_ || converter_out_spec_ != out_spec)
+        {
+            converter_          = std::make_unique<nb::audio_converter>(LPC_SPEC, out_spec);
+            converter_out_spec_ = out_spec;
+        }
+    }
+};
+
+// UI feedback/state for the lpc_node editor widget.
+struct lpc_feedback
+{
+    std::weak_ptr<lpc_node> node_wptr;
+
+    int  ui_word_idx    {0};
+    int  ui_variant_idx {0};
+    int  ui_silence_ms  {500};
+    char ui_phrase[256] {};
 };
 
 

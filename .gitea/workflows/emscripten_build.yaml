@@ -54,4 +54,7 @@ jobs:
           linux-amd64/butler version
           echo "API key length: ${#BUTLER_API_KEY}"
           echo "API key prefix: ${BUTLER_API_KEY:0:6}..."
-          linux-amd64/butler push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
+          echo "Runner IP:"
+          curl -s https://api.ipify.org
+          echo ""
+          linux-amd64/butler --verbose push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}

@@ -67,6 +67,7 @@ struct nb::audio_graph_manager::impl {
 #ifdef NEWBASE_TALKIE_PCM
     std::unordered_map<uint64_t, std::shared_ptr<audio_graph::talkie_pcm_feedback>> talkie_pcm_fb_cache;
 #endif
+    std::unordered_map<uint64_t, std::shared_ptr<audio_graph::lpc_feedback>> lpc_fb_cache;
 
     // Fan-out buffer cache: graphplan node id → internally-injected fan_out_node.
     // Keyed by (gp_id, output_pin_index) packed as gp_id*16 + pin_index.
@@ -254,6 +255,10 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                       { prop_def{"volume", entt::meta_any{1.f}} },
                       true, CAT_SOURCE},
 #endif
+        node_type_def{static_cast<int>(audio_graph::node_type::LPC_SOURCE), "LPC Speech",
+                      {}, {AUDIO_PIN_STREAM},
+                      { prop_def{"volume", entt::meta_any{1.f}} },
+                      true, CAT_SOURCE},
         node_type_def{static_cast<int>(audio_graph::node_type::GROUP), "Group",
                       {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
                       { prop_def{"res_id", entt::meta_any{entt::id_type{0}}, false,
@@ -304,6 +309,7 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
 #ifdef NEWBASE_TALKIE_PCM
     set_color(audio_graph::node_type::TALKIE_PCM_SOURCE, SOURCE_COLOR);
 #endif
+    set_color(audio_graph::node_type::LPC_SOURCE,   SOURCE_COLOR);
     set_color(audio_graph::node_type::GROUP,        CORE_COLOR);
     set_color(audio_graph::node_type::GROUP_INPUT,  BUS_COLOR);
     set_color(audio_graph::node_type::GROUP_OUTPUT, BUS_COLOR);
@@ -603,6 +609,86 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     }
 #endif
 
+    // LPC Speech custom draw.
+    auto lpc_it = std::find_if(d.node_types.begin(), d.node_types.end(),
+        [](const graphplan::node_type_def& t){
+            return t.type_id == static_cast<int>(audio_graph::node_type::LPC_SOURCE);
+        });
+    if (lpc_it != d.node_types.end())
+    {
+        lpc_it->draw_fn = [](graphplan::node_data& nd) -> bool
+        {
+            auto* fb = static_cast<audio_graph::lpc_feedback*>(nd.user_data.get());
+            if (!fb) { ImGui::TextDisabled("(not initialized)"); return false; }
+            auto node = fb->node_wptr.lock();
+            if (!node) { ImGui::TextDisabled("(no live node)"); return false; }
+
+            // --- Word selector ---
+            size_t word_count = 0;
+            const nb::lpc_vocab_entry* words = nb::lpc_vocab_all(word_count);
+
+            if (word_count == 0)
+            {
+                ImGui::TextDisabled("(empty vocabulary)");
+            }
+            else
+            {
+                if (fb->ui_word_idx < 0 || fb->ui_word_idx >= static_cast<int>(word_count))
+                    fb->ui_word_idx = 0;
+
+                ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say word");
+                ImGui::SetNextItemWidth(140.f);
+                ImGui::Combo("##lpcword", &fb->ui_word_idx,
+                    [](void* data, int idx, const char** out) -> bool {
+                        *out = static_cast<const nb::lpc_vocab_entry*>(data)[idx].word;
+                        return true;
+                    },
+                    const_cast<void*>(static_cast<const void*>(words)),
+                    static_cast<int>(word_count));
+
+                const nb::lpc_vocab_entry& entry = words[fb->ui_word_idx];
+                if (fb->ui_variant_idx < 0 ||
+                    fb->ui_variant_idx >= static_cast<int>(entry.variant_count))
+                    fb->ui_variant_idx = 0;
+
+                if (entry.variant_count > 1)
+                {
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(50.f);
+                    ImGui::Combo("##lpcvar", &fb->ui_variant_idx,
+                        [](void* data, int idx, const char** out) -> bool {
+                            *out = static_cast<const char* const*>(data)[idx];
+                            return true;
+                        },
+                        const_cast<void*>(static_cast<const void*>(entry.variant_names)),
+                        static_cast<int>(entry.variant_count));
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_FK_PLAY "##lpcsayword"))
+                    node->say(entry.variants[fb->ui_variant_idx],
+                              entry.variant_lengths[fb->ui_variant_idx]);
+            }
+
+            // --- Silence ---
+            ImGui::SetNextItemWidth(80.f);
+            ImGui::InputInt("ms##lpcsil", &fb->ui_silence_ms);
+            if (fb->ui_silence_ms < 0) fb->ui_silence_ms = 0;
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_FK_VOLUME_OFF " Silence"))
+                node->silence_ms(static_cast<uint16_t>(fb->ui_silence_ms));
+
+            // --- Phrase ---
+            ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say phrase");
+            ImGui::SetNextItemWidth(200.f);
+            ImGui::InputText("##lpcphrase", fb->ui_phrase, sizeof(fb->ui_phrase));
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_FK_PLAY "##lpcsayphrase"))
+                node->say_phrase(fb->ui_phrase);
+
+            return false;
+        };
+    }
+
     return d;
 }();
 
@@ -785,6 +871,7 @@ void audio_graph_manager::_reset_plan_caches(impl* d)
 #ifdef NEWBASE_TALKIE_PCM
     d->talkie_pcm_fb_cache.clear();
 #endif
+    d->lpc_fb_cache.clear();
     if (auto* rs = entt::locator<renderer_service*>::has_value()
                    ? entt::locator<renderer_service*>::value() : nullptr)
     {
@@ -1137,6 +1224,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
 #ifdef NEWBASE_TALKIE_PCM
     const int TALKIE_PCM_TYPE  = static_cast<int>(audio_graph::node_type::TALKIE_PCM_SOURCE);
 #endif
+    const int LPC_TYPE         = static_cast<int>(audio_graph::node_type::LPC_SOURCE);
     const int GROUP_TYPE       = static_cast<int>(audio_graph::node_type::GROUP);
 
     auto prop_f = [](const graphplan::node_data& nd, const char* key, float def) -> float {
@@ -1298,6 +1386,8 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
             else if (nd.type == TALKIE_PCM_TYPE)
                 type_matches = dynamic_cast<audio_graph::talkie_pcm_node*>(cache_it->second.get()) != nullptr;
 #endif
+            else if (nd.type == LPC_TYPE)
+                type_matches = dynamic_cast<audio_graph::lpc_node*>(cache_it->second.get()) != nullptr;
             else
                 type_matches = dynamic_cast<audio_graph::source_node*>(cache_it->second.get()) != nullptr;
         }
@@ -1443,6 +1533,15 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
             }
 #endif
+            else if (nd.type == LPC_TYPE)
+            {
+                auto* ln = static_cast<audio_graph::lpc_node*>(node_ptr.get());
+                ln->set_volume(prop_f(nd, "volume", 1.f));
+                auto& fb_ptr = _d->lpc_fb_cache[gp_id];
+                if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::lpc_feedback>();
+                fb_ptr->node_wptr = std::static_pointer_cast<audio_graph::lpc_node>(node_ptr);
+                _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
+            }
 
             new_graph.add_node(node_ptr);
             log::verb("[audio] reused node gp=%llu ag=%d", gp_id, node_ptr->id());
@@ -1577,6 +1676,16 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 node_ptr = std::move(tn);
             }
 #endif
+            else if (nd.type == LPC_TYPE)
+            {
+                auto ln = std::make_shared<audio_graph::lpc_node>(ag_id);
+                ln->set_volume(prop_f(nd, "volume", 1.f));
+                auto& fb_ptr = _d->lpc_fb_cache[gp_id];
+                if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::lpc_feedback>();
+                fb_ptr->node_wptr = ln;
+                _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
+                node_ptr = std::move(ln);
+            }
             else
             {
                 log::warn("[audio] graphplan node %llu has unknown type %d — skipped", gp_id, nd.type);
@@ -1601,6 +1710,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
 #ifdef NEWBASE_TALKIE_PCM
             _d->talkie_pcm_fb_cache.erase(it->first);
 #endif
+            _d->lpc_fb_cache.erase(it->first);
             auto vit = _d->vis_fb_cache.find(it->first);
             if (vit != _d->vis_fb_cache.end())
             {
