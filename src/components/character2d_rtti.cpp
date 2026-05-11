@@ -39,6 +39,10 @@ void ccharacter2d::_ensure_rtti()
         .data<&ccharacter2d::mask_bits>("mask_bits"_hs)
             .custom<rtti::data_info>(rtti::data_info{"mask_bits"})
         .data<&ccharacter2d::push_force>("push_force"_hs)
-            .custom<rtti::data_info>(rtti::data_info{"push_force"});
+            .custom<rtti::data_info>(rtti::data_info{"push_force"})
+        .data<&ccharacter2d::on_ladder>("on_ladder"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"on_ladder"})
+        .data<&ccharacter2d::climb_speed>("climb_speed"_hs)
+            .custom<rtti::data_info>(rtti::data_info{"climb_speed"});
     log::info("[ccharacter2d] registered");
 }

@@ -14,7 +14,6 @@
          "objectgroup":
             {
              "draworder":"index",
-             "id":2,
              "name":"",
              "objects":[
                     {
@@ -48,6 +47,33 @@
              "x":0,
              "y":0
             }
+        }, 
+        {
+         "id":19,
+         "properties":[
+                {
+                 "name":"ladder",
+                 "type":"bool",
+                 "value":true
+                }]
+        }, 
+        {
+         "id":21,
+         "properties":[
+                {
+                 "name":"ladder",
+                 "type":"bool",
+                 "value":true
+                }]
+        }, 
+        {
+         "id":31,
+         "properties":[
+                {
+                 "name":"ladder",
+                 "type":"bool",
+                 "value":true
+                }]
         }, 
         {
          "id":32,
@@ -87,6 +113,15 @@
              "x":0,
              "y":0
             }
+        }, 
+        {
+         "id":33,
+         "properties":[
+                {
+                 "name":"ladder",
+                 "type":"bool",
+                 "value":true
+                }]
         }],
  "tilewidth":70,
  "type":"tileset",

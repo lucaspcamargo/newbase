@@ -2,6 +2,7 @@
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/mesh2d.hpp>
 #include <newbase/components/body2d.hpp>
+#include <newbase/components/spatial.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
@@ -10,6 +11,7 @@
 #include <newbase/res/manager.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
+#include <cmath>
 #include <utility>
 
 using namespace nb;
@@ -293,6 +295,76 @@ nb::tilemap_object nb::tilemap_system::get_layer_object(entt::id_type map_id, st
 }
 
 // ---------------------------------------------------------------------------
+// Tile property query
+// ---------------------------------------------------------------------------
+
+entt::meta_any nb::tilemap_system::get_tile_property_at(
+    entt::entity map_entity,
+    glm::vec2    world_pos,
+    const std::string& layer_name,
+    const std::string& prop_name) const
+{
+    auto& reg = engine::instance().default_scene().registry();
+
+    const auto* tm = reg.try_get<ctilemap>(map_entity);
+    if (!tm || !tm->map) return {};
+
+    glm::vec2 map_origin {0.f, 0.f};
+    if (const auto* sp = reg.try_get<cspatial>(map_entity))
+        map_origin = {sp->pos.x, sp->pos.y};
+
+    const rtilemap& map = *tm->map;
+    if (map.tile_width <= 0 || map.tile_height <= 0) return {};
+
+    const tilemap_layer* layer = nullptr;
+    for (const auto& l : map.layers)
+        if (l.layer_type == tilemap_layer::type::TILE && l.name == layer_name)
+            { layer = &l; break; }
+    if (!layer) return {};
+
+    const glm::vec2 local = world_pos - map_origin;
+    const int col = static_cast<int>(std::floor(local.x / static_cast<float>(map.tile_width)));
+    const int row = static_cast<int>(std::floor(local.y / static_cast<float>(map.tile_height)));
+
+    if (col < 0 || col >= layer->width || row < 0 || row >= layer->height) return {};
+
+    const int idx = row * layer->width + col;
+    if (idx >= static_cast<int>(layer->tiles.size())) return {};
+
+    const int raw_gid = layer->tiles[idx];
+    if (raw_gid == 0) return {};
+
+    const int gid = raw_gid & 0x1FFFFFFF;
+    const tilemap_tileset* ts = map.find_tileset(gid);
+    if (!ts) return {};
+
+    const int local_id = gid - ts->firstgid;
+
+    auto pit = ts->tile_properties.find(local_id);
+    if (pit == ts->tile_properties.end()) return {};
+
+    auto vit = pit->second.find(prop_name);
+    if (vit == pit->second.end()) return {};
+
+    return vit->second;
+}
+
+bool nb::tilemap_system::tile_bool_property_at(
+    entt::id_type map_res_id, glm::vec2 world_pos,
+    std::string layer_name, std::string prop_name) const
+{
+    auto& reg = engine::instance().default_scene().registry();
+    for (auto [map_eid, tm] : reg.view<ctilemap>().each())
+    {
+        if (!tm.map || tm.map->id() != map_res_id) continue;
+        auto val = get_tile_property_at(map_eid, world_pos, layer_name, prop_name);
+        const bool* b = val.try_cast<bool>();
+        return b && *b;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
 // RTTI
 // ---------------------------------------------------------------------------
 
@@ -330,7 +402,11 @@ extern "C" void _rtti_init_tilemap_system()
         .func<&nb::tilemap_system::get_layer_object_count>("get_layer_object_count"_hs)
             .custom<rtti::func_info>(rtti::func_info{"get_layer_object_count"})
         .func<&nb::tilemap_system::get_layer_object>("get_layer_object"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"get_layer_object"});
+            .custom<rtti::func_info>(rtti::func_info{"get_layer_object"})
+        .func<&nb::tilemap_system::get_tile_property_at>("get_tile_property_at"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"get_tile_property_at"})
+        .func<&nb::tilemap_system::tile_bool_property_at>("tile_bool_property_at"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"tile_bool_property_at"});
 
     entt::meta_factory<std::shared_ptr<nb::tilemap_system>>{rtti::ctx_systems()}
         .type("tilemap_system_shared"_hs)

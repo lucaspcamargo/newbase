@@ -546,8 +546,9 @@ void physics2d::_step_characters(entt::registry& reg, float dt)
     auto view = reg.view<ccharacter2d, cspatial>();
     for (auto [eid, ch, sp] : view.each())
     {
-        // Apply gravity
-        ch.velocity.y += world_gravity.y * ch.gravity_scale * dt;
+        // Apply gravity (suppressed while on a ladder)
+        if (!ch.on_ladder)
+            ch.velocity.y += world_gravity.y * ch.gravity_scale * dt;
 
         b2Capsule capsule;
         capsule.center1 = { sp.pos.x, sp.pos.y - ch.capsule_half_height };

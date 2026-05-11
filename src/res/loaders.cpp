@@ -693,7 +693,7 @@ namespace nb {
             }
         }
 
-        // Per-tile collision shapes.
+        // Per-tile data: custom properties and collision shapes.
         if (ts_node.has_child("tiles"))
         {
             for (auto tile_node : ts_node["tiles"])
@@ -701,6 +701,44 @@ namespace nb {
                 int tile_id = 0;
                 if (!tile_node.has_child("id")) continue;
                 tile_node["id"] >> tile_id;
+
+                if (tile_node.has_child("properties"))
+                {
+                    auto& props = ts.tile_properties[tile_id];
+                    for (auto pn : tile_node["properties"])
+                    {
+                        std::string pname, ptype;
+                        if (pn.has_child("name")) c4::from_chars(pn["name"].val(), &pname);
+                        if (pn.has_child("type")) c4::from_chars(pn["type"].val(), &ptype);
+                        if (pname.empty() || !pn.has_child("value")) continue;
+
+                        if (ptype == "bool")
+                        {
+                            bool v = false;
+                            pn["value"] >> v;
+                            props[pname] = entt::meta_any{v};
+                        }
+                        else if (ptype == "int" || ptype == "object")
+                        {
+                            int v = 0;
+                            pn["value"] >> v;
+                            props[pname] = entt::meta_any{v};
+                        }
+                        else if (ptype == "float")
+                        {
+                            float v = 0.f;
+                            pn["value"] >> v;
+                            props[pname] = entt::meta_any{v};
+                        }
+                        else // string, color, file, class
+                        {
+                            std::string v;
+                            c4::from_chars(pn["value"].val(), &v);
+                            props[pname] = entt::meta_any{std::move(v)};
+                        }
+                    }
+                }
+
                 if (!tile_node.has_child("objectgroup")) continue;
 
                 // Mark tile as having an objectgroup (empty vector = passthrough).
@@ -761,8 +799,8 @@ namespace nb {
                         shapes.push_back(std::move(poly));
                 }
             }
-            log::info("[rloader_tilemap] tileset: loaded collision shapes for %zu tiles",
-                      ts.tile_shapes.size());
+            log::info("[rloader_tilemap] tileset: %zu tiles with collision shapes, %zu with custom properties",
+                      ts.tile_shapes.size(), ts.tile_properties.size());
         }
 
         return true;

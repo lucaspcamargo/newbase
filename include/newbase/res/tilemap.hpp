@@ -4,6 +4,7 @@
 #include <newbase/res/texture.hpp>
 #include <entt/entt.hpp>
 #include <glm/vec2.hpp>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -29,6 +30,11 @@ struct tilemap_tileset {
     // Key present, empty outer vector → tile has an objectgroup with no shapes (passthrough).
     // Key absent → no objectgroup → tile is solid by default (full rectangle).
     std::unordered_map<int, std::vector<std::vector<glm::vec2>>> tile_shapes;
+
+    // Per-tile custom properties from Tiled (tile Properties panel).
+    // Key: local tile ID. Value: property name → value as meta_any.
+    // Types: bool, int, float, std::string (string/color/file/class).
+    std::unordered_map<int, std::unordered_map<std::string, entt::meta_any>> tile_properties;
 };
 
 struct tilemap_object {

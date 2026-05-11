@@ -17,7 +17,11 @@ namespace nb {
 
         float push_force {1.0f};  // velocity transfer coefficient for pushing dynamic bodies (1.0 = full speed transfer)
 
-        bool grounded {false};
+        bool grounded   {false};
+
+        // Ladder climbing. Set on_ladder from script each frame; physics skips gravity when true.
+        bool  on_ladder   {false};
+        float climb_speed {80.0f};
 
         static void _ensure_rtti();
     };
