@@ -44,13 +44,11 @@ jobs:
         run: |
           mv embuild/demo/newbase_demo.html embuild/demo/index.html
       - name: Deploy demo to itch.io
+        continue-on-error: true
         env:
           BUTLER_API_KEY: ${{secrets.BUTLER_API_KEY}}
         run: |
           curl -L -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip butler.zip
           chmod +x linux-amd64/butler
-          ITCH_IPV4=$(curl -4 -s "https://dns.google/resolve?name=upload.itch.io&type=A" | grep -o '"data":"[^"]*"' | head -1 | cut -d'"' -f4)
-          echo "upload.itch.io IPv4: $ITCH_IPV4"
-          echo "$ITCH_IPV4 upload.itch.io" | sudo tee -a /etc/hosts
           linux-amd64/butler push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
