@@ -21,7 +21,6 @@ namespace nb {
 
         // Ladder climbing. Set on_ladder from script each frame; physics skips gravity when true.
         bool  on_ladder   {false};
-        float climb_speed {80.0f};
 
         static void _ensure_rtti();
     };

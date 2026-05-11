@@ -8,6 +8,7 @@
       res: res/platformer/spr/items.sprite
       sequence: coinGold
       pixel_snap: true
+      animating: true
     body2d:
       type: STATIC
       shapes:

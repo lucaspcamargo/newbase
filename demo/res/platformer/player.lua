@@ -9,7 +9,7 @@ local sfx_ladder = {
     hs("res/platformer/sfx/ladder2.ogg"),
 }
 
-local COLOR = "Beige"
+local COLOR = "Pink"
 local SEQ_STAND   = "alien" .. COLOR .. "_stand"
 local SEQ_WALK    = "alien" .. COLOR .. "_walk"
 local SEQ_JUMP    = "alien" .. COLOR .. "_jump"
@@ -19,6 +19,7 @@ local WALK_SPEED        = 350.0
 local JUMP_VEL          = -620.0
 local JUMP_CUT_VEL      = -250.0   -- upward speed clamped to on early release
 local TERMINAL_FALL_VEL = 500.0
+local CLIMB_SPEED = 160.0
 
 local MAP_RES = hs("res/platformer/map/map_0.tmj")
 local MAP_W  = 60 * 70
@@ -112,7 +113,7 @@ local update_handle = clock_update_add(function(delta)
 
     if ladder_attached then
         vx = 0.0
-        vy = dir.y * ch.climb_speed
+        vy = dir.y * CLIMB_SPEED
 
         -- Step sounds while moving
         if dir.y ~= 0.0 then

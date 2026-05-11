@@ -9,6 +9,13 @@ sequences:
       h: 92
       count: 1
       duration: 1.0
+  - name: alienBeige_climb
+    loop: true
+    frames:
+      - source_rect: [478, 175, 66, 95]
+        duration: 0.2
+      - source_rect: [610, 368, 66, 95]
+        duration: 0.2
   - name: alienBeige_climb1
     loop: true
     strip:
@@ -81,6 +88,13 @@ sequences:
       h: 100
       count: 1
       duration: 1.0
+  - name: alienBeige_swim
+    loop: true
+    frames:
+      - source_rect: [209, 95, 69, 98]
+        duration: 0.2
+      - source_rect: [70, 0, 70, 100]
+        duration: 0.2
   - name: alienBeige_walk
     loop: true
     frames:
@@ -115,6 +129,13 @@ sequences:
       h: 92
       count: 1
       duration: 1.0
+  - name: alienBlue_climb
+    loop: true
+    frames:
+      - source_rect: [412, 359, 66, 92]
+        duration: 0.2
+      - source_rect: [412, 267, 66, 92]
+        duration: 0.2
   - name: alienBlue_climb1
     loop: true
     strip:
@@ -187,6 +208,20 @@ sequences:
       h: 97
       count: 1
       duration: 1.0
+  - name: alienBlue_swim
+    loop: true
+    frames:
+      - source_rect: [139, 380, 69, 95]
+        duration: 0.2
+      - source_rect: [70, 100, 70, 97]
+        duration: 0.2
+  - name: alienBlue_walk
+    loop: true
+    frames:
+      - source_rect: [544, 267, 66, 93]
+        duration: 0.2
+      - source_rect: [345, 175, 67, 96]
+        duration: 0.2
   - name: alienBlue_walk1
     loop: true
     strip:
@@ -214,6 +249,13 @@ sequences:
       h: 92
       count: 1
       duration: 1.0
+  - name: alienGreen_climb
+    loop: true
+    frames:
+      - source_rect: [611, 0, 66, 92]
+        duration: 0.2
+      - source_rect: [676, 92, 66, 92]
+        duration: 0.2
   - name: alienGreen_climb1
     loop: true
     strip:
@@ -286,6 +328,20 @@ sequences:
       h: 97
       count: 1
       duration: 1.0
+  - name: alienGreen_swim
+    loop: true
+    frames:
+      - source_rect: [209, 0, 69, 95]
+        duration: 0.2
+      - source_rect: [0, 193, 70, 97]
+        duration: 0.2
+  - name: alienGreen_walk
+    loop: true
+    frames:
+      - source_rect: [277, 276, 68, 93]
+        duration: 0.2
+      - source_rect: [0, 290, 70, 96]
+        duration: 0.2
   - name: alienGreen_walk1
     loop: true
     strip:
@@ -313,6 +369,13 @@ sequences:
       h: 92
       count: 1
       duration: 1.0
+  - name: alienPink_climb
+    loop: true
+    frames:
+      - source_rect: [610, 92, 66, 92]
+        duration: 0.2
+      - source_rect: [545, 0, 66, 92]
+        duration: 0.2
   - name: alienPink_climb1
     loop: true
     strip:
@@ -385,6 +448,20 @@ sequences:
       h: 97
       count: 1
       duration: 1.0
+  - name: alienPink_swim
+    loop: true
+    frames:
+      - source_rect: [140, 0, 69, 95]
+        duration: 0.2
+      - source_rect: [0, 0, 70, 97]
+        duration: 0.2
+  - name: alienPink_walk
+    loop: true
+    frames:
+      - source_rect: [277, 369, 68, 93]
+        duration: 0.2
+      - source_rect: [0, 97, 70, 96]
+        duration: 0.2
   - name: alienPink_walk1
     loop: true
     strip:
@@ -412,6 +489,13 @@ sequences:
       h: 82
       count: 1
       duration: 1.0
+  - name: alienYellow_climb
+    loop: true
+    frames:
+      - source_rect: [544, 360, 66, 82]
+        duration: 0.2
+      - source_rect: [544, 185, 66, 82]
+        duration: 0.2
   - name: alienYellow_climb1
     loop: true
     strip:
@@ -484,6 +568,20 @@ sequences:
       h: 87
       count: 1
       duration: 1.0
+  - name: alienYellow_swim
+    loop: true
+    frames:
+      - source_rect: [140, 95, 69, 85]
+        duration: 0.2
+      - source_rect: [70, 197, 70, 87]
+        duration: 0.2
+  - name: alienYellow_walk
+    loop: true
+    frames:
+      - source_rect: [277, 193, 68, 83]
+        duration: 0.2
+      - source_rect: [0, 386, 70, 86]
+        duration: 0.2
   - name: alienYellow_walk1
     loop: true
     strip:

@@ -153,10 +153,28 @@ sequences:
   loop: true
   name: coinBronze
 - frames:
-  - duration: 1.0
+  - duration: 0.2
     source_rect:
     - '288'
     - '360'
+    - '70'
+    - '70'
+  - duration: 0.2
+    source_rect:
+    - '503'
+    - '440'
+    - '70'
+    - '70'
+  - duration: 0.2
+    source_rect:
+    - '503'
+    - '360'
+    - '70'
+    - '70'
+  - duration: 0.2
+    source_rect:
+    - '503'
+    - '520'
     - '70'
     - '70'
   loop: true
