@@ -589,6 +589,15 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
 
             // --- Phrase ---
             ImGui::BeginDisabled(word_count == 0);
+            ImGui::SetNextItemWidth(80.f);
+            if (ImGui::InputInt("ms##lpciv", &fb->ui_interval_ms))
+            {
+                if (fb->ui_interval_ms < 0) fb->ui_interval_ms = 0;
+                node->set_interval_ms(static_cast<uint16_t>(fb->ui_interval_ms));
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted("interval");
+
             ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say phrase");
             ImGui::SetNextItemWidth(200.f);
             ImGui::InputText("##lpcphrase", fb->ui_phrase, sizeof(fb->ui_phrase));

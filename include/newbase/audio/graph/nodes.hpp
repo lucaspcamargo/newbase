@@ -1283,6 +1283,7 @@ public:
             return nullptr;
         };
 
+        const uint16_t iv = interval_ms_;
         std::string token;
         for (const char* p = phrase; ; ++p)
         {
@@ -1298,8 +1299,9 @@ public:
                     }
                     token.clear();
                 }
-                if (*p == ',')      { silence_ms(150); silence_ms(150); }
-                else if (*p == '.') { silence_ms(150); silence_ms(150); silence_ms(150); }
+                if      (*p == ' ')  { silence_ms(iv); }
+                else if (*p == ',')  { silence_ms(iv); silence_ms(iv); }
+                else if (*p == '.')  { silence_ms(iv); silence_ms(iv); silence_ms(iv); }
                 if (*p == '\0') break;
             }
             else
@@ -1309,8 +1311,9 @@ public:
         }
     }
 
-    void set_volume(float vol) { volume_ = vol; }
-    void set_blabber(bool b)   { blabber_ = b; }
+    void set_volume(float vol)        { volume_ = vol; }
+    void set_blabber(bool b)          { blabber_ = b; }
+    void set_interval_ms(uint16_t ms) { interval_ms_ = ms; }
 
     void pull(audio_buffer::span& dst, uint64_t /*gen*/) override
     {
@@ -1347,6 +1350,7 @@ public:
                 const auto& word = vocab->words[dist(rng_)];
                 const auto& v    = word.variants[0];
                 say(v.data.data(), v.data.size());
+                silence_ms(interval_ms_);
             }
         }
 
@@ -1366,6 +1370,7 @@ private:
     float                                 volume_ {1.f};
     std::shared_ptr<rlpcvocab>            vocab_;
     std::atomic<bool>                     blabber_ {false};
+    std::atomic<uint16_t>                 interval_ms_ {200};
     std::mt19937                          rng_ {std::random_device{}()};
 
     void ensure_converter(audio_spec out_spec)
@@ -1387,6 +1392,7 @@ struct lpc_feedback
     int  ui_word_idx    {0};
     int  ui_variant_idx {0};
     int  ui_silence_ms  {500};
+    int  ui_interval_ms {200};
     char ui_phrase[256] {};
     bool ui_blabber     {false};
 };
