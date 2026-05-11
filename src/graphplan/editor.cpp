@@ -420,8 +420,9 @@ bool editor::draw()
             const float alpha       = ImGui::GetStyle().Alpha;
             const float half_border = ed::GetStyle().NodeBorderWidth * 0.5f;
             const float rounding    = ed::GetStyle().NodeRounding;
+            static constexpr node_type_def s_default_type_def{};
             const float* hc        = type_def ? type_def->header_color
-                                              : node_type_def{}.header_color;
+                                              : s_default_type_def.header_color;
             const ImU32 fill = IM_COL32(
                 static_cast<int>(hc[0] * 255),
                 static_cast<int>(hc[1] * 255),
