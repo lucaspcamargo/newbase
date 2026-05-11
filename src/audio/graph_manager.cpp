@@ -21,9 +21,6 @@
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/log.hpp>
 #include <newbase/ui/imgui_icons.hpp>
-#ifdef NEWBASE_TALKIE_PCM
-#include <newbase/audio/talkie_pcm_vocab.hpp>
-#endif
 #include <entt/locator/locator.hpp>
 #include <entt/meta/meta.hpp>
 
@@ -65,9 +62,6 @@ struct nb::audio_graph_manager::impl {
 
     std::unordered_map<uint64_t, std::shared_ptr<vorbis_feedback>>      vorbis_fb_cache;
     std::unordered_map<uint64_t, std::shared_ptr<visualizer_feedback>>   vis_fb_cache;
-#ifdef NEWBASE_TALKIE_PCM
-    std::unordered_map<uint64_t, std::shared_ptr<audio_graph::talkie_pcm_feedback>> talkie_pcm_fb_cache;
-#endif
     std::unordered_map<uint64_t, std::shared_ptr<audio_graph::lpc_feedback>> lpc_fb_cache;
     std::unordered_map<uint64_t, std::shared_ptr<rlpcvocab>>                 lpc_vocab_cache;
 
@@ -251,12 +245,6 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                       {AUDIO_PIN_STREAM}, {AUDIO_PIN_STREAM},
                       { prop_def{"pitch_ratio", entt::meta_any{1.f}} },
                       true, CAT_FX},
-#ifdef NEWBASE_TALKIE_PCM
-        node_type_def{static_cast<int>(audio_graph::node_type::TALKIE_PCM_SOURCE), "TalkiePCM",
-                      {}, {AUDIO_PIN_STREAM},
-                      { prop_def{"volume", entt::meta_any{1.f}} },
-                      true, CAT_SOURCE},
-#endif
         node_type_def{static_cast<int>(audio_graph::node_type::LPC_SOURCE), "LPC Speech",
                       {}, {AUDIO_PIN_STREAM},
                       { prop_def{"volume",       entt::meta_any{1.f}},
@@ -310,9 +298,6 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
     set_color(audio_graph::node_type::WAVESHAPER,    FX_COLOR);
     set_color(audio_graph::node_type::PHASER,        FX_COLOR);
     set_color(audio_graph::node_type::PITCH,         FX_COLOR);
-#ifdef NEWBASE_TALKIE_PCM
-    set_color(audio_graph::node_type::TALKIE_PCM_SOURCE, SOURCE_COLOR);
-#endif
     set_color(audio_graph::node_type::LPC_SOURCE,   SOURCE_COLOR);
     set_color(audio_graph::node_type::GROUP,        CORE_COLOR);
     set_color(audio_graph::node_type::GROUP_INPUT,  BUS_COLOR);
@@ -530,88 +515,6 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
         };
     }
 
-#ifdef NEWBASE_TALKIE_PCM
-    // TalkiePCM custom draw.
-    auto talkie_it = std::find_if(d.node_types.begin(), d.node_types.end(),
-        [](const graphplan::node_type_def& t){
-            return t.type_id == static_cast<int>(audio_graph::node_type::TALKIE_PCM_SOURCE);
-        });
-    if (talkie_it != d.node_types.end())
-    {
-        talkie_it->draw_fn = [](graphplan::node_data& nd) -> bool
-        {
-            auto* fb = static_cast<audio_graph::talkie_pcm_feedback*>(nd.user_data.get());
-            if (!fb) { ImGui::TextDisabled("(not initialized)"); return false; }
-            auto node = fb->node_wptr.lock();
-            if (!node) { ImGui::TextDisabled("(no live node)"); return false; }
-
-            // --- Word selector ---
-            size_t word_count = 0;
-            const nb::talkie_vocab_entry* words = nb::talkie_vocab_all(word_count);
-            if (fb->ui_word_idx < 0 || fb->ui_word_idx >= static_cast<int>(word_count))
-                fb->ui_word_idx = 0;
-
-            ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say word");
-            ImGui::SetNextItemWidth(140.f);
-            ImGui::Combo("##word", &fb->ui_word_idx,
-                [](void* data, int idx, const char** out) -> bool {
-                    *out = static_cast<const nb::talkie_vocab_entry*>(data)[idx].word;
-                    return true;
-                },
-                const_cast<void*>(static_cast<const void*>(words)),
-                static_cast<int>(word_count));
-
-            const nb::talkie_vocab_entry& entry = words[fb->ui_word_idx];
-            if (fb->ui_variant_idx < 0 || fb->ui_variant_idx >= static_cast<int>(entry.variant_count))
-                fb->ui_variant_idx = 0;
-
-            if (entry.variant_count > 1)
-            {
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(50.f);
-                ImGui::Combo("##var", &fb->ui_variant_idx,
-                    [](void* data, int idx, const char** out) -> bool {
-                        *out = static_cast<const char* const*>(data)[idx];
-                        return true;
-                    },
-                    const_cast<void*>(static_cast<const void*>(entry.variant_names)),
-                    static_cast<int>(entry.variant_count));
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(ICON_FK_PLAY "##sayword"))
-                node->say(entry.variants[fb->ui_variant_idx]);
-
-            // --- Say number ---
-            ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say number");
-            ImGui::SetNextItemWidth(80.f);
-            ImGui::InputInt("##num", &fb->ui_number);
-            ImGui::SameLine();
-            if (ImGui::Button(ICON_FK_PLAY "##saynum"))
-                node->say_number(static_cast<long>(fb->ui_number));
-
-            // --- Silence / pause ---
-            ImGui::SetNextItemWidth(80.f);
-            ImGui::InputInt("ms##sil", &fb->ui_silence_ms);
-            if (fb->ui_silence_ms < 0) fb->ui_silence_ms = 0;
-            ImGui::SameLine();
-            if (ImGui::Button(ICON_FK_VOLUME_OFF " Silence"))
-                node->silence_ms(static_cast<uint16_t>(fb->ui_silence_ms));
-            ImGui::SameLine();
-            if (ImGui::Button("Pause"))
-                node->say_pause();
-
-            // --- Phrase ---
-            ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say phrase");
-            ImGui::SetNextItemWidth(200.f);
-            ImGui::InputText("##phrase", fb->ui_phrase, sizeof(fb->ui_phrase));
-            ImGui::SameLine();
-            if (ImGui::Button(ICON_FK_PLAY "##sayphrase"))
-                node->say_phrase(fb->ui_phrase);
-
-            return false;
-        };
-    }
-#endif
 
     // LPC Speech custom draw.
     auto lpc_it = std::find_if(d.node_types.begin(), d.node_types.end(),
@@ -692,6 +595,9 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
             ImGui::SameLine();
             if (ImGui::Button(ICON_FK_PLAY "##lpcsayphrase"))
                 node->say_phrase(fb->ui_phrase);
+
+            if (ImGui::Checkbox("Blabber", &fb->ui_blabber))
+                node->set_blabber(fb->ui_blabber);
             ImGui::EndDisabled();
 
             return false;
@@ -877,9 +783,6 @@ void audio_graph_manager::_reset_plan_caches(impl* d)
     d->fan_out_cache.clear();
     d->vorbis_res_cache.clear();
     d->vorbis_fb_cache.clear();
-#ifdef NEWBASE_TALKIE_PCM
-    d->talkie_pcm_fb_cache.clear();
-#endif
     d->lpc_fb_cache.clear();
     d->lpc_vocab_cache.clear();
     if (auto* rs = entt::locator<renderer_service*>::has_value()
@@ -1231,9 +1134,6 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     const int WAVESHAPER_TYPE  = static_cast<int>(audio_graph::node_type::WAVESHAPER);
     const int PHASER_TYPE      = static_cast<int>(audio_graph::node_type::PHASER);
     const int PITCH_TYPE       = static_cast<int>(audio_graph::node_type::PITCH);
-#ifdef NEWBASE_TALKIE_PCM
-    const int TALKIE_PCM_TYPE  = static_cast<int>(audio_graph::node_type::TALKIE_PCM_SOURCE);
-#endif
     const int LPC_TYPE         = static_cast<int>(audio_graph::node_type::LPC_SOURCE);
     const int GROUP_TYPE       = static_cast<int>(audio_graph::node_type::GROUP);
 
@@ -1404,10 +1304,6 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 type_matches = dynamic_cast<audio_graph::phaser_node*>(cache_it->second.get()) != nullptr;
             else if (nd.type == PITCH_TYPE)
                 type_matches = dynamic_cast<audio_graph::pitch_node*>(cache_it->second.get()) != nullptr;
-#ifdef NEWBASE_TALKIE_PCM
-            else if (nd.type == TALKIE_PCM_TYPE)
-                type_matches = dynamic_cast<audio_graph::talkie_pcm_node*>(cache_it->second.get()) != nullptr;
-#endif
             else if (nd.type == LPC_TYPE)
                 type_matches = dynamic_cast<audio_graph::lpc_node*>(cache_it->second.get()) != nullptr;
             else
@@ -1544,17 +1440,6 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 static_cast<audio_graph::pitch_node*>(node_ptr.get())
                     ->set_pitch_ratio(prop_f(nd, "pitch_ratio", 1.f));
             }
-#ifdef NEWBASE_TALKIE_PCM
-            else if (nd.type == TALKIE_PCM_TYPE)
-            {
-                auto* tn = static_cast<audio_graph::talkie_pcm_node*>(node_ptr.get());
-                tn->set_volume(prop_f(nd, "volume", 1.f));
-                auto& fb_ptr = _d->talkie_pcm_fb_cache[gp_id];
-                if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::talkie_pcm_feedback>();
-                fb_ptr->node_wptr = std::static_pointer_cast<audio_graph::talkie_pcm_node>(node_ptr);
-                _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
-            }
-#endif
             else if (nd.type == LPC_TYPE)
             {
                 auto* ln = static_cast<audio_graph::lpc_node*>(node_ptr.get());
@@ -1689,18 +1574,6 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
                 node_ptr = std::make_shared<audio_graph::pitch_node>(ag_id,
                     prop_f(nd, "pitch_ratio", 1.f));
             }
-#ifdef NEWBASE_TALKIE_PCM
-            else if (nd.type == TALKIE_PCM_TYPE)
-            {
-                auto tn = std::make_shared<audio_graph::talkie_pcm_node>(ag_id);
-                tn->set_volume(prop_f(nd, "volume", 1.f));
-                auto& fb_ptr = _d->talkie_pcm_fb_cache[gp_id];
-                if (!fb_ptr) fb_ptr = std::make_shared<audio_graph::talkie_pcm_feedback>();
-                fb_ptr->node_wptr = tn;
-                _d->gplan->nodes.at(gp_id).user_data = fb_ptr;
-                node_ptr = std::move(tn);
-            }
-#endif
             else if (nd.type == LPC_TYPE)
             {
                 auto ln = std::make_shared<audio_graph::lpc_node>(ag_id);
@@ -1735,9 +1608,6 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
         {
             _d->vorbis_res_cache.erase(it->first);
             _d->vorbis_fb_cache.erase(it->first);
-#ifdef NEWBASE_TALKIE_PCM
-            _d->talkie_pcm_fb_cache.erase(it->first);
-#endif
             _d->lpc_fb_cache.erase(it->first);
             _d->lpc_vocab_cache.erase(it->first);
             auto vit = _d->vis_fb_cache.find(it->first);

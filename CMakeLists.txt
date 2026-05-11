@@ -16,7 +16,6 @@ option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
 option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during runtime" OFF)
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
-option(NEWBASE_TALKIE_PCM "Enable TalkiePCM LPC speech synthesis audio graph node" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
 set(NEWBASE_WII_SDL_PATH "" CACHE PATH "Path to SDL source tree for Wii builds (overrides vendored/SDL when set)")
@@ -181,21 +180,6 @@ if(NEWBASE_STEAM)
     add_subdirectory(src/steam)
 endif()
 
-if(NEWBASE_TALKIE_PCM)
-    target_include_directories(newbase PUBLIC vendored/TalkiePCM/src)
-    message("[newbase] Generating TalkiePCM vocabulary header...")
-    execute_process(
-        COMMAND "${NEWBASE_PYTHON_INTERPRETER}"
-                "${CMAKE_SOURCE_DIR}/scripts/generate_talkie_vocab.py"
-                "--vocab-dir" "${CMAKE_SOURCE_DIR}/vendored/TalkiePCM/src"
-                "--output"    "${CMAKE_CURRENT_BINARY_DIR}/include/newbase/audio/talkie_pcm_vocab.hpp"
-        RESULT_VARIABLE _talkie_gen_result
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    )
-    if(NOT _talkie_gen_result EQUAL 0)
-        message(FATAL_ERROR "[newbase] Failed to generate TalkiePCM vocabulary header")
-    endif()
-endif()
 
 
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)

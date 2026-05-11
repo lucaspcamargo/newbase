@@ -11,24 +11,12 @@
 #include <newbase/audio/res/rlpcvocab.hpp>
 #include <newbase/log.hpp>
 #include <memory>
+#include <mutex>
+#include <random>
 #include <cassert>
 #include <cstring>
 #include <cmath>
 #include <vector>
-#ifdef NEWBASE_TALKIE_PCM
-#include <cstdio>
-#include <cstdlib>
-#include <cctype>
-// dtostrf is missing outside Arduino; provide it so TalkiePCM.h compiles on desktop
-static inline char* dtostrf(double val, signed char /*width*/, unsigned char prec, char* buf)
-{
-    std::snprintf(buf, 14, "%.*f", static_cast<int>(prec), val);
-    return buf;
-}
-#include <TalkiePCM.h>
-#include <mutex>
-#include <newbase/audio/talkie_pcm_vocab.hpp>
-#endif
 
 namespace nb::audio_graph
 {
@@ -1322,6 +1310,7 @@ public:
     }
 
     void set_volume(float vol) { volume_ = vol; }
+    void set_blabber(bool b)   { blabber_ = b; }
 
     void pull(audio_buffer::span& dst, uint64_t /*gen*/) override
     {
@@ -1336,11 +1325,31 @@ public:
                     reinterpret_cast<const std::byte*>(pending_.data()));
                 auto sp = tmp.as_span();
                 converter_->put(sp);
+                converter_->flush(); // drain SDL resampler tail so word endings aren't clipped
                 pending_.clear();
             }
         }
 
         size_t got = converter_->take(audio_buffer::span(dst));
+
+        if (blabber_ && got == 0)
+        {
+            std::shared_ptr<rlpcvocab> vocab;
+            bool was_empty;
+            {
+                std::lock_guard<std::mutex> lk(mutex_);
+                was_empty = pending_.empty();
+                vocab     = vocab_;
+            }
+            if (was_empty && vocab && vocab->valid && !vocab->words.empty())
+            {
+                std::uniform_int_distribution<size_t> dist(0, vocab->words.size() - 1);
+                const auto& word = vocab->words[dist(rng_)];
+                const auto& v    = word.variants[0];
+                say(v.data.data(), v.data.size());
+            }
+        }
+
         if (got < dst.frames())
         {
             const size_t stride = audio_format_size(graph_spec.format)
@@ -1356,6 +1365,8 @@ private:
     audio_spec                            converter_out_spec_;
     float                                 volume_ {1.f};
     std::shared_ptr<rlpcvocab>            vocab_;
+    std::atomic<bool>                     blabber_ {false};
+    std::mt19937                          rng_ {std::random_device{}()};
 
     void ensure_converter(audio_spec out_spec)
     {
@@ -1377,194 +1388,7 @@ struct lpc_feedback
     int  ui_variant_idx {0};
     int  ui_silence_ms  {500};
     char ui_phrase[256] {};
+    bool ui_blabber     {false};
 };
-
-
-#ifdef NEWBASE_TALKIE_PCM
-
-// Audio graph source node backed by the TalkiePCM LPC speech synthesizer.
-// call say() from the game thread to enqueue synthesized speech;
-// pull() is called from the audio thread and converts from S16 8kHz mono.
-class talkie_pcm_node : public node
-{
-public:
-    explicit talkie_pcm_node(node_id id) : node(id)
-    {
-        talkie_.setDataCallback(&talkie_pcm_node::s_callback);
-    }
-
-    // Enqueue a word. Call from game thread only.
-    void say(const uint8_t* word)
-    {
-        tl_current = this;
-        talkie_.say(word);
-        tl_current = nullptr;
-    }
-
-    // Enqueue a spoken number (-999999..999999). Call from game thread only.
-    void say_number(long number)
-    {
-        tl_current = this;
-        talkie_.sayNumber(number);
-        tl_current = nullptr;
-    }
-
-    void say_pause()
-    {
-        tl_current = this;
-        talkie_.sayPause();
-        tl_current = nullptr;
-    }
-
-    // Enqueue silence for the given duration. Call from game thread only.
-    void silence_ms(uint16_t ms)
-    {
-        tl_current = this;
-        talkie_.silence(ms);
-        tl_current = nullptr;
-    }
-
-    // Speak a natural-language phrase. Call from game thread only.
-    // Words are matched case-insensitively against the vocabulary; unknown words
-    // are spelled out letter by letter. Integers are spoken via say_number().
-    // Commas produce a double pause; periods produce a triple pause.
-    void say_phrase(const char* phrase)
-    {
-        size_t vocab_count = 0;
-        const nb::talkie_vocab_entry* vocab = nb::talkie_vocab_all(vocab_count);
-
-        auto find_word = [&](const char* word) -> const nb::talkie_vocab_entry*
-        {
-            for (size_t i = 0; i < vocab_count; i++)
-            {
-                const char* a = word;
-                const char* b = vocab[i].word;
-                while (*a && *b)
-                {
-                    if (std::toupper(static_cast<unsigned char>(*a)) !=
-                        std::toupper(static_cast<unsigned char>(*b))) break;
-                    ++a; ++b;
-                }
-                if (*a == '\0' && *b == '\0') return &vocab[i];
-            }
-            return nullptr;
-        };
-
-        auto flush_token = [&](const std::string& token)
-        {
-            if (token.empty()) return;
-            // Try integer
-            char* end = nullptr;
-            long num = std::strtol(token.c_str(), &end, 10);
-            if (end == token.c_str() + token.size())
-            {
-                say_number(num);
-                return;
-            }
-            // Try vocab lookup
-            if (const auto* e = find_word(token.c_str()))
-            {
-                say(e->variants[0]);
-                return;
-            }
-            // Spell letter by letter
-            for (char c : token)
-            {
-                char letter[2] = { static_cast<char>(std::toupper(static_cast<unsigned char>(c))), '\0' };
-                if (const auto* e = find_word(letter))
-                    say(e->variants[0]);
-            }
-        };
-
-        std::string token;
-        for (const char* p = phrase; ; ++p)
-        {
-            const unsigned char c = static_cast<unsigned char>(*p);
-            if (*p == ',' || *p == '.' || *p == '\0' || std::isspace(c))
-            {
-                flush_token(token);
-                token.clear();
-                if (*p == ',')      { say_pause(); say_pause(); }
-                else if (*p == '.') { say_pause(); say_pause(); say_pause(); }
-                if (*p == '\0') break;
-            }
-            else
-            {
-                token += static_cast<char>(c);
-            }
-        }
-    }
-
-    void set_volume(float vol) { talkie_.setVolume(vol); }
-
-    void pull(audio_buffer::span& dst, uint64_t /*gen*/) override
-    {
-        const audio_spec graph_spec = dst.buffer_ref().spec();
-        ensure_converter(graph_spec);
-
-        {
-            std::lock_guard<std::mutex> lk(mutex_);
-            if (!pending_.empty())
-            {
-                static const audio_spec TALKIE_SPEC { audio_format::S16, 1, FS };
-                audio_buffer tmp(TALKIE_SPEC, pending_.size(),
-                    reinterpret_cast<const std::byte*>(pending_.data()));
-                auto sp = tmp.as_span();
-                converter_->put(sp);
-                pending_.clear();
-            }
-        }
-
-        size_t got = converter_->take(audio_buffer::span(dst));
-        if (got < dst.frames())
-        {
-            const size_t stride = audio_format_size(graph_spec.format)
-                                  * static_cast<size_t>(graph_spec.channels);
-            std::fill(dst.begin() + got * stride, dst.end(), std::byte{0});
-        }
-    }
-
-private:
-    TalkiePCM            talkie_;
-    std::vector<int16_t> pending_;
-    std::mutex           mutex_;
-    std::unique_ptr<nb::audio_converter> converter_;
-    audio_spec           converter_out_spec_;
-
-    static inline thread_local talkie_pcm_node* tl_current = nullptr;
-
-    static void s_callback(int16_t* data, int len)
-    {
-        if (!tl_current) return;
-        std::lock_guard<std::mutex> lk(tl_current->mutex_);
-        tl_current->pending_.insert(tl_current->pending_.end(), data, data + len);
-    }
-
-    void ensure_converter(audio_spec out_spec)
-    {
-        if (!converter_ || converter_out_spec_ != out_spec)
-        {
-            static const audio_spec TALKIE_SPEC { audio_format::S16, 1, FS };
-            converter_     = std::make_unique<nb::audio_converter>(TALKIE_SPEC, out_spec);
-            converter_out_spec_ = out_spec;
-        }
-    }
-};
-
-// UI feedback/state for the talkie_pcm_node editor widget.
-// Stored in graphplan::node_data::user_data; accessed only from the main thread.
-struct talkie_pcm_feedback
-{
-    std::weak_ptr<talkie_pcm_node> node_wptr;
-
-    // Widget state
-    int  ui_word_idx    {0};
-    int  ui_variant_idx {0};
-    int  ui_number      {0};
-    int  ui_silence_ms  {500};
-    char ui_phrase[256] {};
-};
-
-#endif // NEWBASE_TALKIE_PCM
 
 } // namespace nb::audio_graph
