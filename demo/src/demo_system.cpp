@@ -42,6 +42,7 @@ static void load_demo(int idx)
         auto audio = static_cast<nb::audio*>(audio_system.get());
         audio->bgm_stop();  // TODO stop sfx and reset audio graph state as well
     }
+    nb::engine::instance().clear_render_layers();
     nb::engine::instance().request_scene_change(s_demos[idx].scene_id);
 }
 

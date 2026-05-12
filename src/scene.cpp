@@ -11,6 +11,7 @@
 #include <newbase/components/textext.hpp>
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/character2d.hpp>
+#include <newbase/components/camera.hpp>
 #include <newbase/components/structure.hpp>
 #include <newbase/log.hpp>
 
@@ -118,6 +119,11 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
             {
                 auto &s = reg.emplace<nb::ccharacter2d>(eid);
                 nb::build_character2d(comp, s);
+            }
+            else if(compname == "camera")
+            {
+                auto &s = reg.emplace<nb::ccamera>(eid);
+                nb::build_camera(comp, s);
             }
             else
             {

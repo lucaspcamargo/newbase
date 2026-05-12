@@ -9,4 +9,5 @@ namespace nb {
     struct ctextext;
     struct ctilemap;
     struct ccharacter2d;
+    struct ccamera;
 }

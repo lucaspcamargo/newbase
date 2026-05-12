@@ -7,6 +7,7 @@
 #include <newbase/components/textext.hpp>
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/character2d.hpp>
+#include <newbase/components/camera.hpp>
 #include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/texfont.hpp>
 #include <newbase/res/tilemap.hpp>
@@ -182,6 +183,16 @@ bool nb::build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst)
         def["mask_bits"] >> dst.mask_bits;
     if (def.has_child("push_force"))
         def["push_force"] >> dst.push_force;
+    return true;
+}
+
+bool nb::build_camera(ryml::ConstNodeRef def, ccamera &dst)
+{
+    if (def.has_child("zoom"))    def["zoom"]    >> dst.zoom;
+    if (def.has_child("near_z"))  def["near_z"]  >> dst.near_z;
+    if (def.has_child("far_z"))   def["far_z"]   >> dst.far_z;
+    if (def.has_child("wmax"))    def["wmax"]    >> dst.wmax;
+    if (def.has_child("hmax"))    def["hmax"]    >> dst.hmax;
     return true;
 }
 

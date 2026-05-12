@@ -16,6 +16,8 @@ namespace nb::rtti {
         entt::meta_factory<double>{}.conv<float>();
         entt::meta_factory<lua_Integer>{}.conv<float>();
         entt::meta_factory<lua_Integer>{}.conv<double>();
+        entt::meta_factory<lua_Integer>{}.conv<int>();
+        entt::meta_factory<lua_Integer>{}.conv<unsigned int>();
 
         // entt::entity <-> lua_Integer
         entt::meta_factory<lua_Integer>{}.conv<&conv_lua_int_to_entity>();

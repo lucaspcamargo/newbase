@@ -31,6 +31,7 @@ public:
     float cam_2d_scale();
 
     void set_clear_color(float r, float g, float b);
+    float display_scale() const { return _scale; }
 
     // renderer_service interface
     bool get_2d_extents(renderer_service::extents_2d &extents) override;

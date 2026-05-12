@@ -2,8 +2,6 @@
 local MAP_W = 60 * 70
 local MAP_H = 20 * 70
 
--- Initial camera centered on map; player.lua will take over each frame
-render_simple_cam_2d_setup(MAP_W * 0.5, MAP_H * 0.5, MAP_W, MAP_H)
 render_simple_set_clear_color(0.82, 0.96, 0.97)
 
 -- default gravity
@@ -11,6 +9,31 @@ physics2d_reset_gravity()
 
 -- Play bgm, looped
 audio_bgm_play(hs("res/platformer/bgm/Grasslands Theme.ogg"))
+
+-- Spawn camera entity and register render layer
+local CAMERA_ETREE = hs("res/platformer/camera.et.yaml")
+local _res_camera  = res_get_etree(CAMERA_ETREE)
+local cam_eid      = entity_spawn(CAMERA_ETREE)
+if cam_eid then
+    local cam = get_camera(cam_eid)
+    if cam then
+        cam.zoom = math.min(render_simple_window_width()  / 1920,
+                            render_simple_window_height() / 1080)
+    end
+    local sp = get_spatial(cam_eid)
+    if sp then
+        sp.pos = vec3.new(MAP_W * 0.5, MAP_H * 0.5, 0)
+        sp:apply()
+    end
+    _G.CAMERA_EID = cam_eid
+    engine:clear_render_layers()
+    local rl       = render_layer.new()
+    rl.order       = 0
+    rl.layer_mask  = 0xFFFFFFFF
+    rl.camera      = cam_eid
+    rl.viewport    = render_simple_default_viewport()
+    engine:add_render_layer(rl)
+end
 
 -- Spawn dynamic objects from the map's object layer
 local MAP_RES      = hs("res/platformer/map/map_0.tmj")
@@ -57,3 +80,7 @@ if ts then
         end
     end
 end
+
+script_on_destroy(function()
+    engine:clear_render_layers()
+end)

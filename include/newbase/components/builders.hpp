@@ -13,4 +13,5 @@ namespace nb
     bool build_textext(ryml::ConstNodeRef def, ctextext &dst);
     bool build_tilemap(ryml::ConstNodeRef def, ctilemap &dst);
     bool build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst);
+    bool build_camera(ryml::ConstNodeRef def, ccamera &dst);
 }

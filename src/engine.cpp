@@ -350,6 +350,9 @@ bool engine::event(SDL_Event *evt)
 
 void engine::add_render_layer(const render_layer &layer)
 {
+    log::info("[engine] add_render_layer: order=%d camera=%u vp=%u mask=0x%x total=%zu",
+        layer.order, entt::to_integral(layer.camera), layer.viewport, layer.layer_mask,
+        _d->render_layers.size() + 1);
     _d->render_layers.push_back(layer);
     std::stable_sort(_d->render_layers.begin(), _d->render_layers.end(),
         [](const render_layer &a, const render_layer &b){ return a.order < b.order; });
@@ -499,9 +502,30 @@ extern "C" void _rtti_init_engine()
        can possibly can be solved via some sort of proxy type that forwards to the singleton instance?
     */
 
+    entt::meta_factory<nb::render_layer>{}
+    .type("render_layer"_hs)
+    .custom<rtti::type_info>(rtti::type_info{.identifier="render_layer", .type_class=rtti::TYPE_CLASS_NONE})
+    .ctor<>()
+    .data<&nb::render_layer::scene_id>("scene_id"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"scene_id"})
+    .data<&nb::render_layer::layer_mask>("layer_mask"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"layer_mask"})
+    .data<&nb::render_layer::camera>("camera"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"camera"})
+    .data<&nb::render_layer::viewport>("viewport"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"viewport"})
+    .data<&nb::render_layer::order>("order"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"order"});
+
     entt::meta_factory<nb::engine>{}
     .type("engine"_hs)
     .custom<rtti::type_info>(rtti::type_info{.identifier="engine", .type_class=rtti::TYPE_CLASS_SINGLETON})
     .func<&nb::engine::request_exit>("request_exit"_hs)
-    .custom<rtti::func_info>(rtti::func_info{"request_exit"});
+        .custom<rtti::func_info>(rtti::func_info{"request_exit"})
+    .func<&nb::engine::add_render_layer>("add_render_layer"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"add_render_layer"})
+    .func<&nb::engine::remove_render_layer>("remove_render_layer"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"remove_render_layer"})
+    .func<&nb::engine::clear_render_layers>("clear_render_layers"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"clear_render_layers"});
 }

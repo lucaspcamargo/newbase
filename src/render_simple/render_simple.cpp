@@ -233,6 +233,7 @@ bool render_simple::step(nb::step_phase phase)
 
         if(layers.empty())
         {
+            log::verb("[render] no render layers, using fallback path");
             // Fallback: draw default scene through the default viewport.
             auto dvp_it = _viewports.find(_default_vp);
             const viewport_entry &dvp = (dvp_it != _viewports.end())
@@ -285,6 +286,8 @@ bool render_simple::step(nb::step_phase phase)
                     auto *cam = reg.try_get<ccamera>(layer.camera);
                     if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
                     if(cam) { zoom = cam->zoom; }
+                    log::verb("[render] layer cam=%u sp=%p cam=%p zoom=%.2f cx=%.0f cy=%.0f",
+                        entt::to_integral(layer.camera), sp, cam, zoom, cam_cx, cam_cy);
                 }
 
                 float vp_cx = vp.x + vp.w * 0.5f;
@@ -649,7 +652,11 @@ extern "C" void _rtti_init_render_simple()
         .func<&nb::render_simple::window_height>("window_height"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_height"})
         .func<&nb::render_simple::set_clear_color>("set_clear_color"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"set_clear_color"});
+        .custom<rtti::func_info>(rtti::func_info{"set_clear_color"})
+        .func<&nb::render_simple::default_viewport>("default_viewport"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"default_viewport"})
+        .func<&nb::render_simple::display_scale>("display_scale"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"display_scale"});
     entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
         .type("render_simple_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
