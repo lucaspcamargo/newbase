@@ -16,29 +16,54 @@ sprite_anim::~sprite_anim() = default;
 
 bool sprite_anim::init(ryml::ConstNodeRef /*cfg*/) { return true; }
 
-bool sprite_anim::step(step_phase phase)
+static void sync_source_rects(entt::registry& reg)
 {
-    if (phase != step_phase::GENERAL_UPDATE) return true;
-
-    const float dt = entt::locator<nb::clock*>::has_value()
-        ? entt::locator<nb::clock*>::value()->get_real_dt() : (1.0f/60.0f);
-
-    auto& reg  = engine::instance().default_scene().registry();
-    auto  view = reg.view<csprite>();
-
-    for (auto [eid, cs] : view.each())
+    for (auto [eid, cs] : reg.view<csprite>().each())
     {
-        if (!cs.spr) continue;
-        const auto& seqs = cs.spr->sequences;
-        if (seqs.empty()) continue;
+        if (!cs.spr || cs.spr->sequences.empty()) continue;
 
-        // Resolve current sequence pointer
         const sprite_sequence* seq = cs.sequence.empty()
             ? cs.spr->first_sequence()
             : cs.spr->find_sequence(cs.sequence);
         if (!seq || seq->frames.empty()) continue;
 
-        // Clamp frame index in case sequence changed externally
+        if (cs.frame >= static_cast<int>(seq->frames.size()))
+            cs.frame = 0;
+
+        const std::string& eff_seq = cs.sequence.empty() ? seq->name : cs.sequence;
+        if (cs._cached_sequence != eff_seq || cs._cached_frame != cs.frame)
+        {
+            cs.current_source_rect = seq->frames[cs.frame].source_rect;
+            cs._cached_sequence    = eff_seq;
+            cs._cached_frame       = cs.frame;
+        }
+    }
+}
+
+bool sprite_anim::step(step_phase phase)
+{
+    auto& reg = engine::instance().default_scene().registry();
+
+    if (phase == step_phase::PRE_RENDER)
+    {
+        sync_source_rects(reg);
+        return true;
+    }
+
+    if (phase != step_phase::GENERAL_UPDATE) return true;
+
+    const float dt = entt::locator<nb::clock*>::has_value()
+        ? entt::locator<nb::clock*>::value()->get_real_dt() : (1.0f/60.0f);
+
+    for (auto [eid, cs] : reg.view<csprite>().each())
+    {
+        if (!cs.spr || cs.spr->sequences.empty()) continue;
+
+        const sprite_sequence* seq = cs.sequence.empty()
+            ? cs.spr->first_sequence()
+            : cs.spr->find_sequence(cs.sequence);
+        if (!seq || seq->frames.empty()) continue;
+
         if (cs.frame >= static_cast<int>(seq->frames.size()))
             cs.frame = 0;
 
@@ -78,7 +103,6 @@ bool sprite_anim::step(step_phase phase)
             }
         }
 
-        // Unconditional cache check — catches changes from animation, scripts, or anything else
         const std::string& eff_seq = cs.sequence.empty() ? seq->name : cs.sequence;
         if (cs._cached_sequence != eff_seq || cs._cached_frame != cs.frame)
         {

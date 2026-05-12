@@ -425,10 +425,13 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
             if (dims == glm::vec2{-1.0f, -1.0f})
                 dims = src_rect ? glm::vec2{csr.z, csr.w} : glm::vec2{tex->tex->w, tex->tex->h};
 
-            auto anchor_delta = dims * spr_res->anchor;
-            const glm::vec4 loc_origin{spatial.world * glm::vec4{-anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-            const glm::vec4 loc_right {spatial.world * glm::vec4{ anchor_delta.x, -anchor_delta.y, 0.f, 1.f}};
-            const glm::vec4 loc_down  {spatial.world * glm::vec4{-anchor_delta.x,  anchor_delta.y, 0.f, 1.f}};
+            // anchor: normalized position of the spatial origin within the sprite rect
+            // (0,0)=top-left, (0.5,0.5)=center, (1,1)=bottom-right  (y-down convention)
+            const float quad_left = -spr_res->anchor.x * dims.x;
+            const float quad_top  = -spr_res->anchor.y * dims.y;
+            const glm::vec4 loc_origin{spatial.world * glm::vec4{quad_left,          quad_top,          0.f, 1.f}};
+            const glm::vec4 loc_right {spatial.world * glm::vec4{quad_left + dims.x,  quad_top,          0.f, 1.f}};
+            const glm::vec4 loc_down  {spatial.world * glm::vec4{quad_left,          quad_top + dims.y,  0.f, 1.f}};
 
             auto snap = [&](float v) { return sprite->pixel_snap ? std::roundf(v) : v; };
             const glm::vec4 vp_origin = viewproj * loc_origin;
