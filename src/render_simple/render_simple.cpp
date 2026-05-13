@@ -44,41 +44,57 @@ static void _draw_editor_grid_hack(SDL_Renderer *render,
     float cam_cx, float cam_cy, float zoom,
     int vp_x, int vp_y, int vp_w, int vp_h)
 {
-    constexpr float GRID_STEP = 64.f;
+    // Grid levels in world units. Each is 16x the previous.
+    constexpr float STEPS[]       = { 1.f, 16.f, 64.f, 256.f, 1024.f };
+    constexpr Uint8 MAX_ALPHA[]   = { 35,   45,   60,    75,    90   };
+    constexpr int   NUM_LEVELS    = 5;
+    constexpr float FADE_IN_MIN   = 4.f;   // screen px below which lines disappear
+    constexpr float FADE_IN_FULL  = 24.f;  // screen px at which lines reach full alpha
+
     const float vp_cx = vp_x + vp_w * 0.5f;
     const float vp_cy = vp_y + vp_h * 0.5f;
-
-    // visible world bounds
-    const float wl = (vp_x           - vp_cx) / zoom + cam_cx;
-    const float wr = (vp_x + vp_w    - vp_cx) / zoom + cam_cx;
-    const float wt = (vp_y           - vp_cy) / zoom + cam_cy;
-    const float wb = (vp_y + vp_h    - vp_cy) / zoom + cam_cy;
+    const float wl = (vp_x        - vp_cx) / zoom + cam_cx;
+    const float wr = (vp_x + vp_w - vp_cx) / zoom + cam_cx;
+    const float wt = (vp_y        - vp_cy) / zoom + cam_cy;
+    const float wb = (vp_y + vp_h - vp_cy) / zoom + cam_cy;
 
     SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(render, 180, 180, 200, 40);
 
-    // vertical lines
-    const float x0 = floorf(wl / GRID_STEP) * GRID_STEP;
-    for (float wx = x0; wx <= wr; wx += GRID_STEP)
+    for (int li = 0; li < NUM_LEVELS; ++li)
     {
-        float sx = (wx - cam_cx) * zoom + vp_cx;
-        SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
+        const float step      = STEPS[li];
+        const float screen_px = step * zoom;
+        if (screen_px < FADE_IN_MIN) continue;
+
+        const float t     = std::min(1.f, (screen_px - FADE_IN_MIN) / (FADE_IN_FULL - FADE_IN_MIN));
+        const Uint8 alpha = static_cast<Uint8>(t * MAX_ALPHA[li]);
+        if (alpha < 2) continue;
+
+        SDL_SetRenderDrawColor(render, 180, 180, 200, alpha);
+
+        const float x0 = floorf(wl / step) * step;
+        for (float wx = x0; wx <= wr; wx += step)
+        {
+            float sx = (wx - cam_cx) * zoom + vp_cx;
+            SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
+        }
+
+        const float y0 = floorf(wt / step) * step;
+        for (float wy = y0; wy <= wb; wy += step)
+        {
+            float sy = (wy - cam_cy) * zoom + vp_cy;
+            SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
+        }
     }
 
-    // horizontal lines
-    const float y0 = floorf(wt / GRID_STEP) * GRID_STEP;
-    for (float wy = y0; wy <= wb; wy += GRID_STEP)
-    {
-        float sy = (wy - cam_cy) * zoom + vp_cy;
-        SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
-    }
-
-    // axes
-    SDL_SetRenderDrawColor(render, 180, 180, 200, 100);
-    float ox = (0.f - cam_cx) * zoom + vp_cx;
-    float oy = (0.f - cam_cy) * zoom + vp_cy;
-    SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
-    SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
+    // World-space axes — always visible, higher alpha
+    SDL_SetRenderDrawColor(render, 180, 180, 230, 140);
+    const float ox = (0.f - cam_cx) * zoom + vp_cx;
+    const float oy = (0.f - cam_cy) * zoom + vp_cy;
+    if (ox >= vp_x && ox <= vp_x + vp_w)
+        SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
+    if (oy >= vp_y && oy <= vp_y + vp_h)
+        SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
 
     SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
 }
