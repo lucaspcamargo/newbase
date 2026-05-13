@@ -161,10 +161,14 @@ we also use the following tools during build time:
 
 All of the Python dependencies are listed under `scripts/requirements.txt`, for easy virtual environment setup.
 
-## Source code
+## Source Code
 
-I have vague plans to release the source, but not sure when or how. The way the engine is right now, it is usable by me, but not ready for general release. Considering the work that would go into preparing documentation, and that this is mostly my scratchpad for all things gamey at this point, anyone wanting to use this is better-off with Godot. It remains to be seen whether this release happens.
+Not publicly available yet. A release is planned once the engine matures further.
 
+> Looking for a production-ready game engine? [Godot](https://godotengine.org/) is a great choice.
+
+
+<!--
 
 ## Building
 
@@ -241,6 +245,8 @@ Look into the Emscripten documentation for more details.
 - `NEWBASE_NATIVE_RES_PREFIX`: specify the relative path where resources will be installed and searched for. Defaults to "nb".
 
 You can set these options when running `cmake` by passing `-DOPTION=VALUE`.
+
+-->
 
 ## License
 
