@@ -22,7 +22,13 @@ namespace nb
         virtual void ui_destroy() = 0; // after renderer and backend are destroyed
 
         virtual void draw_tool_windows() = 0;
-        virtual void draw_perf() = 0;  // maybe replace with generic draw_overlays, move physiscs2d overlay to this new system
+        virtual void draw_perf() = 0;
+
+        // Overlay callbacks — drawn after all tool windows, on the foreground draw list.
+        // Suitable for debug wireframes, physics shapes, editor gizmos, etc.
+        using overlay_fn = std::function<void()>;
+        virtual void register_overlay(const char* name, overlay_fn fn) = 0;
+        virtual void unregister_overlay(const char* name) = 0;
 
         // Returns the ImGuiID of the root dockspace, or 0 if not available.
         virtual unsigned int dockspace_id() const { return 0; }

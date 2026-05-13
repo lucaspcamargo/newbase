@@ -30,6 +30,9 @@ namespace nb
 
         void register_open_resource_editor_callback(open_resource_editor_fn fn) override;
         void request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name) override;
+
+        void register_overlay(const char* name, overlay_fn fn) override;
+        void unregister_overlay(const char* name) override;
     private:
         ui_manager_p *_d;
     };

@@ -647,14 +647,60 @@ entt::entity render_simple::pick(const render_layer &layer, float vp_x, float vp
                 dims.x, dims.y, local.x, local.y, ql, ql+dims.x, qt, qt+dims.y, hit);
             if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
         }
+        else if (auto *mesh = reg.try_get<const cmesh2d>(id))
+        {
+            if (!mesh->visible || !mesh->geom || mesh->geom->empty()) continue;
+
+            const glm::vec4 local4 = glm::inverse(spatial.world) * glm::vec4{wx, wy, 0.f, 1.f};
+            const glm::vec2 lp { local4.x, local4.y };
+            const auto &geom  = *mesh->geom;
+            const auto &verts = geom.vertices;
+
+            // Sign of cross product for point-in-triangle test
+            auto tri_hit = [&](int i0, int i1, int i2) {
+                const glm::vec2 a{verts[i0].pos}, b{verts[i1].pos}, c{verts[i2].pos};
+                const float d1 = (lp.x-b.x)*(a.y-b.y) - (a.x-b.x)*(lp.y-b.y);
+                const float d2 = (lp.x-c.x)*(b.y-c.y) - (b.x-c.x)*(lp.y-c.y);
+                const float d3 = (lp.x-a.x)*(c.y-a.y) - (c.x-a.x)*(lp.y-a.y);
+                return !((d1<0||d2<0||d3<0) && (d1>0||d2>0||d3>0));
+            };
+
+            bool hit = false;
+            if (!geom.indices.empty())
+            {
+                for (size_t i = 0; i+2 < geom.indices.size() && !hit; i += 3)
+                    hit = tri_hit(geom.indices[i], geom.indices[i+1], geom.indices[i+2]);
+            }
+            else
+            {
+                for (size_t i = 0; i+2 < verts.size() && !hit; i += 3)
+                    hit = tri_hit((int)i, (int)i+1, (int)i+2);
+            }
+            log::info("[pick]   mesh  eid=%x verts=%zu hit=%d", entt::to_integral(id), verts.size(), hit);
+            if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
+        }
+        else if (auto *emit = reg.try_get<const cparticle_emitter>(id))
+        {
+            // Pick if within emission area radius (pos_variance magnitude, minimum 24px)
+            float radius = 24.f;
+            if (emit->res)
+            {
+                const glm::vec2 &pv = emit->res->emitter.pos_variance;
+                radius = std::max(24.f, glm::length(pv));
+            }
+            const float dx = wx - spatial.pos.x, dy = wy - spatial.pos.y;
+            const bool hit = dx*dx + dy*dy <= radius*radius;
+            log::info("[pick]   emit  eid=%x pos=(%.1f,%.1f) radius=%.1f hit=%d",
+                entt::to_integral(id), spatial.pos.x, spatial.pos.y, radius, hit);
+            if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
+        }
         else
         {
-            // No sprite: small fixed-radius hit area
+            // No visual component: small fixed-radius hit area
             constexpr float HIT_RADIUS = 8.f;
-            const float dx = wx - spatial.pos.x;
-            const float dy = wy - spatial.pos.y;
+            const float dx = wx - spatial.pos.x, dy = wy - spatial.pos.y;
             const bool hit = dx*dx + dy*dy <= HIT_RADIUS*HIT_RADIUS;
-            log::info("[pick]   nospr  eid=%x pos=(%.1f,%.1f,%.1f) dist=%.1f hit=%d",
+            log::info("[pick]   bare  eid=%x pos=(%.1f,%.1f,%.1f) dist=%.1f hit=%d",
                 entt::to_integral(id), spatial.pos.x, spatial.pos.y, spatial.pos.z,
                 sqrtf(dx*dx+dy*dy), hit);
             if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }

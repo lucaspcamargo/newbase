@@ -35,6 +35,7 @@ struct nb::ui_manager_p
     ImGuiID dockspace_id;
     std::string ini_path;
     ui_manager::open_resource_editor_fn open_resource_editor_cb;
+    std::vector<std::pair<std::string, ui_manager::overlay_fn>> overlays;
 };
 
 
@@ -426,4 +427,22 @@ void ui_manager_simple::draw_perf()
     col_text.w *= 0.5f; // make text more transparent
     dl->AddText(bottom_text_pos, ImGui::ColorConvertFloat4ToU32(col_text),
         bottom_text.c_str());
+
+    // Registered overlays (debug wireframes, gizmos, etc.)
+    for (auto &[name, fn] : _d->overlays)
+        fn();
+}
+
+void ui_manager_simple::register_overlay(const char* name, overlay_fn fn)
+{
+    for (auto &[n, f] : _d->overlays)
+        if (n == name) { f = std::move(fn); return; }
+    _d->overlays.emplace_back(name, std::move(fn));
+}
+
+void ui_manager_simple::unregister_overlay(const char* name)
+{
+    auto &v = _d->overlays;
+    v.erase(std::remove_if(v.begin(), v.end(),
+        [name](const auto &p){ return p.first == name; }), v.end());
 }

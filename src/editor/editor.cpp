@@ -24,6 +24,10 @@
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
+#include <newbase/components/sprite.hpp>
+#include <newbase/components/mesh2d.hpp>
+#include <newbase/components/particle_emitter.hpp>
+#include <newbase/res/sprite.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
@@ -45,6 +49,7 @@ struct nb::editor_p
     bool hash_enabled         = false;
     bool render_layers_enabled= false;
     bool show_demo            = false;
+    bool show_wireframes      = true;
     int  log_observer         = -1;
 
     console              con;
@@ -71,7 +76,12 @@ struct nb::editor_p
 };
 
 editor::editor()  : _d(new editor_p) {}
-editor::~editor() { delete _d; }
+editor::~editor()
+{
+    if (auto *ui_mgr = entt::locator<ui_manager*>::value())
+        ui_mgr->unregister_overlay("editor_wireframes");
+    delete _d;
+}
 
 void editor::_sync_editor_cam_to_game()
 {
@@ -156,6 +166,8 @@ bool editor::init(ryml::ConstNodeRef cfg)
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
     ui_mgr->register_open_resource_editor_callback(open_res_editor);
 
+    ui_mgr->register_overlay("editor_wireframes", [this]() { _draw_overlay(); });
+
     return true;
 }
 
@@ -206,69 +218,7 @@ bool editor::step(step_phase phase)
 
         _draw_main_menu();
 
-        // Gizmo overlay — only when editor camera is active (override layers)
-        if (_d->override_layers && _d->selected_entity != entt::null && _d->vp_w > 0 && _d->vp_h > 0)
-        {
-            const ImGuiIO &io = ImGui::GetIO();
-            const float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-            const float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-            // ImGuizmo works in logical pixels
-            const float lvp_x = _d->vp_x / sx;
-            const float lvp_y = _d->vp_y / sy;
-            const float lvp_w = _d->vp_w / sx;
-            const float lvp_h = _d->vp_h / sy;
-
-            ImGui::SetNextWindowPos({lvp_x, lvp_y});
-            ImGui::SetNextWindowSize({lvp_w, lvp_h});
-            ImGui::SetNextWindowBgAlpha(0.f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-            ImGui::Begin("##gizmo_overlay", nullptr,
-                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoInputs |
-                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_NoDocking);
-            ImGui::PopStyleVar();
-
-            ImGuizmo::SetDrawlist();
-            ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
-            ImGuizmo::SetOrthographic(true);
-
-            // Build view matrix from editor camera (inverse of camera transform)
-            // View: translate by -cam, no rotation for 2D
-            glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
-
-            // Orthographic projection matching the editor camera zoom.
-            // Use physical pixel dimensions to match render_simple's world→screen mapping
-            // (render_simple uses the physical viewport for its viewproj, so world units = physical pixels).
-            const float half_w = (_d->vp_w * 0.5f) / _d->cam_zoom;
-            const float half_h = (_d->vp_h * 0.5f) / _d->cam_zoom;
-            glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
-
-            auto *sp = reg.try_get<cspatial>(_d->selected_entity);
-            if (sp)
-            {
-                glm::mat4 world = sp->world;
-                if (ImGuizmo::Manipulate(
-                        glm::value_ptr(view), glm::value_ptr(proj),
-                        ImGuizmo::TRANSLATE, ImGuizmo::LOCAL,
-                        glm::value_ptr(world)))
-                {
-                    // Decompose modified matrix back to pos/rot/scale
-                    float t[3], r[3], s[3];
-                    ImGuizmo::DecomposeMatrixToComponents(
-                        glm::value_ptr(world), t, r, s);
-                    sp->pos.x = t[0];
-                    sp->pos.y = t[1];
-                    sp->pos.z = t[2];
-                    sp->rot   = { r[0], r[1], r[2] };
-                    sp->scale = { s[0], s[1], s[2] };
-                    sp->apply();
-                }
-            }
-
-            ImGui::End();
-        }
+        // (wireframes + gizmo are drawn via the registered UI overlay — see init())
 
         ImGui::Begin(ICON_FK_TABLE " Entities");
 
@@ -467,6 +417,149 @@ bool editor::event(SDL_Event* evt)
     return true;
 }
 
+void editor::_draw_overlay()
+{
+    if (!_d->override_layers || _d->vp_w <= 0 || _d->vp_h <= 0) return;
+
+    const ImGuiIO &io  = ImGui::GetIO();
+    const float scx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+    const float scy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+
+    // Physical→logical pixel helper: convert a world point to an ImGui screen position
+    const float vp_cx_phys = _d->vp_x + _d->vp_w * 0.5f;
+    const float vp_cy_phys = _d->vp_y + _d->vp_h * 0.5f;
+    auto w2s = [&](float wx, float wy) -> ImVec2 {
+        return {
+            ((wx - _d->cam_x) * _d->cam_zoom + vp_cx_phys) / scx,
+            ((wy - _d->cam_y) * _d->cam_zoom + vp_cy_phys) / scy
+        };
+    };
+    // Transform a world-space glm vec4 to screen
+    auto v2s = [&](const glm::vec4 &v) -> ImVec2 { return w2s(v.x, v.y); };
+
+    // Viewport clip rect in logical pixels so we don't draw outside it
+    const ImVec2 vp_min{ (float)_d->vp_x / scx, (float)_d->vp_y / scy };
+    const ImVec2 vp_max{ (_d->vp_x + _d->vp_w) / scx, (_d->vp_y + _d->vp_h) / scy };
+
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    dl->PushClipRect(vp_min, vp_max, true);
+
+    auto &reg = engine::instance().default_scene().registry();
+
+    // --- Wireframes ---
+    if (_d->show_wireframes)
+    {
+        for (auto [id, spatial] : reg.view<const cspatial>().each())
+        {
+            if (id == _d->editor_cam_eid) continue;
+
+            const bool selected = (id == _d->selected_entity);
+            const ImU32 col  = selected ? IM_COL32(255,220,0,220) : IM_COL32(80,200,255,70);
+            const float thick = selected ? 1.5f : 1.0f;
+
+            if (auto *spr = reg.try_get<const csprite>(id))
+            {
+                if (!spr->visible || !spr->spr) continue;
+                auto &sr = *spr->spr;
+                glm::vec2 dims = sr.dims;
+                if (dims == glm::vec2{-1.f,-1.f})
+                {
+                    const glm::vec4 &csr = spr->current_source_rect;
+                    if (csr.z > 0.f) dims = {csr.z, csr.w};
+                    else if (sr.tex && sr.tex->uploaded) dims = {(float)sr.tex->tex->w, (float)sr.tex->tex->h};
+                    else continue;
+                }
+                const float ql = -sr.anchor.x * dims.x, qt = -sr.anchor.y * dims.y;
+                const ImVec2 tl = v2s(spatial.world * glm::vec4{ql,          qt,          0,1});
+                const ImVec2 tr = v2s(spatial.world * glm::vec4{ql+dims.x,   qt,          0,1});
+                const ImVec2 br = v2s(spatial.world * glm::vec4{ql+dims.x,   qt+dims.y,   0,1});
+                const ImVec2 bl = v2s(spatial.world * glm::vec4{ql,          qt+dims.y,   0,1});
+                dl->AddLine(tl, tr, col, thick);
+                dl->AddLine(tr, br, col, thick);
+                dl->AddLine(br, bl, col, thick);
+                dl->AddLine(bl, tl, col, thick);
+            }
+            else if (auto *mesh = reg.try_get<const cmesh2d>(id))
+            {
+                if (!mesh->visible || !mesh->geom || mesh->geom->empty()) continue;
+                const auto &geom  = *mesh->geom;
+                const auto &verts = geom.vertices;
+                auto draw_tri = [&](int i0, int i1, int i2) {
+                    const ImVec2 a = v2s(spatial.world * glm::vec4{verts[i0].pos, 0,1});
+                    const ImVec2 b = v2s(spatial.world * glm::vec4{verts[i1].pos, 0,1});
+                    const ImVec2 c = v2s(spatial.world * glm::vec4{verts[i2].pos, 0,1});
+                    dl->AddLine(a, b, col, thick);
+                    dl->AddLine(b, c, col, thick);
+                    dl->AddLine(c, a, col, thick);
+                };
+                if (!geom.indices.empty())
+                    for (size_t i = 0; i+2 < geom.indices.size(); i+=3)
+                        draw_tri(geom.indices[i], geom.indices[i+1], geom.indices[i+2]);
+                else
+                    for (size_t i = 0; i+2 < verts.size(); i+=3)
+                        draw_tri((int)i,(int)i+1,(int)i+2);
+            }
+            else if (auto *emit = reg.try_get<const cparticle_emitter>(id))
+            {
+                float radius = 24.f;
+                if (emit->res)
+                {
+                    const glm::vec2 &pv = emit->res->emitter.pos_variance;
+                    radius = std::max(24.f, glm::length(pv));
+                }
+                const ImVec2 center = w2s(spatial.pos.x, spatial.pos.y);
+                const float r_screen = radius * _d->cam_zoom / scx;
+                dl->AddCircle(center, r_screen, col, 0, thick);
+                dl->AddLine({center.x-6,center.y}, {center.x+6,center.y}, col, thick);
+                dl->AddLine({center.x,center.y-6}, {center.x,center.y+6}, col, thick);
+            }
+            else
+            {
+                // Bare entity: small cross at origin
+                const ImVec2 c = w2s(spatial.pos.x, spatial.pos.y);
+                dl->AddLine({c.x-5,c.y}, {c.x+5,c.y}, col, thick);
+                dl->AddLine({c.x,c.y-5}, {c.x,c.y+5}, col, thick);
+            }
+        }
+    }
+
+    // --- Gizmo (selected entity, foreground draw list) ---
+    if (_d->selected_entity != entt::null)
+    {
+        const float lvp_x = _d->vp_x / scx, lvp_y = _d->vp_y / scy;
+        const float lvp_w = _d->vp_w / scx, lvp_h = _d->vp_h / scy;
+
+        ImGuizmo::SetDrawlist(dl);
+        ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
+        ImGuizmo::SetOrthographic(true);
+
+        glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
+        const float half_w = (_d->vp_w * 0.5f) / _d->cam_zoom;
+        const float half_h = (_d->vp_h * 0.5f) / _d->cam_zoom;
+        glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
+
+        auto *sp = reg.try_get<cspatial>(_d->selected_entity);
+        if (sp)
+        {
+            glm::mat4 world = sp->world;
+            if (ImGuizmo::Manipulate(
+                    glm::value_ptr(view), glm::value_ptr(proj),
+                    ImGuizmo::TRANSLATE, ImGuizmo::LOCAL,
+                    glm::value_ptr(world)))
+            {
+                float t[3], r[3], s[3];
+                ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(world), t, r, s);
+                sp->pos = {t[0], t[1], t[2]};
+                sp->rot = {r[0], r[1], r[2]};
+                sp->scale = {s[0], s[1], s[2]};
+                sp->apply();
+            }
+        }
+    }
+
+    dl->PopClipRect();
+}
+
 void editor::_draw_main_menu()
 {
     if (!ImGui::BeginMainMenuBar()) return;
@@ -486,6 +579,8 @@ void editor::_draw_main_menu()
             _d->enabled = !_d->enabled;
         if (ImGui::MenuItem("Render Layers", nullptr, _d->render_layers_enabled))
             _d->render_layers_enabled = true;
+        if (ImGui::MenuItem("Wireframes", nullptr, _d->show_wireframes))
+            _d->show_wireframes = !_d->show_wireframes;
 
         ImGui::Separator();
 
@@ -532,6 +627,17 @@ void editor::_draw_main_menu()
                 engine::instance().clear_override_render_layers();
             }
         }
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::SameLine();
+
+    {
+        ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Button,
+            _d->show_wireframes ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
+        if (ImGui::Button(ICON_FK_OBJECT_GROUP " Wireframes"))
+            _d->show_wireframes = !_d->show_wireframes;
         ImGui::PopStyleColor();
     }
 

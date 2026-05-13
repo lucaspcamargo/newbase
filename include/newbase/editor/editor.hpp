@@ -21,6 +21,7 @@ public:
 
 private:
     void _draw_main_menu();
+    void _draw_overlay();
     void _sync_editor_cam_to_game();
     void _apply_override_layers();
     void _ensure_editor_cam();
