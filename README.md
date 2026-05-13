@@ -161,7 +161,7 @@ All of the Python dependencies are listed under `scripts/requirements.txt`, for 
 
 ## Source Code
 
-Not publicly available yet. A release is planned once the engine matures further.
+Not publicly available yet. A release is planned once the engine matures further. Upon request, I can make the source available. Just ping me ^^
 
 > Looking for a production-ready game engine? [Godot](https://godotengine.org/) is a great choice.
 
@@ -248,7 +248,7 @@ You can set these options when running `cmake` by passing `-DOPTION=VALUE`.
 
 ## License
 
-This project is licensed under the BSD 3-Clause license, for now. Future development may change this. See [LICENSE](LICENSE) for details.
+This project will be licensed under the BSD 3-Clause license, when released. <!--See [LICENSE](LICENSE) for details.-->
 
 ## Get in Touch
 
