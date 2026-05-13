@@ -20,6 +20,11 @@ struct render_layer {
     entt::entity     camera      { entt::null };
     viewport_handle  viewport    { VIEWPORT_INVALID };
     int              order       { 0 };
+    bool             clear_bg    { true };
+    float            clear_r     { 0.f };
+    float            clear_g     { 0.f };
+    float            clear_b     { 0.f };
+    bool             use_grid    { false }; // TODO: replace with proper grid layer/component
 };
 
 } // namespace nb

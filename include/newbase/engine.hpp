@@ -46,10 +46,16 @@ public:
     // the current scene is cleared, and the given etree is built into the fresh scene.
     void request_scene_change(entt::id_type etree_id);
 
-    // render layers
+    // render layers (game-owned, exposed to Lua)
     void add_render_layer(const render_layer &layer);
     void remove_render_layer(int order);
     void clear_render_layers();
+
+    // render layer overrides (C++ only; when non-empty, replaces the game layers)
+    void set_override_render_layers(std::vector<render_layer> layers);
+    void clear_override_render_layers();
+
+    // returns override layers if set, otherwise game layers
     const std::vector<render_layer>& render_layers() const;
 
     void request_exit();

@@ -2,7 +2,6 @@
 local MAP_W = 60 * 70
 local MAP_H = 20 * 70
 
-render_simple_set_clear_color(0.82, 0.96, 0.97)
 
 -- default gravity
 physics2d_reset_gravity()
@@ -32,6 +31,10 @@ if cam_eid then
     rl.layer_mask = 0x1   -- world layer
     rl.camera     = cam_eid
     rl.viewport   = render_simple_default_viewport()
+    rl.clear_bg   = true
+    rl.clear_r    = 0.82
+    rl.clear_g    = 0.96
+    rl.clear_b    = 0.97
     engine:add_render_layer(rl)
 end
 
@@ -52,6 +55,7 @@ if hud_cam_eid then
     rl.layer_mask = 0x2   -- HUD layer
     rl.camera     = hud_cam_eid
     rl.viewport   = render_simple_default_viewport()
+    rl.clear_bg   = false
     engine:add_render_layer(rl)
 end
 

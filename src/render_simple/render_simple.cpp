@@ -38,6 +38,50 @@ using entt::operator""_hs;
 static SDL_Rect _safe {};
 static std::vector<SDL_Vertex> _xform_buf {};
 bool _has_ui {false};
+
+// HACK: temporary editor grid — to be replaced with a proper grid layer/component
+static void _draw_editor_grid_hack(SDL_Renderer *render,
+    float cam_cx, float cam_cy, float zoom,
+    int vp_x, int vp_y, int vp_w, int vp_h)
+{
+    constexpr float GRID_STEP = 64.f;
+    const float vp_cx = vp_x + vp_w * 0.5f;
+    const float vp_cy = vp_y + vp_h * 0.5f;
+
+    // visible world bounds
+    const float wl = (vp_x           - vp_cx) / zoom + cam_cx;
+    const float wr = (vp_x + vp_w    - vp_cx) / zoom + cam_cx;
+    const float wt = (vp_y           - vp_cy) / zoom + cam_cy;
+    const float wb = (vp_y + vp_h    - vp_cy) / zoom + cam_cy;
+
+    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(render, 180, 180, 200, 40);
+
+    // vertical lines
+    const float x0 = floorf(wl / GRID_STEP) * GRID_STEP;
+    for (float wx = x0; wx <= wr; wx += GRID_STEP)
+    {
+        float sx = (wx - cam_cx) * zoom + vp_cx;
+        SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
+    }
+
+    // horizontal lines
+    const float y0 = floorf(wt / GRID_STEP) * GRID_STEP;
+    for (float wy = y0; wy <= wb; wy += GRID_STEP)
+    {
+        float sy = (wy - cam_cy) * zoom + vp_cy;
+        SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
+    }
+
+    // axes
+    SDL_SetRenderDrawColor(render, 180, 180, 200, 100);
+    float ox = (0.f - cam_cx) * zoom + vp_cx;
+    float oy = (0.f - cam_cy) * zoom + vp_cy;
+    SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
+    SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
+
+    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
+}
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
 #endif
@@ -223,13 +267,22 @@ bool render_simple::step(nb::step_phase phase)
     {
         ZoneScopedN("Render");
 
-        // Full-screen clear first
-        SDL_SetRenderDrawColor(_render,
-            static_cast<Uint8>(_clear_r * 255), static_cast<Uint8>(_clear_g * 255),
-            static_cast<Uint8>(_clear_b * 255), 255);
-        SDL_RenderClear(_render);
-
         const auto &layers = engine::instance().render_layers();
+
+        // Full-screen clear — use first layer's clear color if present
+        {
+            float cr = _clear_r, cg = _clear_g, cb = _clear_b;
+            if (!layers.empty() && layers.front().clear_bg)
+            {
+                cr = layers.front().clear_r;
+                cg = layers.front().clear_g;
+                cb = layers.front().clear_b;
+            }
+            SDL_SetRenderDrawColor(_render,
+                static_cast<Uint8>(cr * 255), static_cast<Uint8>(cg * 255),
+                static_cast<Uint8>(cb * 255), 255);
+            SDL_RenderClear(_render);
+        }
 
         if(layers.empty())
         {
@@ -299,6 +352,16 @@ bool render_simple::step(nb::step_phase phase)
 
                 SDL_Rect clip_rect { vp.x, vp.y, vp.w, vp.h };
                 SDL_SetRenderClipRect(_render, &clip_rect);
+                if (layer.use_grid)
+                {
+                    SDL_SetRenderDrawColor(_render,
+                        static_cast<Uint8>(layer.clear_r * 255),
+                        static_cast<Uint8>(layer.clear_g * 255),
+                        static_cast<Uint8>(layer.clear_b * 255), 255);
+                    SDL_FRect fill { (float)vp.x, (float)vp.y, (float)vp.w, (float)vp.h };
+                    SDL_RenderFillRect(_render, &fill);
+                    _draw_editor_grid_hack(_render, cam_cx, cam_cy, zoom, vp.x, vp.y, vp.w, vp.h);
+                }
                 _draw_scene(sc->registry(), viewproj, layer.layer_mask, vp);
                 SDL_SetRenderClipRect(_render, nullptr);
             }

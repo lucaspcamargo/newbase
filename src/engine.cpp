@@ -63,6 +63,7 @@ struct nb::engine_p {
     std::optional<entt::id_type> pending_scene_id;
 
     std::vector<render_layer> render_layers;
+    std::vector<render_layer> override_render_layers;
 
     std::array<framecounter_data, nb::step_phase::_STEP_PHASE_COUNT+1> fc_data; // last one is for total
     size_t fc_end = 0;
@@ -372,7 +373,19 @@ void engine::clear_render_layers()
 
 const std::vector<render_layer>& engine::render_layers() const
 {
+    if (!_d->override_render_layers.empty())
+        return _d->override_render_layers;
     return _d->render_layers;
+}
+
+void engine::set_override_render_layers(std::vector<render_layer> layers)
+{
+    _d->override_render_layers = std::move(layers);
+}
+
+void engine::clear_override_render_layers()
+{
+    _d->override_render_layers.clear();
 }
 
 
@@ -515,7 +528,17 @@ extern "C" void _rtti_init_engine()
     .data<&nb::render_layer::viewport>("viewport"_hs)
         .custom<rtti::data_info>(rtti::data_info{"viewport"})
     .data<&nb::render_layer::order>("order"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"order"});
+        .custom<rtti::data_info>(rtti::data_info{"order"})
+    .data<&nb::render_layer::clear_bg>("clear_bg"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"clear_bg"})
+    .data<&nb::render_layer::clear_r>("clear_r"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"clear_r"})
+    .data<&nb::render_layer::clear_g>("clear_g"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"clear_g"})
+    .data<&nb::render_layer::clear_b>("clear_b"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"clear_b"})
+    .data<&nb::render_layer::use_grid>("use_grid"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"use_grid"});
 
     entt::meta_factory<nb::engine>{}
     .type("engine"_hs)
