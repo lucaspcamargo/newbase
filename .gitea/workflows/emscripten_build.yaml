@@ -40,9 +40,12 @@ jobs:
         with:
           name: newbase_emscripten_${{ github.head_ref }}_${{ github.sha }}
           path: embuild
-      - name: Rename demo html output file
+      - name: Prepare demo publish folder
         run: |
-          mv embuild/demo/newbase_demo.html embuild/demo/index.html
+          mkdir -p /tmp/newbase_demo
+          cp -a embuild/demo/newbase_demo.html /tmp/newbase_demo/index.html
+          cp -a embuild/demo/newbase_demo.js   /tmp/newbase_demo/
+          cp -a embuild/demo/newbase_demo.wasm /tmp/newbase_demo/
       - name: Deploy demo to itch.io
         continue-on-error: true
         env:
@@ -51,4 +54,4 @@ jobs:
           curl -L -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip butler.zip
           chmod +x linux-amd64/butler
-          linux-amd64/butler push ./embuild/demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
+          linux-amd64/butler push /tmp/newbase_demo camarguinho/newbase-demo:webgl --userversion ${{ github.sha }}
