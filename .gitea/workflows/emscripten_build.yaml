@@ -29,7 +29,7 @@ jobs:
         run: |
           env
           source venv/bin/activate 
-          cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+          cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: |
           env
