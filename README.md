@@ -17,11 +17,9 @@ A *new base* for making games and interactive stuff. Early release — usable, b
 Here's a build of the engine's `demo` app, that you can run right away:
 
 ```{emscripten} newbase_emscripten_*.zip
-    :entry: demo/newbase_demo.js
+    :entry: demo/newbase_demo.html
     :caption: $FILENAME_NO_EXT$ ($DATE$)
     :aspect-ratio: 16/9
-    :idbfs-mount: /libsdl
-    :stop-func: _nb_engine_request_exit
 ```
 
 *Nice. (I hope? Please let me know is something is amiss. Works on my machine :)*

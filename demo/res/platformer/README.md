@@ -1,12 +1,10 @@
-A classic platformer demo showcasing tilemap loading and rendering via the **Tiled JSON** format,
-tileset support with spacing/margin, and Box2D collision from tile layers. Enemies patrol the
-level, can be stomped to defeat, and will knock back the player with a brief invulnerability window.
-Coins are scattered throughout the map for collection.
+A classic platformer demo showcasing tilemap loading and rendering via the **Tiled JSON** format, tileset support with spacing/margin, and Box2D collision from tile layers.
 
-Use **arrow keys** to move and **`Z`** (joypad A) to jump. Land on top of an enemy to stomp it; running
-into one from the side will knock you back.
+Collect coins, stomp enemies, don't fall.
 
-Press **`F1`** to bring up the editor tools to inspect the scene and entity components.
+**Arrow keys** / d-pad to move, **`Z`** / A to jump. Press **`Enter`** / Start to pause.
+
+Press **`F1`** for editor tools.
 
 ### Assets
 
