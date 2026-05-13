@@ -17,24 +17,18 @@ jobs:
         run: |
           python3 -m venv venv
           source venv/bin/activate
-          which pip && which python
           pip install --upgrade pip
           pip install cmake~=3.5
-          cmake --version
-          echo "Installing script deps..."
           pip install -r scripts/requirements.txt
-          env
           echo PATH=$PATH >> $GITHUB_ENV
-      - name: Configure 
+      - name: Configure
         run: |
-          env
-          source venv/bin/activate 
-          cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_BUILD_TYPE=Release
+          source venv/bin/activate
+          cmake -S . -B embuild -DCMAKE_TOOLCHAIN_FILE=${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON
       - name: Build
         run: |
-          env
           source venv/bin/activate
-          cmake --build embuild -j $(( $(nproc) - 1 ))
+          cmake --build embuild -j $(( $(nproc) + 2 ))
       - name: Upload build artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
@@ -47,6 +41,7 @@ jobs:
           cp -a embuild/demo/newbase_demo.js   /tmp/newbase_demo/
           cp -a embuild/demo/newbase_demo.wasm /tmp/newbase_demo/
       - name: Deploy demo to itch.io
+        if: github.ref == 'refs/heads/main'
         continue-on-error: true
         env:
           BUTLER_API_KEY: ${{secrets.BUTLER_API_KEY}}
