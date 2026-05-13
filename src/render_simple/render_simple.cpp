@@ -392,7 +392,11 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
     auto spatial_view = reg.view<const cspatial>();
     for (auto [id, spatial] : spatial_view.each())
     {
-        if (auto* lyr = reg.try_get<clayers>(id); lyr && !(lyr->mask & layer_mask))
+        const uint32_t entity_mask = [&] {
+            auto* lyr = reg.try_get<clayers>(id);
+            return lyr ? lyr->mask : clayers::MASK_DEFAULT;
+        }();
+        if (!(entity_mask & layer_mask))
             continue;
 
         if (auto* sprite = reg.try_get<const csprite>(id))

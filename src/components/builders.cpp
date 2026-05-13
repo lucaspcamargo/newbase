@@ -8,6 +8,7 @@
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/character2d.hpp>
 #include <newbase/components/camera.hpp>
+#include <newbase/components/layers.hpp>
 #include <newbase/res/particle_emitter.hpp>
 #include <newbase/res/texfont.hpp>
 #include <newbase/res/tilemap.hpp>
@@ -213,5 +214,12 @@ bool nb::build_textext(ryml::ConstNodeRef def, ctextext &dst)
     }
     if (def.has_child("color"))
         load_vec4(def["color"], dst.color);
+    return true;
+}
+
+bool nb::build_layers(ryml::ConstNodeRef def, clayers &dst)
+{
+    if (def.has_child("mask"))
+        def["mask"] >> dst.mask;
     return true;
 }

@@ -1,0 +1,299 @@
+sequences:
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '230'
+    - '0'
+    - '30'
+    - '38'
+  loop: true
+  name: hud_0
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '196'
+    - '41'
+    - '26'
+    - '37'
+  loop: true
+  name: hud_1
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '55'
+    - '98'
+    - '32'
+    - '38'
+  loop: true
+  name: hud_2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '239'
+    - '80'
+    - '28'
+    - '38'
+  loop: true
+  name: hud_3
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '238'
+    - '122'
+    - '29'
+    - '38'
+  loop: true
+  name: hud_4
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '238'
+    - '162'
+    - '28'
+    - '38'
+  loop: true
+  name: hud_5
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '230'
+    - '40'
+    - '30'
+    - '38'
+  loop: true
+  name: hud_6
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '226'
+    - '206'
+    - '32'
+    - '39'
+  loop: true
+  name: hud_7
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '192'
+    - '206'
+    - '32'
+    - '40'
+  loop: true
+  name: hud_8
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '196'
+    - '0'
+    - '32'
+    - '39'
+  loop: true
+  name: hud_9
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '55'
+    - '0'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_coins
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '104'
+    - '0'
+    - '46'
+    - '36'
+  loop: true
+  name: hud_gem_blue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '98'
+    - '185'
+    - '46'
+    - '36'
+  loop: true
+  name: hud_gem_green
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '98'
+    - '147'
+    - '46'
+    - '36'
+  loop: true
+  name: hud_gem_red
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '98'
+    - '223'
+    - '46'
+    - '36'
+  loop: true
+  name: hud_gem_yellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '47'
+    - '53'
+    - '45'
+  loop: true
+  name: hud_heartEmpty
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '94'
+    - '53'
+    - '45'
+  loop: true
+  name: hud_heartFull
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '0'
+    - '53'
+    - '45'
+  loop: true
+  name: hud_heartHalf
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '146'
+    - '147'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyBlue
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '150'
+    - '38'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyBlue_disabled
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '104'
+    - '38'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyGreem_disabled
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '192'
+    - '122'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyGreen
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '193'
+    - '80'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyRed
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '192'
+    - '164'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyRed_disabled
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '146'
+    - '189'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyYellow
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '147'
+    - '80'
+    - '44'
+    - '40'
+  loop: true
+  name: hud_keyYellow_disabled
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '55'
+    - '49'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p1
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '141'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p1Alt
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '49'
+    - '141'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p2
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '190'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p2Alt
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '49'
+    - '190'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p3
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '98'
+    - '98'
+    - '47'
+    - '47'
+  loop: true
+  name: hud_p3Alt
+- frames:
+  - duration: 1.0
+    source_rect:
+    - '0'
+    - '239'
+    - '30'
+    - '28'
+  loop: true
+  name: hud_x
+texture: res/platformer/spr/hud.png

@@ -14,6 +14,8 @@ local update_handle = clock_update_add(function(delta)
         if ea == eid or eb == eid then
             collected = true
             audio_sfx_play(hs("res/platformer/sfx/coin.ogg"), 1.0)
+            if _G.PLAYER_COINS  then _G.PLAYER_COINS  = _G.PLAYER_COINS  + 1   end
+            if _G.PLAYER_SCORE  then _G.PLAYER_SCORE  = _G.PLAYER_SCORE  + 100 end
             entity_destroy(eid)
             return
         end

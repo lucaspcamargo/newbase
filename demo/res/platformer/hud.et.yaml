@@ -1,0 +1,17 @@
+- name: hud_camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      zoom: 1.0
+
+- name: hud
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    script:
+      lua: "res/platformer/hud.lua"

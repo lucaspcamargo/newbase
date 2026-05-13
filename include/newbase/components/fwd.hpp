@@ -10,4 +10,5 @@ namespace nb {
     struct ctilemap;
     struct ccharacter2d;
     struct ccamera;
+    struct clayers;
 }

@@ -5,7 +5,10 @@
 namespace nb {
 
 struct clayers {
-    uint32_t mask { 0xFFFFFFFF };  // member of all layers by default
+    static constexpr uint32_t MASK_DEFAULT = 0x1;
+    static constexpr uint32_t MASK_ALL     = 0xFFFFFFFF;
+
+    uint32_t mask { MASK_DEFAULT };
 
     static void _ensure_rtti();
 };

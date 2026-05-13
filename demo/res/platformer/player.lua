@@ -13,6 +13,7 @@ local COLOR = "Pink"
 local SEQ_STAND   = "alien" .. COLOR .. "_stand"
 local SEQ_WALK    = "alien" .. COLOR .. "_walk"
 local SEQ_JUMP    = "alien" .. COLOR .. "_jump"
+local SEQ_HURT    = "alien" .. COLOR .. "_hurt"
 local SEQ_CLIMB   = { "alien" .. COLOR .. "_climb1", "alien" .. COLOR .. "_climb2" }
 
 local WALK_SPEED        = 350.0
@@ -39,21 +40,64 @@ local ladder_sfx_timer = 0.0
 local LADDER_SFX_INTERVAL = 0.22
 
 -- expose eid globally so enemy scripts can find the player
-_G.PLAYER_EID = eid
+_G.PLAYER_EID    = eid
+_G.PLAYER_LIVES  = 3
+_G.PLAYER_HP     = 3
+_G.PLAYER_SCORE  = 0
+_G.PLAYER_COINS  = 0
 
+local MAX_LIVES       = 3
+local MAX_HP          = 3
 local INVULN_DURATION = 1.5
+local DEATH_DURATION  = 1.8
 is_invulnerable       = false   -- in env: readable by enemy scripts
 local invuln_timer    = 0.0
+is_dead               = false   -- in env: readable by enemy scripts
+local death_timer     = 0.0
 
-function hurt()
-    if is_invulnerable then return end
+local function do_respawn()
+    is_dead         = false
     is_invulnerable = true
     invuln_timer    = INVULN_DURATION
     ladder_attached = false
+    physics2d_character_warp(eid, vec2.new(SPAWN_X, SPAWN_Y))
+    physics2d_character_set_velocity(eid, vec2.new(0, 0))
+    local spr = c_sprite()
+    if spr then spr.color = vec4.new(1, 1, 1, 1) end
+end
+
+local function do_die()
+    is_dead         = true
+    is_invulnerable = true
+    death_timer     = DEATH_DURATION
+    ladder_attached = false
     audio_sfx_play(hs("res/platformer/sfx/damage.ogg"), 1.0)
-    local ch = c_character2d()
-    local vx = ch and -ch.velocity.x * 0.5 or 0
-    physics2d_character_set_velocity(eid, vec2.new(vx, -380.0))
+    physics2d_character_set_velocity(eid, vec2.new(0, -300.0))
+    local spr = c_sprite()
+    if spr then spr.sequence = SEQ_HURT end
+end
+
+function hurt()
+    if is_invulnerable or is_dead then return end
+    _G.PLAYER_HP = _G.PLAYER_HP - 1
+    if _G.PLAYER_HP <= 0 then
+        _G.PLAYER_LIVES = _G.PLAYER_LIVES - 1
+        if _G.PLAYER_LIVES <= 0 then
+            _G.PLAYER_LIVES = MAX_LIVES
+            _G.PLAYER_SCORE = 0
+            _G.PLAYER_COINS = 0
+        end
+        _G.PLAYER_HP = MAX_HP
+        do_die()
+    else
+        is_invulnerable = true
+        invuln_timer    = INVULN_DURATION
+        ladder_attached = false
+        audio_sfx_play(hs("res/platformer/sfx/damage.ogg"), 1.0)
+        local ch = c_character2d()
+        local vx = ch and -ch.velocity.x * 0.5 or 0
+        physics2d_character_set_velocity(eid, vec2.new(vx, -380.0))
+    end
 end
 
 function bounce()
@@ -71,10 +115,26 @@ local update_handle = clock_update_add(function(delta)
 
     if not ch or not sp or not spr then return end
 
-    -- Invulnerability countdown
+    -- Death countdown: lock input, flicker, then respawn
+    if is_dead then
+        death_timer = death_timer - delta
+        local alpha = 0.5 + 0.25 * math.sin((DEATH_DURATION - death_timer) * math.pi * 8)
+        spr.color = vec4.new(1, 1, 1, alpha)
+        if death_timer <= 0 then do_respawn() end
+        return
+    end
+
+    -- Invulnerability countdown + opacity flicker
     if is_invulnerable then
         invuln_timer = invuln_timer - delta
-        if invuln_timer <= 0 then is_invulnerable = false end
+        if invuln_timer <= 0 then
+            is_invulnerable = false
+            if spr then spr.color = vec4.new(1, 1, 1, 1) end
+        else
+            local t = INVULN_DURATION - invuln_timer
+            local alpha = 0.5 + 0.25 * math.sin(t * math.pi * 10)
+            if spr then spr.color = vec4.new(1, 1, 1, alpha) end
+        end
     end
 
     -- Snap back to spawn if the player exits the map

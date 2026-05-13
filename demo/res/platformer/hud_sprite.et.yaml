@@ -1,0 +1,12 @@
+- name: hud_sprite
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: res/platformer/spr/hud.sprite
+      pixel_snap: true
+      animating: false
+    layers:
+      mask: 2

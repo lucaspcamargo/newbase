@@ -16,7 +16,7 @@
 - name: tilemap_fg
   comps:
     spatial:
-      pos: [0, 0, 0]
+      pos: [0, 0, -1]
       rot: [0, 0, 0]
       scale: [1, 1, 1]
     tilemap:

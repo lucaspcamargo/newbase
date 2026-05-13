@@ -10,7 +10,7 @@ physics2d_reset_gravity()
 -- Play bgm, looped
 audio_bgm_play(hs("res/platformer/bgm/Grasslands Theme.ogg"))
 
--- Spawn camera entity and register render layer
+-- Spawn world camera and register world render layer
 local CAMERA_ETREE = hs("res/platformer/camera.et.yaml")
 local _res_camera  = res_get_etree(CAMERA_ETREE)
 local cam_eid      = entity_spawn(CAMERA_ETREE)
@@ -27,11 +27,31 @@ if cam_eid then
     end
     _G.CAMERA_EID = cam_eid
     engine:clear_render_layers()
-    local rl       = render_layer.new()
-    rl.order       = 0
-    rl.layer_mask  = 0xFFFFFFFF
-    rl.camera      = cam_eid
-    rl.viewport    = render_simple_default_viewport()
+    local rl      = render_layer.new()
+    rl.order      = 0
+    rl.layer_mask = 0x1   -- world layer
+    rl.camera     = cam_eid
+    rl.viewport   = render_simple_default_viewport()
+    engine:add_render_layer(rl)
+end
+
+-- Spawn HUD (camera + script, defined in one etree)
+local HUD_ETREE = hs("res/platformer/hud.et.yaml")
+local _res_hud  = res_get_etree(HUD_ETREE)
+entity_spawn(HUD_ETREE)
+local hud_cam_eid = entity_find("hud_camera")
+if hud_cam_eid then
+    local sp = get_spatial(hud_cam_eid)
+    if sp then
+        sp.pos = vec3.new(render_simple_window_width() * 0.5, render_simple_window_height() * 0.5, 0)
+        sp:apply()
+    end
+    _G.HUD_CAMERA_EID = hud_cam_eid
+    local rl      = render_layer.new()
+    rl.order      = 1
+    rl.layer_mask = 0x2   -- HUD layer
+    rl.camera     = hud_cam_eid
+    rl.viewport   = render_simple_default_viewport()
     engine:add_render_layer(rl)
 end
 
