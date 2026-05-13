@@ -44,3 +44,6 @@
 [submodule "vendored/imgui-markdown"]
 	path = vendored/imgui-markdown
 	url = https://github.com/juliettef/imgui_markdown.git
+[submodule "vendored/ImGuizmo"]
+	path = vendored/ImGuizmo
+	url = https://github.com/CedricGuillemet/ImGuizmo.git

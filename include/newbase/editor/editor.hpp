@@ -3,15 +3,16 @@
 #include <newbase/system.hpp>
 
 namespace nb {
-    
+
+struct editor_p;
+
 class editor final : public nb::system
 {
 public:
-    editor() {}
-    ~editor() {}
+    editor();
+    ~editor();
 
-
-    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override {return 0;}
+    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override { return 0; }
     entt::id_type metatype_id() override { return entt::hashed_string{"editor"}.value(); }
 
     bool init(ryml::ConstNodeRef cfg) override;
@@ -20,6 +21,11 @@ public:
 
 private:
     void _draw_main_menu();
+    void _sync_editor_cam_to_game();
+    void _apply_override_layers();
+    void _ensure_editor_cam();
+
+    editor_p *_d;
 };
 
 }

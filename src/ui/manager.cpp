@@ -14,6 +14,7 @@
 #include <SDL3/SDL.h>
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "ImGuizmo.h"
 #include "tracy/Tracy.hpp"
 #include <unordered_map>
 #include <string>
@@ -110,6 +111,7 @@ void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int saf
     }
 
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
     _d->dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(safe_x);
     ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(safe_y);
@@ -133,6 +135,11 @@ void ui_manager_simple::unregister_tool_window(const char* name)
 {
     _d->tool_windows.erase(name);
     log::info("[ui_manager] unregistered tool window '%s'", name);
+}
+
+unsigned int ui_manager_simple::dockspace_id() const
+{
+    return static_cast<unsigned int>(_d->dockspace_id);
 }
 
 void ui_manager_simple::draw_tool_windows()
@@ -287,19 +294,23 @@ void ui_manager_simple::draw_perf()
         work_size = central_node->Size;
     }
 
-    // Keep the renderer's default viewport in sync with the central node.
-    // This runs every frame regardless of whether the perf overlay is drawn.
-    if(auto *rend = entt::locator<renderer_service*>::value())
+    // Keep the renderer's default viewport in sync with the central node,
+    // but only when no override render layers are active — if they are, whoever
+    // set the override (e.g. the editor) owns the viewport layout.
+    if(!engine::instance().has_override_render_layers())
     {
-        viewport_handle dvp = rend->default_viewport();
-        if(dvp != VIEWPORT_INVALID && work_size.x > 1.f && work_size.y > 1.f)
+        if(auto *rend = entt::locator<renderer_service*>::value())
         {
-            const ImGuiIO &io = ImGui::GetIO();
-            float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-            float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-            rend->update_viewport(dvp,
-                static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
-                static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy));
+            viewport_handle dvp = rend->default_viewport();
+            if(dvp != VIEWPORT_INVALID && work_size.x > 1.f && work_size.y > 1.f)
+            {
+                const ImGuiIO &io = ImGui::GetIO();
+                float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+                float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+                rend->update_viewport(dvp,
+                    static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
+                    static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy));
+            }
         }
     }
 

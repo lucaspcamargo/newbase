@@ -54,6 +54,7 @@ public:
     // render layer overrides (C++ only; when non-empty, replaces the game layers)
     void set_override_render_layers(std::vector<render_layer> layers);
     void clear_override_render_layers();
+    bool has_override_render_layers() const;
 
     // returns override layers if set, otherwise game layers
     const std::vector<render_layer>& render_layers() const;

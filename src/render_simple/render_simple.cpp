@@ -113,6 +113,7 @@ _wx(0), _wy(0)
     
     // register services
     entt::locator<renderer_service*>::emplace(this);
+    entt::locator<picker_service*>::emplace(this);
 }
 
 render_simple::~render_simple()
@@ -578,6 +579,90 @@ void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj
             SDL_SetRenderDrawBlendMode(_render, SDL_BLENDMODE_BLEND);
         }
     }
+}
+
+entt::entity render_simple::pick(const render_layer &layer, float vp_x, float vp_y)
+{
+    auto *sc = engine::instance().find_scene(layer.scene_id);
+    if (!sc) { log::warn("[pick] no scene"); return entt::null; }
+
+    auto it = _viewports.find(layer.viewport);
+    if (it == _viewports.end()) { log::warn("[pick] viewport %u not found", layer.viewport); return entt::null; }
+    const auto &vp = it->second;
+
+    // Viewport-local → window → world
+    const float win_x = vp_x + vp.x;
+    const float win_y = vp_y + vp.y;
+    const float vp_cx = vp.x + vp.w * 0.5f;
+    const float vp_cy = vp.y + vp.h * 0.5f;
+
+    float cam_cx = 0.f, cam_cy = 0.f, zoom = 1.f;
+    auto &reg = sc->registry();
+    if (layer.camera != entt::null)
+    {
+        if (auto *sp  = reg.try_get<cspatial>(layer.camera)) { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
+        if (auto *cam = reg.try_get<ccamera> (layer.camera)) { zoom = cam->zoom; }
+    }
+
+    const float wx = (win_x - vp_cx) / zoom + cam_cx;
+    const float wy = (win_y - vp_cy) / zoom + cam_cy;
+
+    log::info("[pick] vp(%.0f,%.0f) win(%.0f,%.0f) world(%.1f,%.1f) cam(%.1f,%.1f) zoom=%.2f vp_rect=%d,%d %dx%d",
+        vp_x, vp_y, win_x, win_y, wx, wy, cam_cx, cam_cy, zoom, vp.x, vp.y, vp.w, vp.h);
+
+    entt::entity best  = entt::null;
+    float        best_z = std::numeric_limits<float>::max();
+
+    for (auto [id, spatial] : reg.view<const cspatial>().each())
+    {
+        // Layer mask check
+        const auto *lyr_comp = reg.try_get<clayers>(id);
+        const uint32_t entity_mask = lyr_comp ? lyr_comp->mask : clayers::MASK_DEFAULT;
+        if (!(entity_mask & layer.layer_mask)) continue;
+
+        if (auto *sprite = reg.try_get<const csprite>(id))
+        {
+            if (!sprite->visible || !sprite->spr) continue;
+            auto &spr = *sprite->spr;
+
+            glm::vec2 dims = spr.dims;
+            if (dims == glm::vec2{-1.f, -1.f})
+            {
+                const glm::vec4 &csr = sprite->current_source_rect;
+                if (csr.z > 0.f)
+                    dims = { csr.z, csr.w };
+                else if (spr.tex && spr.tex->uploaded)
+                    dims = { (float)spr.tex->tex->w, (float)spr.tex->tex->h };
+                else continue;
+            }
+
+            // Transform pick point into local space and test against sprite quad
+            const glm::vec4 local = glm::inverse(spatial.world) * glm::vec4{wx, wy, 0.f, 1.f};
+            const float ql = -spr.anchor.x * dims.x;
+            const float qt = -spr.anchor.y * dims.y;
+            const bool hit = local.x >= ql && local.x <= ql + dims.x &&
+                             local.y >= qt && local.y <= qt + dims.y;
+            log::info("[pick]   sprite eid=%x pos=(%.1f,%.1f,%.1f) dims=(%.0fx%.0f) local=(%.1f,%.1f) quad=[%.1f..%.1f, %.1f..%.1f] hit=%d",
+                entt::to_integral(id), spatial.pos.x, spatial.pos.y, spatial.pos.z,
+                dims.x, dims.y, local.x, local.y, ql, ql+dims.x, qt, qt+dims.y, hit);
+            if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
+        }
+        else
+        {
+            // No sprite: small fixed-radius hit area
+            constexpr float HIT_RADIUS = 8.f;
+            const float dx = wx - spatial.pos.x;
+            const float dy = wy - spatial.pos.y;
+            const bool hit = dx*dx + dy*dy <= HIT_RADIUS*HIT_RADIUS;
+            log::info("[pick]   nospr  eid=%x pos=(%.1f,%.1f,%.1f) dist=%.1f hit=%d",
+                entt::to_integral(id), spatial.pos.x, spatial.pos.y, spatial.pos.z,
+                sqrtf(dx*dx+dy*dy), hit);
+            if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
+        }
+    }
+
+    log::info("[pick] result: %s (eid=%x)", best == entt::null ? "null" : "hit", entt::to_integral(best));
+    return best;
 }
 
 void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)

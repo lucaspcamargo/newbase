@@ -388,6 +388,11 @@ void engine::clear_override_render_layers()
     _d->override_render_layers.clear();
 }
 
+bool engine::has_override_render_layers() const
+{
+    return !_d->override_render_layers.empty();
+}
+
 
 void engine::request_exit()
 {

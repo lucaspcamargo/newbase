@@ -2,6 +2,7 @@
 
 #include <newbase/system.hpp>
 #include <newbase/services/renderer_service.hpp>
+#include <newbase/services/picker_service.hpp>
 #include <newbase/utility/glm.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/camera.hpp>
@@ -9,7 +10,7 @@
 
 namespace nb {
 
-class render_simple : public system, public renderer_service
+class render_simple : public system, public renderer_service, public picker_service
 {
 public:
     render_simple();
@@ -32,6 +33,9 @@ public:
 
     void set_clear_color(float r, float g, float b);
     float display_scale() const { return _scale; }
+
+    // picker_service interface
+    entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
 
     // renderer_service interface
     bool get_2d_extents(renderer_service::extents_2d &extents) override;
