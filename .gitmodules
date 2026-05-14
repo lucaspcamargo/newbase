@@ -31,7 +31,7 @@
 	branch = docking
 [submodule "vendored/imgui-node-editor"]
 	path = vendored/imgui-node-editor
-	url = https://github.com/thedmd/imgui-node-editor.git
+	url = https://github.com/lucaspcamargo/imgui-node-editor.git
 [submodule "vendored/SGDK"]
 	path = vendored/SGDK
 	url = https://github.com/Stephane-D/SGDK.git

@@ -286,7 +286,7 @@ void texture_editor_widget::_toolbar(ImVec2 canvas_avail)
 
 void texture_editor_widget::_draw_canvas(ImVec2 size)
 {
-    ImGui::BeginChild("##cvs", size, ImGuiChildFlags_Border,
+    ImGui::BeginChild("##cvs", size, ImGuiChildFlags_Borders,
         ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
     ImVec2 display = {_canvas->w * _zoom, _canvas->h * _zoom};

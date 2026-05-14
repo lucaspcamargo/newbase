@@ -546,9 +546,8 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                 ImGui::TextUnformatted(ICON_FK_MICROPHONE " Say word");
                 ImGui::SetNextItemWidth(140.f);
                 ImGui::Combo("##lpcword", &fb->ui_word_idx,
-                    [](void* data, int idx, const char** out) -> bool {
-                        *out = static_cast<const nb::rlpcvocab*>(data)->words[idx].name.c_str();
-                        return true;
+                    [](void* data, int idx) -> const char* {
+                        return static_cast<const nb::rlpcvocab*>(data)->words[idx].name.c_str();
                     },
                     const_cast<void*>(static_cast<const void*>(vocab)),
                     static_cast<int>(word_count));
@@ -563,10 +562,9 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(50.f);
                     ImGui::Combo("##lpcvar", &fb->ui_variant_idx,
-                        [](void* data, int idx, const char** out) -> bool {
-                            *out = static_cast<const nb::rlpcvocab_word*>(data)
+                        [](void* data, int idx) -> const char* {
+                            return static_cast<const nb::rlpcvocab_word*>(data)
                                        ->variants[idx].name.c_str();
-                            return true;
                         },
                         const_cast<void*>(static_cast<const void*>(&entry)),
                         static_cast<int>(var_count));
