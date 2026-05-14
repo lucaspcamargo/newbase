@@ -441,7 +441,7 @@ void editor::_draw_overlay()
     const ImVec2 vp_min{ (float)_d->vp_x / scx, (float)_d->vp_y / scy };
     const ImVec2 vp_max{ (_d->vp_x + _d->vp_w) / scx, (_d->vp_y + _d->vp_h) / scy };
 
-    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
     dl->PushClipRect(vp_min, vp_max, true);
 
     auto &reg = engine::instance().default_scene().registry();
