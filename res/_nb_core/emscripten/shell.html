@@ -121,6 +121,13 @@
         fsBtn.textContent = document.fullscreenElement ? '\u22BF' : '\u26F6';
       });
 
+      // Suppress browser defaults for all non-primary mouse buttons on the canvas:
+      // middle-click autoscroll (button 1), context menu (button 2, also covered by
+      // oncontextmenu for the keyboard Menu key), and browser back/forward (3/4).
+      document.getElementById('canvas').addEventListener('mousedown', function (e) {
+        if (e.button !== 0) e.preventDefault();
+      });
+
       function hideOverlay() {
         overlay.classList.add('hidden');
         document.getElementById('canvas').focus();
