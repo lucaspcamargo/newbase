@@ -47,3 +47,6 @@
 [submodule "vendored/ImGuizmo"]
 	path = vendored/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
+[submodule "vendored/SDL_shadercross"]
+	path = vendored/SDL_shadercross
+	url = https://github.com/libsdl-org/SDL_shadercross.git
