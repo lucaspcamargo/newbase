@@ -38,9 +38,6 @@
 [submodule "vendored/tinygettext"]
 	path = vendored/tinygettext
 	url = https://github.com/tinygettext/tinygettext.git
-[submodule "vendored/TalkiePCM"]
-	path = vendored/TalkiePCM
-	url = https://github.com/pschatzmann/TalkiePCM.git
 [submodule "vendored/imgui-markdown"]
 	path = vendored/imgui-markdown
 	url = https://github.com/juliettef/imgui_markdown.git
