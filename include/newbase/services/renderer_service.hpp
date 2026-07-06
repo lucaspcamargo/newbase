@@ -44,6 +44,12 @@ public:
 
     virtual bool get_2d_extents(extents_2d&) = 0;
 
+    virtual int   window_width()  const { return 0; }
+    virtual int   window_height() const { return 0; }
+    virtual float display_scale() const { return 1.f; }
+    virtual void  cam_2d_setup(float cx, float cy, float wmax, float hmax) {}
+    virtual void  set_clear_color(float r, float g, float b) {}
+
     // Returns the handle of the "default viewport" — a persistent viewport that
     // covers the window area available for scene rendering.  Callers (e.g. the
     // ui_manager / editor) may call update_viewport() on this handle to confine

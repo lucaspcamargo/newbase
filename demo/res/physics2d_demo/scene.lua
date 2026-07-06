@@ -1,5 +1,8 @@
-render_simple_cam_2d_setup(0, 0, 1920, 1080)
-render_simple_set_clear_color(0.373, 0.553, 0.827)
+local _rs = svc_renderer_service()
+if _rs then
+    _rs:cam_2d_setup(0, 0, 1920, 1080)
+    _rs:set_clear_color(0.373, 0.553, 0.827)
+end
 physics2d_set_gravity(vec2.new(0, 200))
 
 local BALL_ETREE = hs("res/physics2d_demo/ball.et.yaml")

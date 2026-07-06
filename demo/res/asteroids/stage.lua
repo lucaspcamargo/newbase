@@ -2,7 +2,8 @@
 
 physics2d_set_gravity(vec2.new(0.0, 0.0))
 
-render_simple_cam_2d_setup(0, 0, 1920, 1080)
+local _rs = svc_renderer_service()
+if _rs then _rs:cam_2d_setup(0, 0, 1920, 1080) end
 
 if sys_audio then
     audio_bgm_play(hs("res/asteroids/bgm/ObservingTheStar/ObservingTheStar.ogg"))
@@ -164,7 +165,8 @@ local function apply_scale(s)
     local r = BG_NORMAL[1] + (BG_SLOW[1] - BG_NORMAL[1]) * t
     local g = BG_NORMAL[2] + (BG_SLOW[2] - BG_NORMAL[2]) * t
     local b = BG_NORMAL[3] + (BG_SLOW[3] - BG_NORMAL[3]) * t
-    render_simple_set_clear_color(r, g, b)
+    local _rs = svc_renderer_service()
+    if _rs then _rs:set_clear_color(r, g, b) end
 end
 
 local h_slowtime = clock_update_add_monotonic(function(real_dt)

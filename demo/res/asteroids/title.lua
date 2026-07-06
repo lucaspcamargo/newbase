@@ -4,7 +4,8 @@ local timer   = 0
 local changed = false
 
 -- setup 2d camera
-render_simple_cam_2d_setup(0, 0, 1920, 1080)
+local _rs = svc_renderer_service()
+if _rs then _rs:cam_2d_setup(0, 0, 1920, 1080) end
 
 local update_handle = clock_update_add(function(delta)
     if changed then return end

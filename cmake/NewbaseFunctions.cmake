@@ -67,7 +67,7 @@ endfunction()
 # TODO fold into newbase_add_executable, maybe?
 function(newbase_prepare_executable)
     set(options BUILD_SYMLINKS NO_INSTALL NO_CORE_RESOURCES)
-    set(oneValueArgs TARGET)
+    set(oneValueArgs TARGET CONFIG_FILE)
     set(multiValueArgs SYSTEMS)
     cmake_parse_arguments(PARSE_ARGV 0 arg 
         "${options}" "${oneValueArgs}" "${multiValueArgs}")
@@ -101,16 +101,21 @@ function(newbase_prepare_executable)
         if(arg_SYSTEMS STREQUAL "ALL")
             set(arg_SYSTEMS ${NEWBASE_ALL_SYSTEMS})
         elseif(arg_SYSTEMS STREQUAL "AUTO")
+            if(DEFINED arg_CONFIG_FILE)
+                set(_auto_config "${arg_CONFIG_FILE}")
+            else()
+                set(_auto_config "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml")
+            endif()
             execute_process(
                 COMMAND ${PYTHON_INTERPRETER}
-                        "${NEWBASE_ROOT}/scripts/config_get_systems.py" 
-                        "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml"
+                        "${NEWBASE_ROOT}/scripts/config_get_systems.py"
+                        "${_auto_config}"
                 TIMEOUT 5
                 OUTPUT_VARIABLE arg_SYSTEMS
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
-            message("[newbase_prepare_executable] got systems from 'config.yaml' for '${arg_TARGET}': ${arg_SYSTEMS}")
-            set(rtti_extra_depends "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml")
+            message("[newbase_prepare_executable] got systems from '${_auto_config}' for '${arg_TARGET}': ${arg_SYSTEMS}")
+            set(rtti_extra_depends "${_auto_config}")
         endif()
     endif()
 

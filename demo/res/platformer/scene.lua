@@ -16,8 +16,9 @@ local cam_eid      = entity_spawn(CAMERA_ETREE)
 if cam_eid then
     local cam = get_camera(cam_eid)
     if cam then
-        cam.zoom = math.min(render_simple_window_width()  / 1920,
-                            render_simple_window_height() / 1080)
+        local _rs = svc_renderer_service()
+        cam.zoom = _rs and math.min(_rs:window_width()  / 1920,
+                                    _rs:window_height() / 1080) or 1
     end
     local sp = get_spatial(cam_eid)
     if sp then
@@ -30,7 +31,7 @@ if cam_eid then
     rl.order      = 0
     rl.layer_mask = 0x1   -- world layer
     rl.camera     = cam_eid
-    rl.viewport   = render_simple_default_viewport()
+    rl.viewport   = svc_renderer_service():default_viewport()
     rl.clear_bg   = true
     rl.clear_r    = 0.82
     rl.clear_g    = 0.96
@@ -46,7 +47,8 @@ local hud_cam_eid = entity_find("hud_camera")
 if hud_cam_eid then
     local sp = get_spatial(hud_cam_eid)
     if sp then
-        sp.pos = vec3.new(render_simple_window_width() * 0.5, render_simple_window_height() * 0.5, 0)
+        local _rs = svc_renderer_service()
+        sp.pos = vec3.new(_rs and _rs:window_width() * 0.5 or 0, _rs and _rs:window_height() * 0.5 or 0, 0)
         sp:apply()
     end
     _G.HUD_CAMERA_EID = hud_cam_eid
@@ -54,7 +56,7 @@ if hud_cam_eid then
     rl.order      = 1
     rl.layer_mask = 0x2   -- HUD layer
     rl.camera     = hud_cam_eid
-    rl.viewport   = render_simple_default_viewport()
+    rl.viewport   = svc_renderer_service():default_viewport()
     rl.clear_bg   = false
     engine:add_render_layer(rl)
 end

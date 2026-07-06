@@ -1,0 +1,29 @@
+systems:
+  @NB_DEMO_RENDERER@:
+    #prefer: wayland
+    w: 1280
+    h: 720
+  audio:
+    bgm_gain: -0.2
+    sfx_gain: 0.0
+  script_lua: {}
+  editor: {}
+  input:
+    default_actions: true
+  clock: {}
+  particle_system: {}
+  sprite_anim: {}
+  textext: {}
+  tilemap_system: {}
+  spatial_system: {}
+  physics2d:
+    world_scale: 100
+  steam:
+    app_id: 480
+  sgdk: {}
+resources:
+  scanners:
+    - type: "fs_raw"
+      path: "./res/"
+    - type: "title_storage"
+      path: "/"

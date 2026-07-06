@@ -452,15 +452,6 @@ bool render_simple::event( SDL_Event * evt)
 }
 
 
-int render_simple::window_width()
-{
-    return _wx;
-}
-
-int render_simple::window_height()
-{
-    return _wy;
-}
 
 void render_simple::_draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj,
                                 uint32_t layer_mask, const viewport_entry &/*vp*/)

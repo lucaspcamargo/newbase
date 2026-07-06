@@ -23,16 +23,16 @@ public:
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
     entt::id_type metatype_id() override { return entt::hashed_string{"render_simple"}.value(); }
 
-    int window_width();
-    int window_height();
+    int   window_width()  const override { return _wx; }
+    int   window_height() const override { return _wy; }
+    float display_scale() const override { return _scale; }
 
     // Legacy single-camera setup. Still functional as a fallback when no render
     // layers are configured.
-    void cam_2d_setup(float cx, float cy, float wmax, float hmax);
+    void cam_2d_setup(float cx, float cy, float wmax, float hmax) override;
     float cam_2d_scale();
 
-    void set_clear_color(float r, float g, float b);
-    float display_scale() const { return _scale; }
+    void set_clear_color(float r, float g, float b) override;
 
     // picker_service interface
     entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;

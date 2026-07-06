@@ -1,7 +1,8 @@
 local HUD_SPRITE_ETREE = hs("res/platformer/hud_sprite.et.yaml")
 local _res_hud_sprite  = res_get_etree(HUD_SPRITE_ETREE)
 
-local HUD_SCALE = render_simple_display_scale()
+local _rs = svc_renderer_service()
+local HUD_SCALE = _rs and _rs:display_scale() or 1.0
 
 -- Sprite half-widths and half-heights at 1x (anchor is center = 0.5,0.5)
 -- Widths from hud.sprite source_rect[3], heights from source_rect[4]
@@ -131,8 +132,9 @@ local update_handle = clock_update_add(function()
     if _G.HUD_CAMERA_EID then
         local hsp = get_spatial(_G.HUD_CAMERA_EID)
         if hsp then
-            hsp.pos = vec3.new(render_simple_window_width()  * 0.5,
-                               render_simple_window_height() * 0.5, 0)
+            local _rs2 = svc_renderer_service()
+            hsp.pos = vec3.new(_rs2 and _rs2:window_width()  * 0.5 or 0,
+                               _rs2 and _rs2:window_height() * 0.5 or 0, 0)
             hsp:apply()
         end
     end

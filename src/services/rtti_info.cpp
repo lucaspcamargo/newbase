@@ -14,6 +14,12 @@ static nb::renderer_service::extents_2d _vp_get_2d_extents(nb::renderer_service 
     self.get_2d_extents(e);
     return e;
 }
+static nb::viewport_handle _vp_default_viewport(nb::renderer_service &self) { return self.default_viewport(); }
+static int   _vp_window_width (const nb::renderer_service &self) { return self.window_width(); }
+static int   _vp_window_height(const nb::renderer_service &self) { return self.window_height(); }
+static float _vp_display_scale(const nb::renderer_service &self) { return self.display_scale(); }
+static void  _vp_cam_2d_setup(nb::renderer_service &self, float cx, float cy, float wmax, float hmax) { self.cam_2d_setup(cx, cy, wmax, hmax); }
+static void  _vp_set_clear_color(nb::renderer_service &self, float r, float g, float b) { self.set_clear_color(r, g, b); }
 
 namespace nb::rtti {
 
@@ -47,7 +53,19 @@ void _rtti_init_services()
             }}
         })
         .func<&_vp_get_2d_extents>("get_2d_extents"_hs)
-            .custom<func_info>(func_info{"get_2d_extents"});
+            .custom<func_info>(func_info{"get_2d_extents"})
+        .func<&_vp_default_viewport>("default_viewport"_hs)
+            .custom<func_info>(func_info{"default_viewport"})
+        .func<&_vp_window_width>("window_width"_hs)
+            .custom<func_info>(func_info{"window_width"})
+        .func<&_vp_window_height>("window_height"_hs)
+            .custom<func_info>(func_info{"window_height"})
+        .func<&_vp_display_scale>("display_scale"_hs)
+            .custom<func_info>(func_info{"display_scale"})
+        .func<&_vp_cam_2d_setup>("cam_2d_setup"_hs)
+            .custom<func_info>(func_info{"cam_2d_setup"})
+        .func<&_vp_set_clear_color>("set_clear_color"_hs)
+            .custom<func_info>(func_info{"set_clear_color"});
 
     entt::meta_factory<nb::ui_manager>{}
         .type("ui_manager"_hs)

@@ -1,3 +1,10 @@
+#if(NEWBASE_EMSCRIPTEN)
+    set(NB_DEMO_RENDERER "render_simple")
+#else()
+#    set(NB_DEMO_RENDERER "render_gpu")
+#endif()
+configure_file(config.yaml.in "${CMAKE_CURRENT_BINARY_DIR}/config.yaml" @ONLY)
+
 newbase_add_executable(
     TARGET
         newbase_demo
@@ -5,14 +12,16 @@ newbase_add_executable(
         src/main.c
         src/demo_system.cpp
 )
-newbase_prepare_executable(TARGET newbase_demo SYSTEMS AUTO)
+newbase_prepare_executable(TARGET newbase_demo SYSTEMS AUTO
+    CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/config.yaml"
+)
 #if(NOT WIN32)
 set(BUILD_SYMLINKS BUILD_SYMLINKS)
 #endif()
-newbase_declare_resources(TARGET newbase_demo ${BUILD_SYMLINKS} INDEX 
+newbase_declare_resources(TARGET newbase_demo ${BUILD_SYMLINKS} INDEX
     FILES
         res
-        config.yaml
+        "${CMAKE_CURRENT_BINARY_DIR}/config.yaml"
 )
 
 if(NEWBASE_SGDK)
@@ -34,7 +43,7 @@ else()
     # do regular install
     install(TARGETS newbase_demo DESTINATION bin/)
     install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/res" DESTINATION share/newbase_demo/${NEWBASE_NATIVE_RES_PREFIX}/)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml" DESTINATION share/newbase_demo/${NEWBASE_NATIVE_RES_PREFIX}/)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.yaml" DESTINATION share/newbase_demo/${NEWBASE_NATIVE_RES_PREFIX}/)
     install(DIRECTORY "${CMAKE_SOURCE_DIR}/res/_nb_core" DESTINATION share/newbase_demo/${NEWBASE_NATIVE_RES_PREFIX}/)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${NEWBASE_NATIVE_RES_PREFIX}/index.yaml" DESTINATION share/newbase_demo/${NEWBASE_NATIVE_RES_PREFIX}/)
     install(FILES "${CMAKE_SOURCE_DIR}/res/_nb_core/icon.svg" DESTINATION share/icons/hicolor/scalable/apps/ RENAME br.eng.camargo.newbase.demo.svg)
