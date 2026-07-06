@@ -38,6 +38,17 @@ LICENSE_PATTERNS = [
     (r"public domain",                                   "LicenseRef-PublicDomain"),
 ]
 
+# Overrides for packages whose LICENSE file trips up the regex heuristics
+# above (e.g. multi-license bundles where an embedded sub-license's text
+# gets matched instead of the project's actual license). Keyed by package
+# name as it appears in the vendored/ directory (or nested submodule dirname).
+LICENSE_OVERRIDES: dict[str, str] = {
+    # LICENSE.TXT bundles the LLVM/NCSA license plus several embedded
+    # third-party snippets; the MIT/public-domain patterns above match one
+    # of those snippets instead of the actual top-level license (NCSA).
+    "DirectXShaderCompiler": "NCSA",
+}
+
 
 def detect_license(text: str) -> str:
     """Return an SPDX license expression detected from license file text."""
@@ -72,13 +83,13 @@ def find_license_files(path: Path) -> list[Path]:
     )
 
 
-def parse_gitmodules() -> dict[str, dict]:
+def parse_gitmodules(base_dir: Path) -> dict[str, dict]:
     """
-    Parse .gitmodules into a dict keyed by submodule path.
+    Parse base_dir/.gitmodules into a dict keyed by submodule path.
     Each value holds the key/value pairs from that submodule block
     (excluding 'path' itself).
     """
-    gitmodules = REPO_ROOT / ".gitmodules"
+    gitmodules = base_dir / ".gitmodules"
     if not gitmodules.exists():
         return {}
 
@@ -106,16 +117,17 @@ def parse_gitmodules() -> dict[str, dict]:
     return result
 
 
-def get_submodule_info() -> dict[str, dict]:
+def get_submodule_info(base_dir: Path) -> dict[str, dict]:
     """
-    Combine .gitmodules URL data with live commit/tag data from
-    `git submodule status`.  Returns dict: relative-path -> {url, commit, version_tag}.
+    Combine base_dir/.gitmodules URL data with live commit/tag data from
+    `git submodule status` run inside base_dir.
+    Returns dict: relative-path -> {url, commit, version_tag}.
     """
-    by_path = parse_gitmodules()
+    by_path = parse_gitmodules(base_dir)
 
     r = subprocess.run(
         ["git", "submodule", "status"],
-        cwd=REPO_ROOT, capture_output=True, text=True,
+        cwd=base_dir, capture_output=True, text=True,
     )
     for line in r.stdout.splitlines():
         if not line:
@@ -191,16 +203,82 @@ def make_package(
     download_location: str,
     lic_text: str,
     vcs_ref: str | None = None,
+    parent_spdx_id: str | None = None,
 ) -> dict:
+    license = LICENSE_OVERRIDES.get(name) or (detect_license(lic_text) if lic_text else "NOASSERTION")
     return {
         "name": name,
         "spdx_id": spdx_id(name),
         "version": version or "NOASSERTION",
         "download_location": download_location,
-        "license": detect_license(lic_text) if lic_text else "NOASSERTION",
+        "license": license,
         "copyright": extract_copyright(lic_text) if lic_text else "NOASSERTION",
         "vcs_ref": vcs_ref,
+        "parent_spdx_id": parent_spdx_id,
     }
+
+
+def get_nested_dep_packages(vdir: Path, parent_spdx_id: str) -> list[dict]:
+    """
+    Discover submodules nested inside a vendored dependency (e.g. the
+    SPIRV-Cross/SPIRV-Tools/SPIRV-Headers/DirectXShaderCompiler submodules
+    that live inside vendored/SDL_shadercross/external/). Skips submodules
+    that aren't checked out (empty directory).
+    """
+    nested_info = get_submodule_info(vdir)
+    packages: list[dict] = []
+
+    for rel_path, info in sorted(nested_info.items()):
+        nested_path = vdir / rel_path
+        if not nested_path.is_dir() or not any(nested_path.iterdir()):
+            continue  # not checked out — skip rather than emit a NOASSERTION stub
+
+        lic_files = find_license_files(nested_path)
+        lic_text = "\n".join(f.read_text(errors="replace") for f in lic_files)
+
+        url = info.get("url", "NOASSERTION")
+        commit = info.get("commit", "")
+        raw_tag = info.get("version_tag", "")
+        version = clean_version(raw_tag) if raw_tag else "NOASSERTION"
+        vcs_ref = f"git+{url}@{commit}" if url != "NOASSERTION" and commit else None
+
+        packages.append(make_package(
+            name=nested_path.name,
+            version=version,
+            download_location=url,
+            lic_text=lic_text,
+            vcs_ref=vcs_ref,
+            parent_spdx_id=parent_spdx_id,
+        ))
+
+    return packages
+
+
+def filter_ignored(packages: list[dict], ignore_names: set[str]) -> list[dict]:
+    """
+    Drop packages named in ignore_names, along with any descendants (packages
+    whose parent_spdx_id chain leads to a dropped package). Used for
+    dependencies that are present in the source tree (e.g. as a submodule)
+    but weren't actually compiled into this particular build — CMake knows
+    which build flags were used and passes those names via --ignore.
+    """
+    if not ignore_names:
+        return packages
+
+    removed_ids: set[str] = set()
+    kept = list(packages)
+    changed = True
+    while changed:
+        changed = False
+        next_kept = []
+        for pkg in kept:
+            if pkg["name"] in ignore_names or pkg["parent_spdx_id"] in removed_ids:
+                removed_ids.add(pkg["spdx_id"])
+                changed = True
+                continue
+            next_kept.append(pkg)
+        kept = next_kept
+    return kept
 
 
 def main() -> None:
@@ -211,6 +289,12 @@ def main() -> None:
         "--output", "-o",
         default=str(REPO_ROOT / "sbom.spdx"),
         help="Output file path (default: <repo-root>/sbom.spdx)",
+    )
+    parser.add_argument(
+        "--ignore", action="append", default=[], metavar="NAME",
+        help="Package name to exclude from the SBOM, e.g. a dependency present "
+             "in the source tree but not compiled into this build "
+             "(descendants are dropped too). May be passed multiple times.",
     )
     # When newbase is used as a dependency from an external project, CMake
     # passes these so the caller appears as the top-level SPDX package.
@@ -260,7 +344,7 @@ def main() -> None:
     root_pkg["spdx_id"] = "SPDXRef-Package-newbase"  # stable well-known ID
 
     # --- Vendored dependencies ---
-    submodule_info = get_submodule_info()
+    submodule_info = get_submodule_info(REPO_ROOT)
     vendored_dir = REPO_ROOT / "vendored"
     dep_packages: list[dict] = []
 
@@ -280,13 +364,22 @@ def main() -> None:
         version = clean_version(raw_tag) if raw_tag else "NOASSERTION"
         vcs_ref = f"git+{url}@{commit}" if url != "NOASSERTION" and commit else None
 
-        dep_packages.append(make_package(
+        dep_pkg = make_package(
             name=vdir.name,
             version=version,
             download_location=url,
             lic_text=lic_text,
             vcs_ref=vcs_ref,
-        ))
+        )
+        dep_packages.append(dep_pkg)
+
+        # Recurse into submodules nested inside this dependency (e.g.
+        # SDL_shadercross's vendored SPIRV-Cross/SPIRV-Tools/SPIRV-Headers/
+        # DirectXShaderCompiler), which are statically linked into newbase
+        # but not listed in the top-level .gitmodules.
+        dep_packages.extend(get_nested_dep_packages(vdir, dep_pkg["spdx_id"]))
+
+    dep_packages = filter_ignored(dep_packages, set(args.ignore))
 
     # --- Assemble SPDX document ---
     out: list[str] = []
@@ -321,7 +414,8 @@ def main() -> None:
     else:
         out.append("Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-newbase")
     for dep in dep_packages:
-        out.append(f"Relationship: SPDXRef-Package-newbase DEPENDS_ON {dep['spdx_id']}")
+        parent_spdx_id = dep["parent_spdx_id"] or "SPDXRef-Package-newbase"
+        out.append(f"Relationship: {parent_spdx_id} DEPENDS_ON {dep['spdx_id']}")
     out.append("")
 
     output_path = Path(args.output)

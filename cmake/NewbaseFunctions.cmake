@@ -181,6 +181,11 @@ function(newbase_prepare_executable)
             "--caller-source-dir" "${PROJECT_SOURCE_DIR}"
         )
     endif()
+    if(NOT NEWBASE_ENABLE_DXC)
+        # DirectXShaderCompiler is present in the source tree (a submodule of
+        # SDL_shadercross) but not actually compiled in unless DXC is enabled.
+        list(APPEND sbom_args "--ignore" "DirectXShaderCompiler")
+    endif()
     if(DEFINED EMSCRIPTEN)
         # Emscripten embeds the SBOM at link time via --embed-file, so the file
         # must exist before the link step — keep the always-run pre-build target.
