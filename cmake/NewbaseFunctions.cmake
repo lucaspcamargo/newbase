@@ -33,10 +33,6 @@ message("[newbase_functions] newbase root dir is: ${NEWBASE_ROOT}")
 # ensure NEWBASE_ROOT is absolute
 get_filename_component(NEWBASE_ROOT "${NEWBASE_ROOT}" ABSOLUTE)
 
-if(WIN32 AND NOT CMAKE_CROSSCOMPILING)
-    set(PYTHON_INTERPRETER python.exe)
-endif()
-
 function(newbase_add_executable)
     set(options "")
     set(oneValueArgs TARGET)
@@ -107,7 +103,7 @@ function(newbase_prepare_executable)
                 set(_auto_config "${CMAKE_CURRENT_SOURCE_DIR}/config.yaml")
             endif()
             execute_process(
-                COMMAND ${PYTHON_INTERPRETER}
+                COMMAND ${NEWBASE_PYTHON_INTERPRETER}
                         "${NEWBASE_ROOT}/scripts/config_get_systems.py"
                         "${_auto_config}"
                 TIMEOUT 5
@@ -137,7 +133,7 @@ function(newbase_prepare_executable)
     message("[newbase_prepare_executable] RTTI entry points: to '${rtti_entry_file_output}'")
     add_custom_command(
         OUTPUT "${rtti_entry_file_output}"
-        COMMAND ${PYTHON_INTERPRETER}
+        COMMAND ${NEWBASE_PYTHON_INTERPRETER}
             ${NEWBASE_ROOT}/scripts/codegen_rtti_entry_points.py
             "${rtti_entry_file_template}"
             "${rtti_entry_file_output}"
@@ -192,7 +188,7 @@ function(newbase_prepare_executable)
         set(sbom_target ${arg_TARGET}_sbom_gen)
         add_custom_target(${sbom_target} ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
-            COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
+            COMMAND ${NEWBASE_PYTHON_INTERPRETER} ${sbom_args}
             BYPRODUCTS "${sbom_output}"
             VERBATIM
         )
@@ -201,7 +197,7 @@ function(newbase_prepare_executable)
         # All other platforms: generate only when the executable is (re)linked.
         add_custom_command(TARGET ${arg_TARGET} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${sbom_output_dir}"
-            COMMAND ${PYTHON_INTERPRETER} ${sbom_args}
+            COMMAND ${NEWBASE_PYTHON_INTERPRETER} ${sbom_args}
             VERBATIM
         )
     endif()
@@ -311,7 +307,7 @@ function(newbase_declare_resources)
     message("[newbase_declare_resources] creating target index. Resources are at: ${links_dest_dir}")
         set(res_index_target ${arg_TARGET}_res_index)
         add_custom_target( ${res_index_target} ALL
-            COMMAND ${PYTHON_INTERPRETER}
+            COMMAND ${NEWBASE_PYTHON_INTERPRETER}
                 ${NEWBASE_ROOT}/scripts/res_indexer.py
                 "${links_dest_dir}"
             # BYPRODUCTS index file, if needed (?)
