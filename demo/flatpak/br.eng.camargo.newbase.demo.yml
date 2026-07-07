@@ -20,7 +20,7 @@ finish-args:
 modules:
   - name: newbase_demo
     buildsystem: cmake-ninja
-    config-opts: ["-DNEWBASE_LUA_ROOT=lua", "-DNEWBASE_FDO_FILES=ON", "-DNEWBASE_USE_XDG_DATA_DIRS=ON", "-DNEWBASE_LTO=ON"]
+    config-opts: ["-DCMAKE_BUILD_TYPE=Release", "-DNEWBASE_LUA_ROOT=lua", "-DNEWBASE_FDO_FILES=ON", "-DNEWBASE_USE_XDG_DATA_DIRS=ON", "-DNEWBASE_LTO=ON"]
     sources:
       - type: git
         url: ../..

@@ -134,13 +134,13 @@ static std::shared_ptr<nb::rlpcvocab> load_rlpcvocab(entt::id_type id)
 
 void _rtti_init_audio_rlpcvocab()
 {
-    using namespace nb::rtti;
+    using namespace nb;
 
     entt::meta_factory<nb::rlpcvocab>{}
         .type("rlpcvocab"_hs)
         .custom<rtti::type_info>(rtti::type_info{
             .identifier = "lpcvocab",
-            .type_class = TYPE_CLASS_RESOURCE,
+            .type_class = rtti::TYPE_CLASS_RESOURCE,
             .data = {.resource = {
                 .editor_icon = ICON_FK_COMMENTS,
                 .extensions  = "rlpcvocab"
@@ -155,7 +155,7 @@ void _rtti_init_audio_rlpcvocab()
         .type("rlpcvocab_ptr"_hs)
         .ctor<>()
         .custom<rtti::type_info>(rtti::type_info{
-            .type_class = TYPE_CLASS_RESOURCE_PTR,
+            .type_class = rtti::TYPE_CLASS_RESOURCE_PTR,
             .data = {.resource_ptr = {
                 .resource_type_id = "rlpcvocab"_hs.value(),
                 .get_ptr = +[](const entt::meta_any& a) -> std::shared_ptr<nb::resource> {
