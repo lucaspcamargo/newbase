@@ -138,7 +138,7 @@ void _rtti_init_audio_rlpcvocab()
 
     entt::meta_factory<nb::rlpcvocab>{}
         .type("rlpcvocab"_hs)
-        .custom<type_info>(type_info{
+        .custom<rtti::type_info>(rtti::type_info{
             .identifier = "lpcvocab",
             .type_class = TYPE_CLASS_RESOURCE,
             .data = {.resource = {
@@ -154,7 +154,7 @@ void _rtti_init_audio_rlpcvocab()
     entt::meta_factory<std::shared_ptr<nb::rlpcvocab>>{}
         .type("rlpcvocab_ptr"_hs)
         .ctor<>()
-        .custom<type_info>(type_info{
+        .custom<rtti::type_info>(rtti::type_info{
             .type_class = TYPE_CLASS_RESOURCE_PTR,
             .data = {.resource_ptr = {
                 .resource_type_id = "rlpcvocab"_hs.value(),
