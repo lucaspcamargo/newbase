@@ -24,6 +24,7 @@ files = []
 
 paths = glob.glob("**", root_dir=resdir, recursive=True)
 for relpath in paths:
+    relpath = relpath.replace(os.sep, "/")
     if relpath == "index.yaml":
         continue
     path = os.path.join(resdir, relpath)
