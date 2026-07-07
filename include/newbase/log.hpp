@@ -34,8 +34,10 @@ namespace log {
 
 // TODO: respect static log level in all logging function templates
 
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-security"
+#endif
 
     template<typename... Params>
     inline void verb(const char *msg, Params... params)
@@ -74,7 +76,9 @@ namespace log {
         SDL_LogCritical(SDL_LOG_CATEGORY_APPLICATION, msg, params...);
     }
 
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 
 }
 }

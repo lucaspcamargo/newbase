@@ -17,9 +17,8 @@ struct lpc_vocab_entry {
 // the static table in lpc_vocab.hpp with TMS5220-compatible bitstream data.
 inline const lpc_vocab_entry* lpc_vocab_all(size_t& out_count)
 {
-    static const lpc_vocab_entry entries[] = {};
     out_count = 0;
-    return entries;
+    return nullptr;
 }
 
 } // namespace nb
