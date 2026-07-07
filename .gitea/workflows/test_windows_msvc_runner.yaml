@@ -1,0 +1,12 @@
+name: Test Windows MSVC Runner
+run-name: ${{ gitea.actor }} is testing the Windows MSVC self-hosted runner 🧪
+on: workflow_dispatch
+
+jobs:
+  Test:
+    runs-on: windows-msvc
+    steps:
+      - name: Sanity check host
+        run: echo "hello from $env:COMPUTERNAME"
+      - name: Confirm MSVC is on PATH
+        run: cl.exe 2>&1 | Select-String "Microsoft"
