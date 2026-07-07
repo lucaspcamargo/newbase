@@ -8,5 +8,16 @@ jobs:
     steps:
       - name: Sanity check host
         run: echo "hello from $env:COMPUTERNAME"
+      - name: Setup MSVC dev environment
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "vswhere did not find a VS install with the VC.Tools.x86.x64 component" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+          cmd.exe /c "`"$vcvars`" x64 && set" | ForEach-Object {
+            if ($_ -match "^([^=]+)=(.*)$") {
+              "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
       - name: Confirm MSVC is on PATH
         run: cl.exe 2>&1 | Select-String "Microsoft"
