@@ -1,46 +1,54 @@
 name: Windows Build
-run-name: ${{ gitea.actor }} is cross-building newbase for Windows 🪟
+run-name: ${{ gitea.actor }} is building newbase for Windows with MSVC 🪟
 on: [push]
 
 jobs:
   Main-Build:
-    runs-on: ubuntu-latest
-    container:
-      image: gt.camargo.eng.br/camargo/ubuntu-latest-mxe:v1
-      credentials:
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GT_API_TOKEN }}
+    runs-on: windows-msvc
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: "Setup Python"
+
+      - name: Setup MSVC dev environment
         run: |
-          env
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "vswhere did not find a VS install with the VC.Tools.x86.x64 component" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
+          cmd.exe /c "`"$vcvars`" x64 && set" | ForEach-Object {
+            if ($_ -match "^([^=]+)=(.*)$") {
+              "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+
+      - name: Setup Python and CMake
+        run: |
           python -m venv venv
-          ls venv/bin
-          . venv/bin/activate
-          which pip && which python
-          pip install --upgrade pip
+          . .\venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install cmake~=3.5 ninja
+          cmake --version
+          ninja --version
           echo "Installing script deps..."
           pip install -r scripts/requirements.txt
-          echo PATH=$PATH >> $GITHUB_ENV
-      - name: Configure 
+          "$env:VIRTUAL_ENV\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Configure
         run: |
-          . venv/bin/activate
-          export PATH="/opt/mxe/usr/bin:${PATH}"
-          env
-          ls /opt/mxe/usr/bin
-          x86_64-w64-mingw32.static-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DNEWBASE_LTO=ON 
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEWBASE_ENABLE_DXC=ON
+
       - name: Build
         run: |
-          . venv/bin/activate
-          export PATH="/opt/mxe/usr/bin:${PATH}"
-          env
-          x86_64-w64-mingw32.static-cmake --build build -j $(( $(nproc) - 1 ))
+          cmake --build build -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Install
+        run: |
+          cmake --install build --prefix build/install
+
       - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
-          name: newbase_windows_amd64_${{ github.head_ref }}_${{ github.sha }}
-          path: build
+          name: newbase_windows_msvc_amd64_${{ github.head_ref }}_${{ github.sha }}
+          path: build/install
