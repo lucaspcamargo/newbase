@@ -22,6 +22,11 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("[newbase_options] enabling C++17 and fast math for glm")
     set(GLM_ENABLE_FAST_MATH ON)
 endif()
+if(MSVC)
+    # glm's /Za (added when this is OFF) conflicts with /fp:fast (MSVC D8016).
+    # CACHE+FORCE since glm's pinned cmake_policy range makes plain set() unreliable here.
+    set(GLM_ENABLE_LANG_EXTENSIONS ON CACHE BOOL "" FORCE)
+endif()
 
 if(NEWBASE_LTO)
     message("[newbase] LTO requested, checking support...")
