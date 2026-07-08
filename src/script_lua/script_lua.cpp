@@ -800,6 +800,44 @@ void script_lua::on_scene_change()
     engine::instance().default_scene().registry().on_destroy<cscript>().connect<&script_lua::_on_cscript_destroy>();
 }
 
+std::string script_lua::eval(const std::string &code)
+{
+    if (luaL_loadbuffer(_d->L, code.c_str(), code.size(), "=eval") != LUA_OK)
+    {
+        const char *err = lua_tostring(_d->L, -1);
+        std::string msg = err ? err : "(no message)";
+        log::warn("[script_lua] eval load error: %s", msg.c_str());
+        lua_pop(_d->L, 1);
+        return "load error: " + msg;
+    }
+
+    // Same nresults=1 convention as make_meta_callback_from_lua
+    // (bindings.cpp) — only the chunk's first return value is captured.
+    if (lua_pcall(_d->L, 0, 1, 0) != LUA_OK)
+    {
+        const char *err = lua_tostring(_d->L, -1);
+        std::string msg = err ? err : "(no message)";
+        log::warn("[script_lua] eval runtime error: %s", msg.c_str());
+        lua_pop(_d->L, 1);
+        return "runtime error: " + msg;
+    }
+
+    if (lua_isnil(_d->L, -1))
+    {
+        lua_pop(_d->L, 1);
+        return std::string();
+    }
+
+    // luaL_tolstring invokes __tostring if present, so a boxed nb.meta_any
+    // result (e.g. `return some_component`) prints via box_tostring
+    // (bindings.cpp) exactly like it would in an interactive Lua REPL.
+    size_t len = 0;
+    const char *s = luaL_tolstring(_d->L, -1, &len);
+    std::string result(s, len);
+    lua_pop(_d->L, 2); // pop the tolstring copy and the original result
+    return result;
+}
+
 void* script_lua::l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
 {
     // TODO use a pool allocator? entt provides some stuff
@@ -892,7 +930,9 @@ extern "C" void _rtti_init_script_lua()
     entt::meta_factory<script_lua>{}
         .type("script_lua"_hs)
         .custom<rtti::type_info>(rtti::type_info{"script_lua", rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>();
+        .base<nb::system>()
+        .func<&script_lua::eval>("eval"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"eval"});
     entt::meta_factory<std::shared_ptr<nb::script_lua>>{rtti::ctx_systems()}
         .type("script_lua_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::script_lua>>()
