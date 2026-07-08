@@ -548,9 +548,8 @@ bool editor::draw()
                 ed::Resume();
             }
         }
-
-        ed::EndCreate(); // Wraps up object creation action handling.
     }
+    ed::EndCreate(); // Must run every frame, even when BeginCreate() returned false.
 
 
     // Deletes a node and all its pins and connected links from the plan.
