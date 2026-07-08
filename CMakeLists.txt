@@ -17,6 +17,7 @@ option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executab
 option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during runtime" OFF)
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
 option(NEWBASE_ENABLE_DXC "Compile in DirectXShaderCompiler (DXC) support for SDL_shadercross, needed for D3D12/DXIL shaders" ${WIN32})
+option(NEWBASE_ENABLE_MCP "Enable the embedded MCP (Model Context Protocol) server system, exposing engine introspection/control over HTTP" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
 set(NEWBASE_WII_SDL_PATH "" CACHE PATH "Path to SDL source tree for Wii builds (overrides vendored/SDL when set)")
@@ -189,6 +190,25 @@ add_subdirectory(src/tilemap)
 if(NEWBASE_STEAM)
     add_subdirectory(src/steam)
 endif()
+if(NEWBASE_ENABLE_MCP)
+    if(DEFINED EMSCRIPTEN)
+        message(FATAL_ERROR "[newbase] NEWBASE_ENABLE_MCP is not supported on Emscripten: "
+            "server sockets don't make sense on the web, and alternatives are not yet implemented.")
+    endif()
+    message("[newbase] adding cpp-httplib")
+    # Pin every "if available" opportunistic dependency off — this is a
+    # localhost-only JSON-RPC server, no TLS/compression needed, and leaving
+    # these on ON (their defaults) makes the build non-reproducible across
+    # machines depending on what happens to be installed on each one.
+    set(HTTPLIB_REQUIRE_OPENSSL          OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_ZLIB_IF_AVAILABLE    OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_BROTLI_IF_AVAILABLE  OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_ZSTD_IF_AVAILABLE    OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_COMPILE                  OFF CACHE BOOL "" FORCE) # header-only is fine at our call volume
+    add_subdirectory(vendored/cpp-httplib EXCLUDE_FROM_ALL)
+    add_subdirectory(src/mcp)
+endif()
 
 
 
@@ -235,6 +255,9 @@ if(NOT NEWBASE_WII) # -- may be needed in the future, but we can leave it for no
 export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
 export(TARGETS tinygettext NAMESPACE nb:: FILE newbase-tinygettext-export.cmake) # same for tinygettext
+if(NEWBASE_ENABLE_MCP)
+    export(TARGETS httplib NAMESPACE nb:: FILE newbase-httplib-export.cmake) # same for cpp-httplib, needed by the mcp system
+endif()
 # iterate over all systems in NEWBASE_ALL_SYSTEMS list and export them
 foreach(system IN LISTS NEWBASE_ALL_SYSTEMS)
     set(system_target newbase_sys_${system})

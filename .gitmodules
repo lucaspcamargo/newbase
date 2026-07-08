@@ -47,3 +47,6 @@
 [submodule "vendored/SDL_shadercross"]
 	path = vendored/SDL_shadercross
 	url = https://github.com/libsdl-org/SDL_shadercross.git
+[submodule "vendored/cpp-httplib"]
+	path = vendored/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git

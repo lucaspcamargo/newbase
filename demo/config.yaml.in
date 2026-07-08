@@ -21,6 +21,8 @@ systems:
   steam:
     app_id: 480
   sgdk: {}
+  mcp:
+    port: 8765
 resources:
   scanners:
     - type: "fs_raw"
