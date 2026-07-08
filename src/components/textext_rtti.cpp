@@ -31,7 +31,7 @@ void ctextext::_ensure_rtti()
             })
         .data<&ctextext::text>("text"_hs)
             .custom<rtti::data_info>(rtti::data_info{"text"})
-        .data<&ctextext::color>("color"_hs)
+        .data<&ctextext::color, entt::as_ref_t>("color"_hs)
             .custom<rtti::data_info>(rtti::data_info{
                 .identifier = "color",
                 .subtype    = rtti::DATA_SUBTYPE_COLOR

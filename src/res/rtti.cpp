@@ -58,9 +58,9 @@ namespace nb::rtti {
                 }
             })
             .ctor<>()
-            .data<&rsprite::anchor>("anchor"_hs)
+            .data<&rsprite::anchor, entt::as_ref_t>("anchor"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"anchor"})
-            .data<&rsprite::dims>("dims"_hs)
+            .data<&rsprite::dims, entt::as_ref_t>("dims"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"dims"})
             .data<&rsprite::tex>("tex"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"tex"});
