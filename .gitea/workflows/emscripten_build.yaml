@@ -11,6 +11,8 @@ jobs:
         with:
           submodules: recursive
       - uses: mymindstorm/setup-emsdk@v16
+        with:
+          version: 6.0.1
       - name: Verify Emscripten installation
         run: emcc -v
       - name: "Setup Python and CMake"
