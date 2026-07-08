@@ -8,6 +8,7 @@
 #include <newbase/utility/glm.hpp>
 #include <newbase/res/resource.hpp>
 #include <newbase/res/manager.hpp>
+#include <newbase/script_lua/script_lua.hpp>
 #include <entt/entt.hpp>
 #include <httplib.h>
 #include <ryml.hpp>
@@ -962,6 +963,47 @@ void mcp::_register_builtin_tools()
                 return "{\"ok\":true,\"result\":null}";
 
             return "{\"ok\":true,\"result\":" + value_json + "}";
+        });
+
+    register_tool("eval_lua",
+        "Executes arbitrary Lua code in the running engine's script_lua system (the same "
+        "lua_State used for scripted entities/systems — full access to whatever the game's Lua "
+        "bindings expose, including live component/system access). Argument: {\"code\": <string>}. "
+        "Returns the stringified first return value of the chunk (empty if none). SAFETY: this is "
+        "the least restricted tool available — it can read and mutate arbitrary engine/game state "
+        "and is not sandboxed; use deliberately.",
+        "{\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"}},\"required\":[\"code\"]}",
+        [this](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            if (!aroot.has_child("code"))
+                return "{\"error\":\"missing 'code' argument\"}";
+
+            std::string code;
+            aroot["code"] >> code;
+
+            // Delegate to sys_function_call's own tool function for the
+            // actual dispatch, rather than re-deriving the same
+            // entt::meta_func::invoke() call by hand — guarantees identical
+            // (already independently verified) behavior instead of risking
+            // subtle divergence, and avoids duplicating the invocation logic.
+            auto it = _tools.find("sys_function_call");
+            if (it == _tools.end())
+                return "{\"error\":\"internal: sys_function_call tool missing\"}";
+
+            std::string inner_args = "{\"system\":\"script_lua\",\"function\":\"eval\",\"args\":[" +
+                                      json_string(code) + "]}";
+            return it->second.fn(inner_args);
         });
 }
 
