@@ -168,6 +168,7 @@ namespace nb::rtti {
         .type(entt::hashed_string{name_str "_ptr"}.value()) \
         .ctor<>() \
         .custom<type_info>(type_info{ \
+        .identifier = name_str "_ptr", \
         .type_class = TYPE_CLASS_RESOURCE_PTR, \
         .data = {.resource_ptr = { \
             .resource_type_id = entt::hashed_string{name_str}.value(), \

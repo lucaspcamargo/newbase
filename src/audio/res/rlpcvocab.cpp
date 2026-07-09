@@ -155,6 +155,7 @@ void _rtti_init_audio_rlpcvocab()
         .type("rlpcvocab_ptr"_hs)
         .ctor<>()
         .custom<rtti::type_info>(rtti::type_info{
+            .identifier = "rlpcvocab_ptr",
             .type_class = rtti::TYPE_CLASS_RESOURCE_PTR,
             .data = {.resource_ptr = {
                 .resource_type_id = "rlpcvocab"_hs.value(),
