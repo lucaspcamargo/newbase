@@ -1,3 +1,10 @@
+// ATTENTION: This MCP server system has been majorly vibe-coded, and is
+// therefore, very ugly code. Lots of JSON built via string concatenation, a
+// hope, and a prayer. It can be much better once we standardize YAML/JSON
+// SerDe functionality for our RTTI system and types. That will be done when
+// scene saving/loading is properly implemented, completing the editor
+// workflow. Before that, we'll stick to this mess.
+
 #include <newbase/mcp/mcp.hpp>
 #include <newbase/log.hpp>
 #include <newbase/engine.hpp>
@@ -448,6 +455,143 @@ entt::meta_func find_func(entt::meta_type type, const std::string& func_name)
     return {};
 }
 
+const char* type_class_name(rtti::type_class_t tc)
+{
+    switch (tc)
+    {
+        case rtti::TYPE_CLASS_COMPONENT:    return "component";
+        case rtti::TYPE_CLASS_RESOURCE:     return "resource";
+        case rtti::TYPE_CLASS_SYSTEM:       return "system";
+        case rtti::TYPE_CLASS_SINGLETON:    return "singleton";
+        case rtti::TYPE_CLASS_RES_STORAGE:  return "res_storage";
+        case rtti::TYPE_CLASS_SERVICE:      return "service";
+        case rtti::TYPE_CLASS_RESOURCE_PTR: return "resource_ptr";
+        default:                            return "none";
+    }
+}
+
+// Links `child` under `parent` in the cstructure sibling-list tree (or
+// unlinks it if parent == entt::null), removing it from any previous
+// parent's child list first. Mirrors script_lua's entity_set_parent Lua
+// binding (script_lua.cpp) — duplicated rather than shared since that logic
+// lives inline in a lua_CFunction closure, not a reusable non-Lua-facing
+// helper.
+void reparent_entity(entt::registry& reg, entt::entity child, entt::entity parent)
+{
+    auto& cs = reg.get_or_emplace<cstructure>(child);
+
+    if (cs.parent != entt::null && reg.valid(cs.parent))
+    {
+        auto* ps = reg.try_get<cstructure>(cs.parent);
+        if (ps)
+        {
+            if (ps->first_child == child)
+            {
+                ps->first_child = cs.next_sibling;
+            }
+            else
+            {
+                entt::entity cur = ps->first_child;
+                while (cur != entt::null && reg.valid(cur))
+                {
+                    auto& sib = reg.get<cstructure>(cur);
+                    if (sib.next_sibling == child) { sib.next_sibling = cs.next_sibling; break; }
+                    cur = sib.next_sibling;
+                }
+            }
+        }
+    }
+    cs.next_sibling = entt::null;
+    cs.parent = parent;
+
+    if (parent != entt::null && reg.valid(parent))
+    {
+        auto& ps = reg.get_or_emplace<cstructure>(parent);
+        cs.next_sibling = ps.first_child;
+        ps.first_child  = child;
+    }
+}
+
+// Builds a full JSON dump of one entity: name/parent (if it has a
+// cstructure), every RTTI component attached and every one of its
+// supported top-level fields (same coverage as field_to_json; unsupported
+// fields are silently omitted rather than erroring out, since a dump should
+// be best-effort). If `recurse` is set, also recursively dumps the child
+// entities (via cstructure's sibling list) under "children".
+std::string dump_entity_json(entt::registry& reg, entt::entity eid, bool recurse)
+{
+    std::string out = "{\"entity\":" + std::to_string(entt::to_integral(eid));
+
+    cstructure* s = reg.try_get<cstructure>(eid);
+    if (s)
+    {
+        if (s->has_name())
+            out += ",\"name\":" + json_string(s->get_name());
+        if (s->parent != entt::null)
+            out += ",\"parent\":" + std::to_string(entt::to_integral(s->parent));
+    }
+
+    out += ",\"components\":[";
+    bool first_comp = true;
+    for (auto&& curr : reg.storage())
+    {
+        auto& storage = curr.second;
+        if (!storage.contains(eid))
+            continue;
+        auto comp_type = entt::resolve(curr.first);
+        if (comp_type.info() == entt::type_id<void>())
+            continue;
+        const rtti::type_info* info = comp_type.custom();
+        if (!info || info->type_class != rtti::TYPE_CLASS_COMPONENT)
+            continue;
+
+        if (!first_comp) out += ",";
+        first_comp = false;
+
+        void* void_val = storage.value(eid);
+        entt::meta_any comp_ref = comp_type.from_void(void_val);
+
+        out += "{\"name\":" + json_string(info->identifier.c_str()) + ",\"fields\":{";
+        bool first_field = true;
+        for (auto&& [did, d] : comp_ref.type().data())
+        {
+            const rtti::data_info* di = d.custom().operator const rtti::data_info*();
+            if (!di)
+                continue;
+            auto member = d.get(comp_ref);
+            std::string value_json = field_to_json(member);
+            if (value_json.empty())
+                continue;
+            if (!first_field) out += ",";
+            first_field = false;
+            out += json_string(di->identifier.c_str()) + ":" + value_json;
+        }
+        out += "}}";
+    }
+    out += "]";
+
+    if (recurse)
+    {
+        out += ",\"children\":[";
+        bool first_child = true;
+        if (s)
+        {
+            entt::entity cur = s->first_child;
+            while (cur != entt::null && reg.valid(cur))
+            {
+                if (!first_child) out += ",";
+                first_child = false;
+                out += dump_entity_json(reg, cur, true);
+                cur = reg.get<cstructure>(cur).next_sibling;
+            }
+        }
+        out += "]";
+    }
+
+    out += "}";
+    return out;
+}
+
 }
 
 mcp::mcp()
@@ -473,6 +617,12 @@ bool mcp::init(ryml::ConstNodeRef cfg)
 
     if (!cfg.invalid() && !cfg.empty() && cfg.has_child("port"))
         cfg["port"] >> _port;
+    if (!cfg.invalid() && !cfg.empty() && cfg.has_child("bind_host"))
+        cfg["bind_host"] >> _bind_host;
+
+    if (_bind_host != "127.0.0.1")
+        log::warn("[mcp] bind_host is '%s' — the MCP server is reachable from other machines. "
+                  "It has no authentication; only do this on a trusted network.", _bind_host.c_str());
 
     _register_builtin_tools();
 
@@ -488,9 +638,9 @@ bool mcp::init(ryml::ConstNodeRef cfg)
     });
 
     _svr_thread = std::thread([this]() {
-        log::info("[mcp] listening on 127.0.0.1:%d", _port);
-        if (!_svr->listen("127.0.0.1", _port))
-            log::error("[mcp] failed to bind 127.0.0.1:%d", _port);
+        log::info("[mcp] listening on %s:%d", _bind_host.c_str(), _port);
+        if (!_svr->listen(_bind_host.c_str(), _port))
+            log::error("[mcp] failed to bind %s:%d", _bind_host.c_str(), _port);
     });
 
     return true;
@@ -645,6 +795,113 @@ void mcp::_register_builtin_tools()
             }
 
             return ryml::emitrs_json<std::string>(out);
+        });
+
+    register_tool("entity_find",
+        "Finds the first entity in the default scene whose cstructure name matches exactly. "
+        "Argument: {\"name\": <string>}.",
+        "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"]}",
+        [](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            if (!aroot.has_child("name"))
+                return "{\"error\":\"missing 'name' argument\"}";
+            std::string name;
+            aroot["name"] >> name;
+
+            auto& reg = engine::instance().default_scene().registry();
+            for (auto [e, s] : reg.view<cstructure>().each())
+            {
+                if (s.has_name() && s.get_name() == name)
+                    return "{\"entity\":" + std::to_string(entt::to_integral(e)) + "}";
+            }
+            return "{\"entity\":null}";
+        });
+
+    register_tool("entity_create",
+        "Creates a new entity in the default scene. Argument: {\"name\": <optional string>, "
+        "\"parent\": <optional integer entity id>}. A cstructure is only attached if a name "
+        "and/or parent is given. Returns {\"entity\": <new entity id>}.",
+        "{\"type\":\"object\",\"properties\":{"
+        "\"name\":{\"type\":\"string\"},"
+        "\"parent\":{\"type\":\"integer\"}"
+        "}}",
+        [](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            uint32_t raw_parent = 0;
+            bool has_parent = aroot.has_child("parent");
+            if (has_parent && !read_uint32(aroot["parent"], &raw_parent))
+                return "{\"error\":\"malformed 'parent' argument\"}";
+
+            auto& reg = engine::instance().default_scene().registry();
+            if (has_parent && !reg.valid(static_cast<entt::entity>(raw_parent)))
+                return "{\"error\":\"no such parent entity\"}";
+
+            entt::entity eid = reg.create();
+
+            std::string name;
+            bool has_name = aroot.has_child("name");
+            if (has_name)
+                aroot["name"] >> name;
+
+            if (has_name)
+                reg.get_or_emplace<cstructure>(eid).set_name(name);
+            if (has_parent)
+                reparent_entity(reg, eid, static_cast<entt::entity>(raw_parent));
+
+            return "{\"entity\":" + std::to_string(entt::to_integral(eid)) + "}";
+        });
+
+    register_tool("entity_destroy",
+        "Queues an entity in the default scene for destruction. It is actually destroyed at the "
+        "end of the next PREPARE phase, not immediately. Argument: {\"entity\": <integer "
+        "entity id>}.",
+        "{\"type\":\"object\",\"properties\":{\"entity\":{\"type\":\"integer\"}},\"required\":[\"entity\"]}",
+        [](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            uint32_t raw_id = 0;
+            if (!aroot.has_child("entity") || !read_uint32(aroot["entity"], &raw_id))
+                return "{\"error\":\"missing or malformed 'entity' argument\"}";
+            auto eid = static_cast<entt::entity>(raw_id);
+
+            auto& reg = engine::instance().default_scene().registry();
+            if (!reg.valid(eid))
+                return "{\"error\":\"no such entity\"}";
+
+            engine::instance().default_scene().queue_destroy(eid);
+            return "{\"ok\":true}";
         });
 
     register_tool("entity_component_list",
@@ -811,6 +1068,45 @@ void mcp::_register_builtin_tools()
                 return std::string("{\"error\":") + json_string(error) + "}";
 
             return "{\"ok\":true}";
+        });
+
+    register_tool("entity_dump",
+        "Full dump of an entity in the default scene: name, parent, every RTTI component "
+        "attached, and every one of its supported top-level fields (same coverage as "
+        "entity_field_get; unsupported fields, e.g. nested structs, are silently omitted). "
+        "Argument: {\"entity\": <integer entity id>, \"children\": <optional bool, default "
+        "false; recursively dump child entities too, nested under \"children\">}.",
+        "{\"type\":\"object\",\"properties\":{"
+        "\"entity\":{\"type\":\"integer\"},"
+        "\"children\":{\"type\":\"boolean\"}"
+        "},\"required\":[\"entity\"]}",
+        [](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            uint32_t raw_id = 0;
+            if (!aroot.has_child("entity") || !read_uint32(aroot["entity"], &raw_id))
+                return "{\"error\":\"missing or malformed 'entity' argument\"}";
+            auto eid = static_cast<entt::entity>(raw_id);
+
+            bool recurse = false;
+            if (aroot.has_child("children"))
+                aroot["children"] >> recurse;
+
+            auto& reg = engine::instance().default_scene().registry();
+            if (!reg.valid(eid))
+                return "{\"error\":\"no such entity\"}";
+
+            return dump_entity_json(reg, eid, recurse);
         });
 
     register_tool("sys_function_list",
@@ -1004,6 +1300,92 @@ void mcp::_register_builtin_tools()
             std::string inner_args = "{\"system\":\"script_lua\",\"function\":\"eval\",\"args\":[" +
                                       json_string(code) + "]}";
             return it->second.fn(inner_args);
+        });
+
+    register_tool("rtti_dump",
+        "Enumerates RTTI-registered types (components, resources, systems, etc.) with their "
+        "fields and functions. Arguments: {\"type_class\": <optional string; one of "
+        "\"component\", \"resource\", \"system\", \"singleton\", \"res_storage\", \"service\", "
+        "\"resource_ptr\">, \"name\": <optional string; exact RTTI identifier, restricts to a "
+        "single type>}.",
+        "{\"type\":\"object\",\"properties\":{"
+        "\"type_class\":{\"type\":\"string\"},"
+        "\"name\":{\"type\":\"string\"}"
+        "}}",
+        [](const std::string& args_json) -> std::string {
+            ryml::ConstNodeRef aroot;
+            ryml::Tree atree;
+            try
+            {
+                atree = parse_json_safe(args_json);
+                aroot = atree.rootref();
+            }
+            catch (const std::exception& e)
+            {
+                return std::string("{\"error\":") + json_string(std::string("invalid arguments: ") + e.what()) + "}";
+            }
+
+            std::string filter_class, filter_name;
+            if (aroot.has_child("type_class"))
+                aroot["type_class"] >> filter_class;
+            if (aroot.has_child("name"))
+                aroot["name"] >> filter_name;
+
+            std::string types_json = "[";
+            bool first_type = true;
+            for (auto&& [cpp_id, type] : entt::resolve())
+            {
+                const rtti::type_info* info = type.custom();
+                if (!info || info->type_class == rtti::TYPE_CLASS_NONE)
+                    continue;
+                if (!filter_class.empty() && filter_class != type_class_name(info->type_class))
+                    continue;
+                if (!filter_name.empty() && filter_name != info->identifier.c_str())
+                    continue;
+
+                if (!first_type) types_json += ",";
+                first_type = false;
+
+                types_json += "{\"identifier\":" + json_string(info->identifier.c_str()) +
+                              ",\"type_class\":" + json_string(type_class_name(info->type_class));
+
+                types_json += ",\"fields\":[";
+                bool first_field = true;
+                for (auto&& [did, d] : type.data())
+                {
+                    const rtti::data_info* di = d.custom().operator const rtti::data_info*();
+                    if (!di)
+                        continue;
+                    if (!first_field) types_json += ",";
+                    first_field = false;
+                    types_json += "{\"identifier\":" + json_string(di->identifier.c_str());
+                    if (di->subtype == rtti::DATA_SUBTYPE_RESOURCE)
+                        types_json += ",\"subtype\":\"resource\"";
+                    else if (di->subtype == rtti::DATA_SUBTYPE_COLOR)
+                        types_json += ",\"subtype\":\"color\"";
+                    types_json += "}";
+                }
+                types_json += "]";
+
+                types_json += ",\"functions\":[";
+                bool first_func = true;
+                for (auto&& [fhash, f] : type.func())
+                {
+                    const rtti::func_info* fi = f.custom();
+                    if (!fi)
+                        continue;
+                    if (!first_func) types_json += ",";
+                    first_func = false;
+                    types_json += "{\"identifier\":" + json_string(fi->identifier.c_str()) +
+                                  ",\"arity\":" + std::to_string((uint32_t)f.arity()) + "}";
+                }
+                types_json += "]";
+
+                types_json += "}";
+            }
+            types_json += "]";
+
+            return "{\"types\":" + types_json + "}";
         });
 }
 

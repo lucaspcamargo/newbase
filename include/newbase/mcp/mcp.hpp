@@ -76,6 +76,7 @@ private:
 
     std::unique_ptr<httplib::Server> _svr;
     std::thread                      _svr_thread;
+    std::string                      _bind_host {"127.0.0.1"};
     int                               _port {8765};
 
     std::mutex                       _pending_mtx;
