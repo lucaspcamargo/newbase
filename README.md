@@ -3,8 +3,8 @@
 ![icon](res/_nb_core/icon.svg)
 
 
-<!-- repo not yet public, may be in the future, then badge can be added : ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
-![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)-->
+![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
+![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)
 
 A *new base* for making games and interactive stuff. Early release — usable, but evolving.
 
@@ -159,15 +159,6 @@ we also use the following tools during build time:
 
 All of the Python dependencies are listed under `scripts/requirements.txt`, for easy virtual environment setup.
 
-## Source Code
-
-Not publicly available yet. A release is planned once the engine matures further. Upon request, I can make the source available. Just ping me ^^
-
-> Looking for a production-ready game engine? [Godot](https://godotengine.org/) is a great choice.
-
-
-<!--
-
 ## Building
 
 CMake is the main build tool for this project. Python 3 is also a build-time dependency, as described above.
@@ -244,11 +235,9 @@ Look into the Emscripten documentation for more details.
 
 You can set these options when running `cmake` by passing `-DOPTION=VALUE`.
 
--->
-
 ## License
 
-This project will be licensed under the BSD 3-Clause license, when released. <!--See [LICENSE](LICENSE) for details.-->
+This project is licensed under the BSD 3-Clause license. See [LICENSE](LICENSE) for details.
 
 ## Get in Touch
 
