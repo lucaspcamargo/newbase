@@ -3,6 +3,7 @@
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_video.h> // SDL_GetWindowFromID/SDL_GetWindowSize, to turn normalized finger coords into window pixels
 #include <entt/entt.hpp>
 #include <unordered_map>
 
@@ -13,6 +14,7 @@ static gamepad_button _conv_gp_button(SDL_GamepadButton btn);
 static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis);
 static void _apply_dir_axis(glm::vec3 &arr, input_axis axis, float value);
 static void _apply_dir(glm::vec3 &arr, input_direction dir);
+static glm::vec2 _finger_to_window_pos(const SDL_TouchFingerEvent &tf);
 
 struct gamepad_data
 {
@@ -44,6 +46,13 @@ struct nb::input_p
     std::set<SDL_Scancode> kbd_was_pressed;
     std::set<SDL_Scancode> kbd_was_released;
     std::unordered_map<SDL_Scancode, uint64_t> kbd_when_pressed_ns;
+
+    // buffered mouse/touch pointer state
+    pointer_state pointer;
+    bool pointer_pending_pressed {false};
+    bool pointer_pending_released {false};
+    SDL_FingerID active_finger {0};
+    bool has_active_finger {false};
 };
 
 input::input()
@@ -170,6 +179,12 @@ bool input::step(step_phase phase)
             }
         }
         
+        // present pointer transitions buffered since the last frame, then reset them
+        _d->pointer.was_pressed = _d->pointer_pending_pressed;
+        _d->pointer.was_released = _d->pointer_pending_released;
+        _d->pointer_pending_pressed = false;
+        _d->pointer_pending_released = false;
+
         // cleanup stored states for further events
         _d->kbd_was_pressed.clear();
         _d->kbd_was_released.clear();
@@ -275,6 +290,65 @@ bool input::event(SDL_Event *evt)
         _d->kbd_is_pressed.erase(sc);
         _d->kbd_was_released.insert(sc);
     }
+    else if(evt->type == SDL_EVENT_MOUSE_MOTION)
+    {
+        // ignore synthetic mouse motion generated from touch — real finger events drive the pointer instead
+        if(evt->motion.which != SDL_TOUCH_MOUSEID)
+        {
+            _d->pointer.position = {evt->motion.x, evt->motion.y};
+        }
+    }
+    else if(evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+    {
+        if(evt->button.which != SDL_TOUCH_MOUSEID && evt->button.button == SDL_BUTTON_LEFT)
+        {
+            _d->pointer.position = {evt->button.x, evt->button.y};
+            _d->pointer.is_pressed = true;
+            _d->pointer_pending_pressed = true;
+            log::verb("[input] pointer pressed: (%f, %f)", _d->pointer.position.x, _d->pointer.position.y);
+        }
+    }
+    else if(evt->type == SDL_EVENT_MOUSE_BUTTON_UP)
+    {
+        if(evt->button.which != SDL_TOUCH_MOUSEID && evt->button.button == SDL_BUTTON_LEFT)
+        {
+            _d->pointer.position = {evt->button.x, evt->button.y};
+            _d->pointer.is_pressed = false;
+            _d->pointer_pending_released = true;
+            log::verb("[input] pointer released: (%f, %f)", _d->pointer.position.x, _d->pointer.position.y);
+        }
+    }
+    else if(evt->type == SDL_EVENT_FINGER_DOWN)
+    {
+        // track the first finger to touch down as the primary pointer; ignore additional fingers
+        if(!_d->has_active_finger)
+        {
+            _d->has_active_finger = true;
+            _d->active_finger = evt->tfinger.fingerID;
+            _d->pointer.position = _finger_to_window_pos(evt->tfinger);
+            _d->pointer.is_pressed = true;
+            _d->pointer_pending_pressed = true;
+            log::verb("[input] finger pressed: (%f, %f)", _d->pointer.position.x, _d->pointer.position.y);
+        }
+    }
+    else if(evt->type == SDL_EVENT_FINGER_MOTION)
+    {
+        if(_d->has_active_finger && evt->tfinger.fingerID == _d->active_finger)
+        {
+            _d->pointer.position = _finger_to_window_pos(evt->tfinger);
+        }
+    }
+    else if(evt->type == SDL_EVENT_FINGER_UP || evt->type == SDL_EVENT_FINGER_CANCELED)
+    {
+        if(_d->has_active_finger && evt->tfinger.fingerID == _d->active_finger)
+        {
+            _d->has_active_finger = false;
+            _d->pointer.position = _finger_to_window_pos(evt->tfinger);
+            _d->pointer.is_pressed = false;
+            _d->pointer_pending_released = true;
+            log::verb("[input] finger released: (%f, %f)", _d->pointer.position.x, _d->pointer.position.y);
+        }
+    }
 
     return true;
 }
@@ -373,6 +447,26 @@ glm::vec3 input::action_direction(entt::id_type action_id)
         return it->second.direction;
     }
     return {.0f, .0f, .0f};
+}
+
+glm::vec2 input::pointer_position() const
+{
+    return _d->pointer.position;
+}
+
+bool input::pointer_is_pressed() const
+{
+    return _d->pointer.is_pressed;
+}
+
+bool input::pointer_was_pressed() const
+{
+    return _d->pointer.was_pressed;
+}
+
+bool input::pointer_was_released() const
+{
+    return _d->pointer.was_released;
 }
 
 void input::gamepad_add(uint32_t joy_id)
@@ -605,6 +699,14 @@ extern "C" void _rtti_init_input()
             .custom<rtti::func_info>(rtti::func_info{"action_was_released"})
         .func<&nb::input::action_direction>("action_direction"_hs)
             .custom<rtti::func_info>(rtti::func_info{"action_direction"})
+        .func<&nb::input::pointer_position>("pointer_position"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"pointer_position"})
+        .func<&nb::input::pointer_is_pressed>("pointer_is_pressed"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"pointer_is_pressed"})
+        .func<&nb::input::pointer_was_pressed>("pointer_was_pressed"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"pointer_was_pressed"})
+        .func<&nb::input::pointer_was_released>("pointer_was_released"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"pointer_was_released"})
         .func<&nb::input::rumble>("rumble"_hs)
             .custom<rtti::func_info>(rtti::func_info{"rumble"});
     entt::meta_factory<std::shared_ptr<nb::input>>{rtti::ctx_systems()}
@@ -723,4 +825,13 @@ static void _apply_dir(glm::vec3 &arr, input_direction dir)
             arr[2] -= 1.0f;
             return;
     }
+}
+
+static glm::vec2 _finger_to_window_pos(const SDL_TouchFingerEvent &tf)
+{
+    int w = 0, h = 0;
+    SDL_Window *win = SDL_GetWindowFromID(tf.windowID);
+    if(win)
+        SDL_GetWindowSize(win, &w, &h);
+    return {tf.x * static_cast<float>(w), tf.y * static_cast<float>(h)};
 }

@@ -40,6 +40,14 @@ public:
     bool action_was_released(entt::id_type action_id);
     glm::vec3 action_direction(entt::id_type action_id);
 
+    // unified mouse/touch pointer, in window logical pixels (origin top-left).
+    // touch is tracked via the first active finger; scripts wanting world-space
+    // coordinates should convert via the renderer_service's 2D extents.
+    glm::vec2 pointer_position() const;
+    bool pointer_is_pressed() const;
+    bool pointer_was_pressed() const;
+    bool pointer_was_released() const;
+
     // we need api to identify different input devices
     // so that it can be assigned to different players
     // and also action state per player, which changes the above

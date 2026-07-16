@@ -116,4 +116,15 @@ struct input_action_state
     glm::vec3 direction {.0f, .0f, .0f};
 };
 
+// unified mouse/touch pointer state, in window logical pixels.
+// mouse and single-finger touch both drive the same pointer, so
+// script-driven dragging (e.g. physics2d body dragging) works with either.
+struct pointer_state
+{
+    glm::vec2 position {0.0f, 0.0f};
+    bool is_pressed {false};
+    bool was_pressed {false};
+    bool was_released {false};
+};
+
 }

@@ -37,7 +37,9 @@ void _rtti_init_services()
         .data<&nb::renderer_service::extents_2d::top>("top"_hs)
         .data<&nb::renderer_service::extents_2d::right>("right"_hs)
         .data<&nb::renderer_service::extents_2d::bottom>("bottom"_hs)
-        .data<&nb::renderer_service::extents_2d::ui_scale>("ui_scale"_hs);
+        .data<&nb::renderer_service::extents_2d::ui_scale>("ui_scale"_hs)
+        .data<&nb::renderer_service::extents_2d::screen_x>("screen_x"_hs)
+        .data<&nb::renderer_service::extents_2d::screen_y>("screen_y"_hs);
 
     entt::meta_factory<nb::renderer_service>{}
         .type("renderer_service"_hs)

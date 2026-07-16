@@ -439,6 +439,15 @@ void script_lua::bind_global_api()
     });
     lua_setglobal(_d->L, "hs");
 
+    // ENTITY_NULL -- sentinel returned (as a plain integer) for "no entity" by system
+    // functions returning entt::entity through the generic RTTI binding path, e.g.
+    // physics2d_point_query. Scripts should compare against this instead of truthiness.
+    {
+        entt::entity null_ent = entt::null;
+        lua_pushinteger(_d->L, (lua_Integer)entt::to_integral(null_ent));
+    }
+    lua_setglobal(_d->L, "ENTITY_NULL");
+
     // engine: non-owning reference to nb::engine::instance()
     lua::push_meta_any(_d->L, entt::forward_as_meta(engine::instance()));
     lua_setglobal(_d->L, "engine");

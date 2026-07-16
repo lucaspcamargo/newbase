@@ -58,6 +58,27 @@ struct nb::physics2d_p
     struct contact_pair { entt::entity a; entt::entity b; };
     std::vector<contact_pair> contact_begins {};
 
+    // script-driven drags: a kinematic anchor body chases a moving target point, and a motor
+    // joint pulls the dragged body toward the anchor (same approach as the Box2D "mouse joint" sample)
+    struct drag_t
+    {
+        b2BodyId anchor {b2_nullBodyId};
+        b2JointId joint {b2_nullJointId};
+        glm::vec2 target {0.f, 0.f};
+    };
+    std::unordered_map<int, drag_t> drags {};
+    int next_drag_id {0};
+
+    void drag_destroy(drag_t &drag)
+    {
+        if(B2_IS_NON_NULL(drag.joint))
+            b2DestroyJoint(drag.joint, true);
+        if(B2_IS_NON_NULL(drag.anchor))
+            b2DestroyBody(drag.anchor);
+        drag.joint = b2_nullJointId;
+        drag.anchor = b2_nullBodyId;
+    }
+
     // signal receiver: called synchronously before cbody2d component data is freed
     void on_body_destroy(entt::registry &reg, entt::entity eid)
     {
@@ -203,6 +224,22 @@ bool physics2d::step(step_phase phase)
         const int substeps = 4;
         const float dt = entt::locator<nb::clock*>::has_value()
             ? entt::locator<nb::clock*>::value()->get_dt() : (1.0f/60.0f);
+
+        // drive active drag anchors toward their current target before stepping the world
+        for(auto it = _d->drags.begin(); it != _d->drags.end(); )
+        {
+            auto &drag = it->second;
+            if(B2_IS_NULL(drag.joint) || !b2Joint_IsValid(drag.joint))
+            {
+                // dragged body (or the world) was destroyed out from under us
+                _d->drag_destroy(drag);
+                it = _d->drags.erase(it);
+                continue;
+            }
+            if(dt > 0.f)
+                b2Body_SetTargetTransform(drag.anchor, b2Transform{{drag.target.x, drag.target.y}, b2Rot_identity}, dt);
+            ++it;
+        }
 
         if(B2_IS_NON_NULL(_d->world_id))
         {
@@ -685,6 +722,100 @@ glm::vec4 physics2d::raycast(float x1, float y1, float x2, float y2, uint64_t ma
     return {r.fraction, r.normal.x, r.normal.y, 0.f};
 }
 
+namespace
+{
+    struct point_query_ctx { b2Vec2 point; b2BodyId body_id {b2_nullBodyId}; };
+
+    bool _point_query_cb(b2ShapeId shape_id, void *raw)
+    {
+        auto *ctx = static_cast<point_query_ctx*>(raw);
+        if (!b2Shape_TestPoint(shape_id, ctx->point)) return true;
+        ctx->body_id = b2Shape_GetBody(shape_id);
+        return false; // stop at first (topmost) hit
+    }
+}
+
+entt::entity physics2d::point_query(glm::vec2 world_point, uint64_t mask) const
+{
+    if (B2_IS_NULL(_d->world_id)) return entt::null;
+
+    b2Vec2 p {world_point.x, world_point.y};
+    b2Vec2 d {0.001f, 0.001f};
+    b2AABB box {b2Sub(p, d), b2Add(p, d)};
+
+    b2QueryFilter filter = b2DefaultQueryFilter();
+    filter.maskBits = mask;
+
+    point_query_ctx ctx {p, b2_nullBodyId};
+    b2World_OverlapAABB(_d->world_id, box, filter, _point_query_cb, &ctx);
+    if (B2_IS_NULL(ctx.body_id)) return entt::null;
+
+    auto it = _d->body_entt.find(ctx.body_id);
+    return it != _d->body_entt.end() ? it->second : entt::null;
+}
+
+int physics2d::drag_begin(entt::entity ent, glm::vec2 world_point, float force_scale)
+{
+    if (B2_IS_NULL(_d->world_id)) return -1;
+
+    auto &reg = engine::instance().default_scene().registry();
+    auto *cbody = reg.try_get<cbody2d>(ent);
+    if (!cbody || !B2_IS_NON_NULL(cbody->_body_id))
+    {
+        log::warn("[physics2d] drag_begin: no physics body: %x", ent);
+        return -1;
+    }
+
+    b2Vec2 p {world_point.x, world_point.y};
+
+    b2BodyDef anchor_def = b2DefaultBodyDef();
+    anchor_def.type = b2_kinematicBody;
+    anchor_def.position = p;
+    anchor_def.enableSleep = false;
+    b2BodyId anchor = b2CreateBody(_d->world_id, &anchor_def);
+
+    b2MotorJointDef joint_def = b2DefaultMotorJointDef();
+    joint_def.base.bodyIdA = anchor;
+    joint_def.base.bodyIdB = cbody->_body_id;
+    joint_def.base.localFrameB.p = b2Body_GetLocalPoint(cbody->_body_id, p);
+    joint_def.linearHertz = 7.5f;
+    joint_def.linearDampingRatio = 1.0f;
+
+    b2MassData mass_data = b2Body_GetMassData(cbody->_body_id);
+    float g = b2Length(b2World_GetGravity(_d->world_id));
+    float mg = mass_data.mass * (g > 0.f ? g : 10.0f); // fall back to a nominal g so zero/no-gravity worlds still get a usable drag force
+    joint_def.maxSpringForce = force_scale * mg;
+    if (mass_data.mass > 0.0f)
+    {
+        // acts like angular friction, keeping the dragged body from spinning freely
+        float lever = sqrtf(mass_data.rotationalInertia / mass_data.mass);
+        joint_def.maxVelocityTorque = 0.25f * lever * mg;
+    }
+
+    b2JointId joint = b2CreateMotorJoint(_d->world_id, &joint_def);
+    b2Body_SetAwake(cbody->_body_id, true);
+
+    int drag_id = _d->next_drag_id++;
+    _d->drags.emplace(drag_id, physics2d_p::drag_t{anchor, joint, world_point});
+    return drag_id;
+}
+
+bool physics2d::drag_update(int drag_id, glm::vec2 world_point)
+{
+    auto it = _d->drags.find(drag_id);
+    if (it == _d->drags.end()) return false;
+    it->second.target = world_point;
+    return true;
+}
+
+void physics2d::drag_end(int drag_id)
+{
+    auto it = _d->drags.find(drag_id);
+    if (it == _d->drags.end()) return;
+    _d->drag_destroy(it->second);
+    _d->drags.erase(it);
+}
+
 // RTTI metadata
 extern "C" void _rtti_init_physics2d()
 {
@@ -723,7 +854,15 @@ extern "C" void _rtti_init_physics2d()
         .func<&nb::physics2d::character_warp>("character_warp"_hs)
             .custom<rtti::func_info>(rtti::func_info{"character_warp"})
         .func<&nb::physics2d::raycast>("raycast"_hs)
-            .custom<rtti::func_info>(rtti::func_info{"raycast"});
+            .custom<rtti::func_info>(rtti::func_info{"raycast"})
+        .func<&nb::physics2d::point_query>("point_query"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"point_query"})
+        .func<&nb::physics2d::drag_begin>("drag_begin"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"drag_begin"})
+        .func<&nb::physics2d::drag_update>("drag_update"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"drag_update"})
+        .func<&nb::physics2d::drag_end>("drag_end"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"drag_end"});
     entt::meta_factory<std::shared_ptr<nb::physics2d>>{rtti::ctx_systems()}
         .type("physics2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::physics2d>>()

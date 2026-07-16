@@ -51,6 +51,17 @@ public:
     // world-space raycast; returns vec4(fraction, nx, ny, 0) or vec4(-1,0,0,0) on miss
     glm::vec4 raycast(float x1, float y1, float x2, float y2, uint64_t mask) const;
 
+    // world-space point query; returns the topmost entity with a body/shape overlapping the
+    // point, or entt::null if none. Intended for script-driven picking (e.g. mouse/touch drag).
+    entt::entity point_query(glm::vec2 world_point, uint64_t mask = 0xffffffffffffffffull) const;
+
+    // script-driven dragging: creates a kinematic anchor body at world_point and a motor joint
+    // pulling ent's body toward it, mimicking the official Box2D "mouse joint" sample. Returns a
+    // drag handle (>=0) to pass to drag_update/drag_end, or -1 on failure.
+    int  drag_begin(entt::entity ent, glm::vec2 world_point, float force_scale = 100.0f);
+    bool drag_update(int drag_id, glm::vec2 world_point);
+    void drag_end(int drag_id);
+
 private:
     void _draw_tool_window(bool *close);
     void _step_characters(entt::registry &reg, float dt);
