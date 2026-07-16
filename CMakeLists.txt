@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # core vars and options
-set(NEWBASE_VERSION "0.0.0")  # TODO - get from git somehow
+set(NEWBASE_VERSION "0.1.0")  # TODO - get from git somehow
 set(NEWBASE_LOG_LEVEL "DEBUG" CACHE STRING "Minimum log level to compile in. Lower log levels are removed from binary.")
 option(NEWBASE_LTO "Enable LTO if available" OFF)
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
