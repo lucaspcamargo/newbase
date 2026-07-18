@@ -86,6 +86,9 @@
     #fullscreen-btn:hover {
       background: rgba(255, 255, 255, 0.12);
     }
+    #fullscreen-btn.nb-hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -108,6 +111,22 @@
       var statusEl = document.getElementById('loading-status');
       var fillEl   = document.getElementById('progress-fill');
       var fsBtn    = document.getElementById('fullscreen-btn');
+
+      // Embedders (e.g. an iframe host page) can hide the fullscreen button by
+      // launching this page with ?nb_fullscreen_btn=0, or at any time by posting
+      // {nbFullscreenBtn: false} to this window (origin is not checked since the
+      // toggle carries no sensitive data).
+      function setFullscreenBtnVisible(visible) {
+        fsBtn.classList.toggle('nb-hidden', !visible);
+      }
+      if (/[?&]nb_fullscreen_btn=0\b/.test(window.location.search)) {
+        setFullscreenBtnVisible(false);
+      }
+      window.addEventListener('message', function (e) {
+        if (e.data && typeof e.data === 'object' && 'nbFullscreenBtn' in e.data) {
+          setFullscreenBtnVisible(!!e.data.nbFullscreenBtn);
+        }
+      });
 
       fsBtn.addEventListener('click', function () {
         if (!document.fullscreenElement) {
@@ -133,9 +152,50 @@
         document.getElementById('canvas').focus();
       }
 
-      // start indeterminate animation immediately — for now, files are embedded so
-      // there is no separate download; setStatus will not provide (n/total) numbers.
-      fillEl.classList.add('indeterminate');
+      // Embedders that know the uncompressed .wasm size up front (e.g. because they
+      // built it) can pass ?nb_wasm_size_hint=<bytes> so the progress bar reflects
+      // actual download progress instead of an indeterminate animation. This is
+      // necessary because CDNs commonly serve the file brotli/gzip-compressed
+      // without a Content-Length header (the compressed size isn't known ahead of
+      // time), so we can't infer the total from the response itself.
+      var wasmSizeHint = 0;
+      var sizeHintMatch = /[?&]nb_wasm_size_hint=(\d+)\b/.exec(window.location.search);
+      if (sizeHintMatch) wasmSizeHint = parseInt(sizeHintMatch[1], 10);
+
+      if (wasmSizeHint > 0) {
+        var nativeFetch = window.fetch;
+        window.fetch = function (input, init) {
+          var url = (typeof input === 'string') ? input : input.url;
+          if (!/\.wasm(\?|$)/.test(url)) return nativeFetch(input, init);
+          return nativeFetch(input, init).then(function (response) {
+            if (!response.body) return response;
+            var received = 0;
+            var reader = response.body.getReader();
+            var stream = new ReadableStream({
+              pull: function (controller) {
+                return reader.read().then(function (result) {
+                  if (result.done) { controller.close(); return; }
+                  received += result.value.byteLength;
+                  // clamp below 100% — compilation/instantiation still follows the download
+                  var pct = Math.min(99, Math.floor(received / wasmSizeHint * 100));
+                  fillEl.style.width = pct + '%';
+                  statusEl.textContent = 'Downloading… ' + pct + '%';
+                  controller.enqueue(result.value);
+                });
+              }
+            });
+            return new Response(stream, {
+              headers: response.headers,
+              status: response.status,
+              statusText: response.statusText
+            });
+          });
+        };
+      } else {
+        // no size hint — fall back to an indeterminate animation since setStatus
+        // will not provide (n/total) numbers for embedded/streamed files.
+        fillEl.classList.add('indeterminate');
+      }
 
       window.Module = {
         canvas: document.getElementById('canvas'),

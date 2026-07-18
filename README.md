@@ -20,6 +20,8 @@ Here's a build of the engine's `demo` app, that you can run right away:
     :entry: demo/newbase_demo.html
     :caption: $FILENAME_NO_EXT$ ($DATE$)
     :aspect-ratio: 16/9
+    :url-params: nb_fullscreen_btn=0
+    :size-hint-param: newbase_demo.wasm->nb_wasm_size_hint
 ```
 
 *Nice. (I hope? Please let me know is something is amiss. Works on my machine :)*
