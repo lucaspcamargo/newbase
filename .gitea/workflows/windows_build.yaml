@@ -11,6 +11,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Compute artifact ref label
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            "REF_LABEL=$env:GITHUB_REF_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            "REF_LABEL=$($env:GITHUB_SHA.Substring(0,8))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+
       - name: Setup MSVC dev environment
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -50,5 +58,5 @@ jobs:
       - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
-          name: newbase_windows_msvc_amd64_${{ github.head_ref }}_${{ github.sha }}
+          name: newbase_windows_msvc_amd64_${{ github.head_ref }}_${{ env.REF_LABEL }}
           path: build/install

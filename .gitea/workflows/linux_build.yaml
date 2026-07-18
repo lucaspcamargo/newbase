@@ -10,6 +10,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Compute artifact ref label
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "REF_LABEL=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "REF_LABEL=$(echo "$GITHUB_SHA" | cut -c1-8)" >> "$GITHUB_ENV"
+          fi
       - name: Setup build deps
         run: |
           cat /etc/os-release
@@ -54,5 +61,5 @@ jobs:
       - name: Upload install artifact
         uses: https://gitea.com/actions/gitea-upload-artifact@v4
         with:
-          name: newbase_linux_amd64_${{ github.head_ref }}_${{ github.sha }}
+          name: newbase_linux_amd64_${{ github.head_ref }}_${{ env.REF_LABEL }}
           path: build/install
