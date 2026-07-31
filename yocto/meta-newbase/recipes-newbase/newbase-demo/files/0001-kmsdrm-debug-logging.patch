@@ -1,0 +1,131 @@
+Upstream-Status: Inappropriate [debug-only]
+
+kmsdrm/video driver-selection debug logging, temporary for RPi5 kmsdrm
+bring-up. Elevates the previously-silent/LogDebug-only branches in
+SDL_VideoInit's driver-selection loop and kmsdrm's get_driindex() (DRM
+master denial, unusable connectors, per-device open/resource failures,
+final "nothing found" summary) to SDL_LogError so they show on stderr by
+default with no SDL_LOGGING hint needed. Also logs the real
+SDL_GetError() from SDL_EGL_LoadLibrary() in KMSDRM_CreateWindow() before
+it gets overwritten by the generic "Can't load EGL/GL library on window
+creation." error. Drop this patch once the kmsdrm bring-up issues are
+diagnosed.
+
+diff --git a/vendored/SDL/src/video/SDL_video.c b/vendored/SDL/src/video/SDL_video.c
+index 588f61d18..bd02fa0ec 100644
+--- a/vendored/SDL/src/video/SDL_video.c
++++ b/vendored/SDL/src/video/SDL_video.c
+@@ -668,10 +668,13 @@ bool SDL_VideoInit(const char *driver_name)
+                 if (!bootstrap[i]->is_preferred &&
+                     (driver_attempt_len == SDL_strlen(bootstrap[i]->name)) &&
+                     (SDL_strncasecmp(bootstrap[i]->name, driver_attempt, driver_attempt_len) == 0)) {
++                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Trying video driver '%s'...", bootstrap[i]->name);
+                     video = bootstrap[i]->create();
+                     if (video) {
++                        SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Video driver '%s' initialized successfully", bootstrap[i]->name);
+                         break;
+                     }
++                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Video driver '%s' failed: %s", bootstrap[i]->name, SDL_GetError());
+                 }
+             }
+ 
+@@ -679,10 +682,13 @@ bool SDL_VideoInit(const char *driver_name)
+         }
+     } else {
+         for (i = 0; bootstrap[i]; ++i) {
++            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Trying video driver '%s'...", bootstrap[i]->name);
+             video = bootstrap[i]->create();
+             if (video) {
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Video driver '%s' initialized successfully", bootstrap[i]->name);
+                 break;
+             }
++            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Video driver '%s' failed: %s", bootstrap[i]->name, SDL_GetError());
+         }
+     }
+     if (video) {
+diff --git a/vendored/SDL/src/video/kmsdrm/SDL_kmsdrmvideo.c b/vendored/SDL/src/video/kmsdrm/SDL_kmsdrmvideo.c
+index 7d5c13e19..3da655f7c 100644
+--- a/vendored/SDL/src/video/kmsdrm/SDL_kmsdrmvideo.c
++++ b/vendored/SDL/src/video/kmsdrm/SDL_kmsdrmvideo.c
+@@ -118,7 +118,7 @@ static int get_driindex(void)
+                 if (SDL_KMSDRM_LoadSymbols()) {
+                     drmModeRes *resources = KMSDRM_drmModeGetResources(drm_fd);
+                     if (resources) {
+-                        SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO,
++                        SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
+                                      "%s%d connector, encoder and CRTC counts are: %d %d %d",
+                                      kmsdrm_dri_cardpath, devindex,
+                                      resources->count_connectors,
+@@ -154,26 +154,56 @@ static int get_driindex(void)
+ 
+                                     if (!access_denied) {
+                                         available = devindex;
++                                    } else {
++                                        SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                                                     "%s%d connector %u is connected but DRM master could not be obtained (EACCES) -- is something else (Xorg, another compositor, a getty on this vt) already holding DRM master?",
++                                                     kmsdrm_dri_cardpath, devindex, resources->connectors[i]);
+                                     }
++                                } else {
++                                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                                                 "%s%d connector %u not usable (connection=%d, count_modes=%d)",
++                                                 kmsdrm_dri_cardpath, devindex, resources->connectors[i],
++                                                 conn->connection, conn->count_modes);
+                                 }
+ 
+                                 KMSDRM_drmModeFreeConnector(conn);
+                             }
++                        } else {
++                            SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                                         "%s%d has no usable connectors/encoders/crtcs (counts: %d %d %d)",
++                                         kmsdrm_dri_cardpath, devindex,
++                                         resources->count_connectors,
++                                         resources->count_encoders,
++                                         resources->count_crtcs);
+                         }
+                         KMSDRM_drmModeFreeResources(resources);
++                    } else {
++                        SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                                     "%s%d opened fine but drmModeGetResources() failed, errno: %d",
++                                     kmsdrm_dri_cardpath, devindex, errno);
+                     }
+                     SDL_KMSDRM_UnloadSymbols();
++                } else {
++                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                                 "%s opened fine but SDL_KMSDRM_LoadSymbols() failed: %s",
++                                 device, SDL_GetError());
+                 }
+                 close(drm_fd);
+             } else {
+-                SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO,
+-                             "Failed to open KMSDRM device %s, errno: %d", device, errno);
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                             "Failed to open KMSDRM device %s, errno: %d (%s)", device, errno, strerror(errno));
+             }
+         }
+     }
+ 
+     closedir(folder);
+ 
++    if (available < 0) {
++        SDL_LogError(SDL_LOG_CATEGORY_VIDEO,
++                     "get_driindex(): no usable KMS device found under %s%s* -- see prior lines for the per-device reason",
++                     kmsdrm_dri_path, kmsdrm_dri_devname);
++    }
++
+     return available;
+ }
+ 
+@@ -2129,11 +2159,13 @@ bool KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Propert
+         if (!_this->egl_data) {
+             egl_display = (NativeDisplayType)_this->internal->gbm_dev;
+             if (!SDL_EGL_LoadLibrary(_this, NULL, egl_display)) {
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "SDL_EGL_LoadLibrary() failed for default GL profile: %s", SDL_GetError());
+                 // Try again with OpenGL ES 2.0
+                 _this->gl_config.profile_mask = SDL_GL_CONTEXT_PROFILE_ES;
+                 _this->gl_config.major_version = 2;
+                 _this->gl_config.minor_version = 0;
+                 if (!SDL_EGL_LoadLibrary(_this, NULL, egl_display)) {
++                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "SDL_EGL_LoadLibrary() failed for GLES2 profile too: %s", SDL_GetError());
+                     return SDL_SetError("Can't load EGL/GL library on window creation.");
+                 }
+             }

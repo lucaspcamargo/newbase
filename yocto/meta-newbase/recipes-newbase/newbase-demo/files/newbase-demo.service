@@ -1,0 +1,38 @@
+[Unit]
+Description=newbase engine demo (KMS/DRM, no display manager)
+# fbcon/getty and the demo both want the VT; hand tty1 over to us instead of
+# a login prompt.
+Conflicts=getty@tty1.service
+After=getty@tty1.service systemd-user-sessions.service
+# DRM node naming (card0 vs card1) isn't guaranteed stable across kernels;
+# Restart=on-failure below covers the case where it isn't ready yet at boot.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/newbase_demo
+# Resource lookup (nb/, config.yaml) is relative to cwd, not argv0 — see
+# demo/CMakeLists.txt install() rules.
+WorkingDirectory=/usr/share/newbase_demo
+# SDL_GetPrefPath() (used for the ImGui settings file) needs XDG_DATA_HOME
+# or HOME set, neither of which systemd provides by default -- without one
+# it returns NULL and the app aborts (std::logic_error) constructing a
+# std::string from it. StateDirectory creates/owns /var/lib/newbase-demo;
+# point XDG_DATA_HOME there instead of $HOME, since this is service state,
+# not a login user's home.
+StateDirectory=newbase-demo
+Environment=XDG_DATA_HOME=/var/lib/newbase-demo
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+Restart=on-failure
+RestartSec=2
+# Kiosk-style: runs as root so it has DRM master + raw input access without
+# extra udev/group setup. Tighten this (video/render/input groups + udev
+# rules) once the bring-up is stable.
+
+[Install]
+WantedBy=multi-user.target

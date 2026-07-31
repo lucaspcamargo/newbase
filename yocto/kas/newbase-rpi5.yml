@@ -1,0 +1,106 @@
+header:
+  version: 14
+
+machine: raspberrypi5
+distro: poky
+target: newbase-demo-image
+
+# NOTE ON BRANCHES: pinned to "walnascar" (Yocto 5.2), the newest release
+# line with matching branches confirmed on poky, meta-openembedded, and
+# meta-raspberrypi (verified via `git ls-remote --heads` on 2026-07-26 —
+# there is no newer named release branch yet, "master" is dev-only). If a
+# newer release line exists by the time you read this, re-check with
+# ls-remote before repinning all three refspecs below to a matching triplet.
+# All `path:` values below are resolved relative to KAS_WORK_DIR (which we
+# deliberately leave at its default -- the repo root -- so meta-newbase's
+# self-repo path keeps resolving correctly). The fetched repos are pointed
+# into build/yocto/ explicitly so they don't clutter the repo root; the
+# build/downloads/sstate-cache dirs are redirected separately via
+# KAS_BUILD_DIR/DL_DIR/SSTATE_DIR env vars (see yocto/README.md).
+repos:
+  meta-newbase:
+    path: yocto/meta-newbase
+    layers:
+      .:
+
+  poky:
+    url: https://git.yoctoproject.org/git/poky
+    path: build/yocto/poky
+    refspec: walnascar
+    layers:
+      meta:
+      meta-poky:
+
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    path: build/yocto/meta-openembedded
+    refspec: walnascar
+    layers:
+      meta-oe:
+      meta-python:
+
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    path: build/yocto/meta-raspberrypi
+    refspec: walnascar
+    layers:
+      .:
+
+local_conf_header:
+  newbase-machine: |
+    # DISABLE_VC4GRAPHICS defaults unset -> vc4-kms-v3d overlay + mesa stay on,
+    # which is what gives us a real KMS/DRM display instead of the frozen
+    # legacy fbdev/fkms path.
+    #
+    # INIT_MANAGER (not VIRTUAL-RUNTIME_init_manager directly) is poky's
+    # supported switch for this: it pulls in
+    # conf/distro/include/init-manager-systemd.inc, which handles
+    # DISTRO_FEATURES (systemd + usrmerge -- needed for systemd's udev
+    # package to PROVIDE "udev"; without it eudev is also skipped since it
+    # conflicts with the systemd feature), the VIRTUAL-RUNTIME_* defaults,
+    # and ROOT_HOME = "/root" (systemd hardcodes /root in its own sources
+    # per that file's comment) all in one place -- no need to hand-roll them.
+    INIT_MANAGER = "systemd"
+    DISTRO_FEATURES:append = " vulkan"
+
+    # RPi5's onboard Broadcom WiFi/BT firmware (bcm43455) ships under a
+    # restricted license flag; accept it explicitly or it's skipped as
+    # unbuildable, taking down packagegroup-base-extended with it.
+    LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
+
+    # poky ships with root entirely locked out by default (no password, no
+    # login at all) -- bake in a fixed one instead of hand-editing
+    # /etc/shadow on the flashed card after every rebuild. Debug-only
+    # password, not meant to survive past bring-up.
+    #
+    # usermod -p wants an already-encrypted hash, not plaintext (extrausers
+    # passes options straight through to the real usermod -- there's no
+    # plaintext shorthand). Hash below is `openssl passwd -6 root`, i.e.
+    # password is literally "root".
+    #
+    # $ MUST be escaped as \$: extrausers.bbclass's set_user_group() does
+    # user_group_settings="${EXTRA_USERS_PARAMS}" -- a DOUBLE-quoted shell
+    # assignment, so unescaped $6/$z/$f... in the hash get expanded as
+    # (unset, empty) shell variables, silently mangling the hash into
+    # garbage that can't match any password. Learned this the hard way --
+    # first attempt landed on the device as
+    # ".CW8JloEDCsG93Z.19/HNcBOknZWuEhK2KZxuzA2k/arCSX3BvjsWJIJf8pbF3JDIrRAIWC1KPHuj5//".
+    INHERIT += "extrausers"
+    EXTRA_USERS_PARAMS = "usermod -p '\$6\$z.CW8JloEDCsG93Z\$fS4wDTp4VNWNmkeSwvF9x.19/HNcBOknZWuEhK2KZxuzA2k/arCSX3BvjsWJIJf8pbF3JDIrRAIWC1KPHuj5//' root;"
+
+  newbase-build: |
+    # Codegen at CMake configure time needs the venv from scripts/requirements.txt
+    # (see yocto/README.md). kas-container mounts this repo at /repo inside the
+    # build container regardless of host layout, so point straight at a venv
+    # built *inside* that container (a host-built venv's binaries/shebangs
+    # won't reliably run against the container's own libc/python). Named
+    # venv-kas (not venv) so it doesn't collide with a host-side venv/ used
+    # for native builds -- /repo is the same bind-mounted checkout as the host.
+    export PYTHON_INTERPRETER = "/repo/venv-kas/bin/python"
+
+    # Capped for this build machine (limited RAM, no swap) -- BB_NUMBER_THREADS
+    # recipes can each spawn a PARALLEL_MAKE-wide compile job concurrently, so
+    # these aren't simply additive. Watch memory during the first build and
+    # lower further if needed.
+    BB_NUMBER_THREADS = "5"
+    PARALLEL_MAKE = "-j 5"

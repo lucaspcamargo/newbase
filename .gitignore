@@ -3,6 +3,7 @@ build_ems
 build_distcc
 out
 wbuild
+venv-kas
 compile_commands.json
 
 emsdk
