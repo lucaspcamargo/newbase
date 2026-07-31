@@ -48,10 +48,13 @@ ui_manager_simple::ui_manager_simple()
 ui_manager_simple::~ui_manager_simple()
 {
     log::info("[ui_manager] syncing ui settings");
-    ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
+    if (!_d->ini_path.empty())
+    {
+        ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
 #ifdef __EMSCRIPTEN__
-    ::nb::ems::sync_pref_path();
+        ::nb::ems::sync_pref_path();
 #endif
+    }
     delete _d;
     log::info("[ui_manager] destroyed");
 }
@@ -60,17 +63,22 @@ bool ui_manager_simple::ui_init()
 {
     // Setup Dear ImGui context
     char * prefs = SDL_GetPrefPath(
-        SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING), 
+        SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING),
         SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING));
-    std::string imgui_cfg_path {prefs};
-    SDL_free(prefs);
-    
-    assert(imgui_cfg_path.size());
-    if(imgui_cfg_path[imgui_cfg_path.size()-1]!='/')
-    imgui_cfg_path += "/";
-    imgui_cfg_path += "ImGui.cfg";
-    log::info("[ui_manager] cfg file at: '%s'", imgui_cfg_path.c_str());
-    _d->ini_path = imgui_cfg_path;
+    if (prefs)
+    {
+        std::string imgui_cfg_path {prefs};
+        SDL_free(prefs);
+        if(imgui_cfg_path[imgui_cfg_path.size()-1]!='/')
+            imgui_cfg_path += "/";
+        imgui_cfg_path += "ImGui.cfg";
+        log::info("[ui_manager] cfg file at: '%s'", imgui_cfg_path.c_str());
+        _d->ini_path = imgui_cfg_path;
+    }
+    else
+    {
+        log::error("[ui_manager] SDL_GetPrefPath() failed: %s -- ImGui settings won't persist", SDL_GetError());
+    }
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -81,7 +89,16 @@ bool ui_manager_simple::ui_init()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    ImGui::LoadIniSettingsFromDisk(_d->ini_path.c_str());
+    // kmsdrm's hardware cursor plane is a small, fixed size reported by the
+    // GPU driver (DRM_CAP_CURSOR_WIDTH/HEIGHT, e.g. 64x64) regardless of the
+    // display resolution, so it ends up tiny. Draw our own instead -- the
+    // SDL3 ImGui backend already hides the system cursor automatically
+    // whenever io.MouseDrawCursor is set.
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "kmsdrm") == 0)
+        io.MouseDrawCursor = true;
+
+    if (!_d->ini_path.empty())
+        ImGui::LoadIniSettingsFromDisk(_d->ini_path.c_str());
 
     imgui_style_setup();
 
@@ -104,7 +121,8 @@ void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int saf
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantSaveIniSettings) {
-        ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
+        if (!_d->ini_path.empty())
+            ImGui::SaveIniSettingsToDisk(_d->ini_path.c_str());
         io.WantSaveIniSettings = false;
 #ifdef __EMSCRIPTEN__
         ::nb::ems::sync_pref_path();

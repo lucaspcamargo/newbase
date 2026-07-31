@@ -190,6 +190,46 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
                         | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_MAXIMIZED;
     int window_w = 1024, window_h = 768;
+
+    if (cfg.has_child("w") && !cfg["w"].invalid())
+        cfg["w"] >> window_w;
+    if (cfg.has_child("h") && !cfg["h"].invalid())
+        cfg["h"] >> window_h;
+
+    // kmsdrm has no windowing system: "window size" *is* the physical DRM
+    // mode (see KMSDRM_GetClosestDisplayMode(), matched against the size
+    // we ask for below), so go exclusive-fullscreen at the monitor's
+    // highest available resolution/refresh rate instead of whatever
+    // size was requested above.
+    SDL_DisplayMode best_mode {};
+    bool have_best_mode = false;
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "kmsdrm") == 0)
+    {
+        int mode_count = 0;
+        SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(SDL_GetPrimaryDisplay(), &mode_count);
+        for (int i = 0; i < mode_count; i++)
+        {
+            const SDL_DisplayMode *m = modes[i];
+            if (!have_best_mode
+                || (m->w * m->h > best_mode.w * best_mode.h)
+                || (m->w * m->h == best_mode.w * best_mode.h && m->refresh_rate > best_mode.refresh_rate))
+            {
+                best_mode = *m;
+                have_best_mode = true;
+            }
+        }
+        SDL_free(modes);
+
+        if (have_best_mode)
+        {
+            window_w = best_mode.w;
+            window_h = best_mode.h;
+            window_flags = (window_flags & ~SDL_WINDOW_MAXIMIZED) | SDL_WINDOW_FULLSCREEN;
+            log::info("[render_simple] kmsdrm: using native mode %dx%d@%gHz", window_w, window_h, best_mode.refresh_rate);
+        }
+        else
+            log::warn("[render_simple] kmsdrm: SDL_GetFullscreenDisplayModes() found nothing, falling back to %dx%d", window_w, window_h);
+    }
 #endif
     _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING), window_w, window_h, window_flags);
     if (_win == nullptr)
@@ -197,6 +237,10 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
         log::error("[render_simple] SDL_CreateWindow(): %s\n", SDL_GetError());
         return false;
     }
+#ifndef NEWBASE_WII
+    if (have_best_mode)
+        SDL_SetWindowFullscreenMode(_win, &best_mode);
+#endif
     _scale = SDL_GetWindowDisplayScale(_win);
     log::info("[render_simple] window scale: %f", _scale);
 
