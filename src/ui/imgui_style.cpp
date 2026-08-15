@@ -9,6 +9,15 @@
 
 using namespace nb;
 
+namespace {
+constexpr int kUiFontSize = 15; // base ImGui font size, in pixels
+// Kenney's icon glyphs render slightly larger than ForkAwesome's at the same
+// point size, so its raster size is nudged down by 1px to visually match
+// (its GlyphMinAdvanceX still tracks kUiFontSize, like every other merged
+// icon font, so spacing stays consistent regardless of the raster-size tweak).
+constexpr int kKenneyIconFontSize = kUiFontSize - 1;
+}
+
 void nb::imgui_style_setup()
 {
     ImVec4* colors = ImGui::GetStyle().Colors;
@@ -93,7 +102,7 @@ void nb::imgui_style_fonts_setup(float scale)
         config.RasterizerDensity = scale;
         void * copy = malloc(mainfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, mainfont_data.data(), mainfont_data.size());
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, mainfont_data.size(), 14, &config);
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, mainfont_data.size(), (float)kUiFontSize, &config);
     }
     else
     {
@@ -110,11 +119,11 @@ void nb::imgui_style_fonts_setup(float scale)
         strncpy(config.Name, "icons", sizeof(ImFontConfig::Name));
         config.RasterizerDensity = scale;
         config.MergeMode = true;
-        config.GlyphMinAdvanceX = 14.0f;
+        config.GlyphMinAdvanceX = (float)kUiFontSize;
         void * copy = malloc(iconfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, iconfont_data.data(), iconfont_data.size());
         static const ImWchar icon_ranges[] = { ICON_MIN_FK, ICON_MAX_FK, 0 };
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont_data.size(), 14, &config, icon_ranges);
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont_data.size(), (float)kUiFontSize, &config, icon_ranges);
     }
     else
     {
@@ -131,12 +140,12 @@ void nb::imgui_style_fonts_setup(float scale)
         strncpy(config.Name, "icons_kenney", sizeof(ImFontConfig::Name));
         config.RasterizerDensity = scale;
         config.MergeMode = true;
-        config.GlyphMinAdvanceX = 14.0f;
+        config.GlyphMinAdvanceX = (float)kUiFontSize;
         config.GlyphOffset.y = 1.0f; // adjust vertical position
         void * copy = malloc(iconfont2_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, iconfont2_data.data(), iconfont2_data.size());
         static const ImWchar icon_ranges2[] = { ICON_MIN_KI, ICON_MAX_KI, 0 };
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont2_data.size(), 13, &config, icon_ranges2);
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, iconfont2_data.size(), (float)kKenneyIconFontSize, &config, icon_ranges2);
     }
     else
     {
@@ -154,7 +163,7 @@ void nb::imgui_style_fonts_setup(float scale)
         config.RasterizerDensity = scale;
         void * copy = malloc(boldfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, boldfont_data.data(), boldfont_data.size());
-        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, boldfont_data.size(), 14, &config);
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, boldfont_data.size(), (float)kUiFontSize, &config);
     }
     else
     {
