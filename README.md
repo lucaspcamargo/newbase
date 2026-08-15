@@ -1,8 +1,5 @@
 # newbase engine
 
-![icon](res/_nb_core/icon.svg)
-
-
 ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)
 
@@ -29,10 +26,8 @@ ENGBR_SECTION-->
 
 ## Features
 
-Target feature set for the first release is still in flux.
-
 For now, we have:
-- Data-driven Entity-Component-System architecture
+- Data-driven Entity-Component-System architecture, with an RTTI system
 - Integrated editor (WIP)
 - Lua scripting
 - SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
@@ -40,8 +35,8 @@ For now, we have:
 - 2D Physics and collision handling
 - Particle system
 - Resource management
-- RTTI system
-- Some extras: tilemaps, textured text, 
+- Some extras: tilemaps, textured text, etc...
+- A Lupi-compatible runtime system
 
 ## Platforms
 
@@ -113,7 +108,7 @@ This system implements 2D rigid-body physics, via the industry-standard Box2D li
 
 (TODO add more details)
 
-<!--ENGBR_TOGGLE-->
+<!--
 
 ### sgdk
 
@@ -121,7 +116,14 @@ The "sgdk" system is a bit of a black sheep. It does not interoperate with the E
 
 Games are compiled to native code, and no CPUs from the original system are emulated. The VDP is emulated in software, but can support different output resolutions, and other goodies. Therefore, a game may use some additional features when using the compatibility layer, and mix-and-match code meant for the Mega Drive and for newbase. This allows for (possibly enhanced) ports to be published for whatever platform is supported by newbase, without much compromise.
 
-<!--ENGBR_TOGGLE-->
+-->
+
+### lupi
+
+The "lupi" system is a compatibility layer for games written in Lua against the [Lupi console API](https://lupi.api.br/docs/), a 480x270, 256-color indexed retro console. Each cart runs its own Lua source, unmodified, in an isolated `lua_State`, driven by a single `update(frame)` callback per simulation step.
+
+Real carts ship no source assets. Lupi's own build pipeline normally slices sprite sheets, builds a color palette, and compiles Tiled maps ahead of time. "lupi" reimplements that pipeline itself at cart-boot instead, so a cart's original source tree runs directly with no separate compiler or devkit involved. See `doc/system_lupi.md` for the full picture.
+
 
 ### spatial, clock
 

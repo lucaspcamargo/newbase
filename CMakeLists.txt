@@ -11,6 +11,7 @@ option(NEWBASE_LTO "Enable LTO if available" OFF)
 option(NEWBASE_TRACING  "Enable tracing with Tracy" OFF)
 option(NEWBASE_SGDK "Enable SGDK compatibility subsystem" OFF) # off by default
 set(NEWBASE_SGDK_PATH "${CMAKE_SOURCE_DIR}/vendored/SGDK" CACHE PATH "Path to SGDK root")
+option(NEWBASE_LUPI "Enable Lupi compatibility subsystem" ON) # on by default, pure Lua, no extra deps
 option(NEWBASE_EMSCRIPTEN_HTML "Ask emcc to compile executables into standalone HTML files too" ON)
 option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
@@ -189,6 +190,9 @@ add_subdirectory(src/tilemap)
 # OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)
     add_subdirectory(src/steam)
+endif()
+if(NEWBASE_LUPI)
+    add_subdirectory(src/lupi)
 endif()
 if(NEWBASE_ENABLE_MCP)
     if(DEFINED EMSCRIPTEN)

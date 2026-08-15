@@ -21,6 +21,7 @@ systems:
   steam:
     app_id: 480
   sgdk: {}
+  lupi: {}
   mcp:
     port: 8765
 resources:

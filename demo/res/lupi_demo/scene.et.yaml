@@ -1,0 +1,4 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/lupi_demo/scene.lua"
