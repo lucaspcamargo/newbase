@@ -43,6 +43,16 @@ struct lupi_p {
     // truth ui.map()'s tileset lookups use directly, without a Lua round-trip.
     std::unordered_map<std::string, std::shared_ptr<lupi_spritesheet>> sprite_by_name;
 
+    // Snapshot of `pal` taken right after lupi_scan_cart_assets finishes
+    // synthesizing it (sprite auto-quantization + palette_overrides.yaml +
+    // gap backfill), before the cart's own Lua ever runs. This is the real
+    // source of truth for Palette.hex's search/allocate logic and for what
+    // the Lua `Palette` table is supposed to mean — `pal` itself is fair
+    // game for a cart to clobber at runtime via ui.palset (e.g. whole-screen
+    // fade effects), but that must never perturb what Palette.hex resolves a
+    // given color to. See loaders.cpp's Palette.hex closure.
+    lupi_palette master_pal;
+
     // scratch RGBA8888 buffer, reused every RENDER-phase blit
     std::vector<uint32_t> rgba_scratch;
 

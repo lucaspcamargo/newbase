@@ -55,7 +55,7 @@ lupi_spritesheet* lupi_check_sprite_ref(lua_State* L, int idx);
 // time rather than through the generic rman() cache, since the result
 // depends on the cart's live, shared palette state.
 std::shared_ptr<lupi_spritesheet> lupi_load_spritesheet_indexed(
-    const std::vector<char>& png_bytes, lupi_palette& pal);
+    const std::vector<char>& png_bytes, lupi_palette& pal, const std::string& path = {});
 
 // Loads a cart resource (lupi.yaml manifest + sibling game.lua via rscript) by resource id.
 struct rloader_lupi_cart {

@@ -8,6 +8,7 @@
 #include <cctype>
 #include <climits>
 #include <cstdlib>
+#include <unordered_set>
 
 using namespace nb;
 
@@ -227,20 +228,87 @@ int find_or_allocate_color(lupi_palette& pal, uint16_t color)
     return best;
 }
 
+// Palette.hex's own allocator (see the closure below for why this can't just
+// call find_or_allocate_color on the live `pal`): searches p.master_pal — the
+// frozen, boot-time snapshot of the cart's synthesized palette — instead of
+// `pal`, which a cart is free to clobber wholesale at runtime (ui.palset fade
+// effects). A color only ever gets a *new* slot the first time it's ever
+// requested and wasn't already part of the cart's own sprite-derived palette;
+// once assigned, that mapping is permanent for the cart's lifetime. New slots
+// are mirrored into `pal` too, in lockstep, so rendering can actually use them.
+int find_in_master_or_allocate(lupi_p& p, uint16_t color)
+{
+    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i)
+        if (p.master_pal.allocated[i] && p.master_pal.bgr555[i] == color)
+            return i;
+
+    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i) {
+        if (!p.master_pal.allocated[i]) {
+            p.master_pal.set(i, color);
+            p.pal.set(i, color);
+            return i;
+        }
+    }
+
+    auto chan = [](uint16_t c, int shift) { return (c >> shift) & 0x1F; };
+    int b0 = chan(color, 10), g0 = chan(color, 5), r0 = chan(color, 0);
+    int best = 1, best_dist = INT_MAX;
+    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i) {
+        int b1 = chan(p.master_pal.bgr555[i], 10), g1 = chan(p.master_pal.bgr555[i], 5), r1 = chan(p.master_pal.bgr555[i], 0);
+        int d = (r0 - r1) * (r0 - r1) + (g0 - g1) * (g0 - g1) + (b0 - b1) * (b0 - b1);
+        if (d < best_dist) { best_dist = d; best = i; }
+    }
+    return best;
+}
+
 }
 
 std::shared_ptr<lupi_spritesheet> nb::lupi_load_spritesheet_indexed(
-    const std::vector<char>& png_bytes, lupi_palette& pal)
+    const std::vector<char>& png_bytes, lupi_palette& pal, const std::string& path)
 {
     int w, h, chs;
     auto* rgba = stbi_load_from_memory(
         reinterpret_cast<const stbi_uc*>(png_bytes.data()), (int)png_bytes.size(), &w, &h, &chs, 4);
     if (!rgba) {
-        log::error("[lupi_load_spritesheet_indexed] stbi decode failed");
+        log::error("[lupi_load_spritesheet_indexed] stbi decode failed for '%s'", path.c_str());
+        return nullptr;
+    }
+
+    // Mirrors lupi-codec's image_validator.lua: the real compiler never ships
+    // (deletes at build time) an image over 512x512, or with more than 256
+    // unique colors — a real cart just can't reference a file the pipeline
+    // refused to build in the first place. We can't refuse to ship (the cart
+    // is already running), but silently accepting either just means a stray
+    // asset — e.g. a project's own reference/preview PNG that isn't meant to
+    // be a game asset at all — can quietly exhaust the cart's whole 256-slot
+    // palette. Reject the same way instead: the file just never becomes a
+    // usable sprite (Sprites.find() sees nothing for it), same as on real
+    // hardware.
+    if (w > 512 || h > 512) {
+        log::error("[lupi_load_spritesheet_indexed] '%s' is %dx%d, exceeds lupi-codec's 512x512 limit, skipping",
+                    path.c_str(), w, h);
+        stbi_image_free(rgba);
         return nullptr;
     }
 
     auto px = [&](int x, int y) -> const uint8_t* { return rgba + (static_cast<size_t>(y) * w + x) * 4; };
+
+    {
+        std::unordered_set<uint32_t> unique_colors;
+        for (int y = 0; y < h && unique_colors.size() <= 256; ++y) {
+            for (int x = 0; x < w; ++x) {
+                const uint8_t* c = px(x, y);
+                unique_colors.insert((uint32_t)c[0] << 24 | (uint32_t)c[1] << 16 | (uint32_t)c[2] << 8 | c[3]);
+                if (unique_colors.size() > 256) break;
+            }
+        }
+        if (unique_colors.size() > 256) {
+            log::error("[lupi_load_spritesheet_indexed] '%s' has more than 256 unique colors, skipping",
+                        path.c_str());
+            stbi_image_free(rgba);
+            return nullptr;
+        }
+    }
 
     // --- magic-marker tile detection (mirrors lupi-codec's tile_detector.lua) ---
     bool is_tiled = false;
@@ -397,7 +465,7 @@ void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
             log::error("[lupi_scan_cart_assets] cannot read '%s'", path.c_str());
             continue;
         }
-        auto sheet = lupi_load_spritesheet_indexed(bytes, p.pal);
+        auto sheet = lupi_load_spritesheet_indexed(bytes, p.pal, path);
         if (!sheet) continue;
 
         std::string rel = path.substr(p.cart_dir.size());
@@ -445,15 +513,31 @@ void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
     for (int i = 0; i <= max_index; ++i)
         p.pal.allocated[i] = true;
 
+    // Freeze this as the cart's "master" palette — see lupi_p::master_pal and
+    // find_in_master_or_allocate — before any of the cart's own Lua runs and
+    // gets a chance to clobber `pal` at runtime (ui.palset fade effects, etc).
+    p.master_pal = p.pal;
+
     // --- Palette = { [1]=bgr555, [2]=bgr555, ..., hex = function(rgb) ... end }
     // — our own synthesized equivalent of lupi-codec's generated palette.lua,
     // built from exactly the colors our own quantization pass just allocated.
-    // `Palette.hex` is a real, confirmed part of some carts' own convention
-    // (e.g. a real cart's `kColors.black = Palette.hex(0x000000)`) — a
-    // dynamic hex-color -> index lookup/allocator, NOT a lupi-codec output;
-    // it's the cart author's own escape hatch around exactly the "hardcoded
-    // index means nothing without the real master palette" problem we hit
-    // with other carts, so it needs no override sidecar to get right colors.
+    // `Palette.hex` is NOT part of the real, documented Lupi API (confirmed:
+    // absent from lupi.api.br/docs, from lupinho's lua_api.c, and from
+    // lupi-codec's generated palette.lua) — multiple real carts call it
+    // anyway, expecting a pre-existing global exactly like Sprites/Palette,
+    // so on real hardware they'd crash outright. We keep it as a compatible
+    // stand-in rather than let those carts fail to boot at all.
+    //
+    // It resolves against p.master_pal, NOT the live `pal`, via
+    // find_in_master_or_allocate — see that function for why: some carts dim
+    // their entire runtime palette every frame via a
+    // `for i=1,#Palette do ui.palset(i-1, dim(Palette[i])) end` loop, and an
+    // exact-match search against the just-dimmed `pal` would fail almost
+    // every call (dimmed != original), allocating a *new* slot each time and
+    // burning through the 256-slot budget in roughly one fade's worth of
+    // frames — then, once exhausted, silently reusing already-dimmed
+    // neighbors as if they were original colors, visibly darkening a bit
+    // more with every subsequent fade, permanently.
     lua_newtable(L);
     int n = 0;
     for (int i = 0; i < LUPI_PALETTE_SIZE && p.pal.allocated[i]; ++i, ++n) {
@@ -466,10 +550,14 @@ void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
         uint8_t r = (uint8_t)((hex >> 16) & 0xFF);
         uint8_t g = (uint8_t)((hex >> 8) & 0xFF);
         uint8_t b = (uint8_t)(hex & 0xFF);
-        int index = find_or_allocate_color(p->pal, rgb8_to_bgr555(r, g, b));
+        uint16_t bgr555 = rgb8_to_bgr555(r, g, b);
 
+        int index = find_in_master_or_allocate(*p, bgr555);
+
+        // Keep the Lua `Palette` table in sync with the master palette too —
+        // a no-op unless this call just allocated a genuinely new slot.
         lua_getglobal(L, "Palette");
-        lua_pushinteger(L, p->pal.bgr555[index]);
+        lua_pushinteger(L, p->master_pal.bgr555[index]);
         lua_rawseti(L, -2, index + 1);
         lua_pop(L, 1);
 
@@ -495,6 +583,11 @@ void nb::lupi_apply_palette_overrides(lupi_p& p)
 {
     std::string path = p.cart_dir + "palette_overrides.yaml";
     auto id = entt::hashed_string{path.c_str()}.value();
+
+    // Most carts have no sidecar at all — check first so the common case
+    // doesn't trip rmanager's "unknown asset id" error log on every boot.
+    if (!rman().known(id))
+        return;
 
     std::vector<char> data;
     if (!rman().read_all_sync(id, data, true))

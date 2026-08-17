@@ -67,6 +67,25 @@ bool has_suffix(const std::string& s, const std::string& suffix)
     return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+// The real compiler runs over a cart's *entire* file tree and picks a codec
+// per file by sniffing content, not by folder location (see lupi-codec's
+// codecs.lua/tiled_validator.lua: any "*.json" gets this same check) — so a
+// Tiled map can live anywhere in a cart (confirmed: a real cart ships one at
+// "sprites/bgmap.json", required as "sprites.bgmap", not under a "maps/"
+// folder at all). Replicates the same tiledversion+type=="map" sniff so an
+// unrelated .json (a save file, config, etc) isn't mistaken for a map.
+bool looks_like_tiled_map(const std::vector<char>& json_bytes)
+{
+    auto data = json_bytes; // ryml parses in place
+    auto tree = ryml::parse_json_in_place(c4::to_substr(data.data()));
+    auto root = tree.rootref();
+    if (!root.is_map() || !root.has_child("tiledversion") || !root.has_child("type"))
+        return false;
+    std::string type;
+    root["type"] >> type;
+    return type == "map";
+}
+
 std::string strip_png(const std::string& s)
 {
     return has_suffix(s, ".png") ? s.substr(0, s.size() - 4) : s;
@@ -86,12 +105,71 @@ struct compiled_map {
     std::vector<compiled_layer> layers;
 };
 
-compiled_map compile_one(const std::vector<char>& json_bytes, const std::string& path)
+// Mirrors lupi-codec's tiled_validator.lua: the real compiler hard-rejects a
+// map at build time on any of these, refusing to ship it at all. We can't
+// refuse to ship (the cart's already running), so instead of silently
+// misparsing something we don't understand — e.g. treating a base64-encoded
+// layer's `data` string as an int array — we log the same rejection loudly
+// and skip just that map, leaving a clear "module not found" for the cart's
+// own require() to surface instead of garbage tiles.
+bool validate_tiled_map(ryml::ConstNodeRef root, const std::string& path)
 {
-    compiled_map m;
+    auto str_is = [](ryml::ConstNodeRef n, const char* expect) {
+        std::string s; n >> s; return s == expect;
+    };
+
+    if (root.has_child("orientation") && !str_is(root["orientation"], "orthogonal")) {
+        log::error("[tiled_maps] %s: only 'orthogonal' orientation is supported", path.c_str());
+        return false;
+    }
+    if (root.has_child("renderorder") && !str_is(root["renderorder"], "right-down")) {
+        log::error("[tiled_maps] %s: only 'right-down' render order is supported", path.c_str());
+        return false;
+    }
+    if (root.has_child("infinite")) {
+        bool infinite = false; root["infinite"] >> infinite;
+        if (infinite) {
+            log::error("[tiled_maps] %s: infinite maps are not supported", path.c_str());
+            return false;
+        }
+    }
+    if (root.has_child("layers")) {
+        for (auto layer_node : root["layers"]) {
+            if (layer_node.has_child("type") && !str_is(layer_node["type"], "tilelayer"))
+                continue; // no objectgroups in real carts, but be safe
+
+            std::string name;
+            if (layer_node.has_child("name")) layer_node["name"] >> name;
+
+            if (name == "metadata" || name == "tilesets") {
+                log::error("[tiled_maps] %s: layer name '%s' is reserved", path.c_str(), name.c_str());
+                return false;
+            }
+            int lx = 0, ly = 0;
+            if (layer_node.has_child("x")) layer_node["x"] >> lx;
+            if (layer_node.has_child("y")) layer_node["y"] >> ly;
+            if (lx != 0 || ly != 0) {
+                log::error("[tiled_maps] %s: layer '%s' must start at x=0,y=0", path.c_str(), name.c_str());
+                return false;
+            }
+            if (layer_node.has_child("data") && !layer_node["data"].is_seq()) {
+                log::error("[tiled_maps] %s: layer '%s' data isn't a plain array — export Tiled layer "
+                           "data as CSV, not Base64/compressed", path.c_str(), name.c_str());
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool compile_one(const std::vector<char>& json_bytes, const std::string& path, compiled_map& m)
+{
     auto data = json_bytes; // ryml parses in place
     auto tree = ryml::parse_json_in_place(c4::to_substr(data.data()));
     auto root = tree.rootref();
+
+    if (!validate_tiled_map(root, path))
+        return false;
 
     if (root.has_child("width"))     root["width"]     >> m.width;
     if (root.has_child("height"))    root["height"]    >> m.height;
@@ -139,7 +217,7 @@ compiled_map compile_one(const std::vector<char>& json_bytes, const std::string&
             m.layers.push_back(std::move(layer));
         }
     }
-    return m;
+    return true;
 }
 
 // Pushes a fresh Lua table {[k1]=v1, [k2]=v2, ...} for a sparse int->int map.
@@ -188,12 +266,10 @@ void push_compiled_map(lua_State* L, const compiled_map& m)
 
 void nb::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
 {
-    std::string maps_dir = p.cart_dir + "maps/";
-
-    lua_newtable(L); // the "lupi_maps" registry table: "maps.<name>" -> compiled table
+    lua_newtable(L); // the "lupi_maps" registry table: "<dotted.module.path>" -> compiled table
     int n = 0;
     for (const auto& [res_id, handle] : rman().handles()) {
-        if (handle.path.compare(0, maps_dir.size(), maps_dir) != 0) continue;
+        if (handle.path.compare(0, p.cart_dir.size(), p.cart_dir) != 0) continue;
         if (!has_suffix(handle.path, ".json")) continue;
 
         std::vector<char> bytes;
@@ -201,7 +277,10 @@ void nb::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
             log::error("[lupi_compile_cart_maps] cannot read '%s'", handle.path.c_str());
             continue;
         }
-        auto m = compile_one(bytes, handle.path);
+        if (!looks_like_tiled_map(bytes)) continue; // not every .json in a cart is a map
+
+        compiled_map m;
+        if (!compile_one(bytes, handle.path, m)) continue; // rejected — see validate_tiled_map
 
         // Module name mirrors require()'s own dot-for-slash convention (see
         // api_require.cpp) applied to the path relative to the cart root, so
@@ -218,5 +297,5 @@ void nb::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
         ++n;
     }
     lua_setfield(L, LUA_REGISTRYINDEX, "lupi_maps");
-    log::info("[lupi_compile_cart_maps] compiled %d map(s) under '%s'", n, maps_dir.c_str());
+    log::info("[lupi_compile_cart_maps] compiled %d map(s) under '%s'", n, p.cart_dir.c_str());
 }

@@ -63,19 +63,25 @@ int l_require(lua_State* L)
         // Already populated as globals by lupi_scan_cart_assets before
         // game.lua runs — nothing left to do.
         lua_pushboolean(L, true);
-    } else if (n.rfind("maps.", 0) == 0) {
+    } else {
+        // The real compiler turns any "*.json" Tiled map, wherever it lives
+        // in the cart tree, into a same-path .lua module — it isn't limited
+        // to a "maps/" folder or a "maps."-prefixed name (confirmed: a real
+        // cart ships one at "sprites/bgmap.json", required as
+        // "sprites.bgmap"). So every require() checks the compiled-maps
+        // registry first, by its plain dotted name, and only falls back to
+        // loading an actual sibling .lua file if nothing compiled there.
         lua_getfield(L, LUA_REGISTRYINDEX, "lupi_maps");
         lua_getfield(L, -1, name);
         lua_remove(L, -2);
-        if (lua_isnil(L, -1))
-            return luaL_error(L, "require '%s': no compiled map found (expected maps/%s.json)",
-                               name, name + 5);
-    } else {
-        if (!load_and_run_sibling(L, *p, n))
-            return lua_error(L); // error object already on top of the stack
         if (lua_isnil(L, -1)) {
-            lua_pop(L, 1);
-            lua_pushboolean(L, true); // vanilla require(): a module returning nothing caches as `true`
+            lua_pop(L, 1); // pop nil
+            if (!load_and_run_sibling(L, *p, n))
+                return lua_error(L); // error object already on top of the stack
+            if (lua_isnil(L, -1)) {
+                lua_pop(L, 1);
+                lua_pushboolean(L, true); // vanilla require(): a module returning nothing caches as `true`
+            }
         }
     }
 
