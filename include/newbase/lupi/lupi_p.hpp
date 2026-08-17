@@ -79,6 +79,12 @@ struct lupi_p {
     // at init() time in all cases — lazily started on the first event() call
     // once a keyboard-focused window exists (see lupi::event()).
     bool text_input_started { false };
+
+    // Set once lupi's own gamepad-only input actions have been registered
+    // with the `input` system (see register_lupi_gamepad_actions in
+    // lupi.cpp) — lazy rather than done in init(), since system init order
+    // between `lupi` and `input` isn't guaranteed.
+    bool gamepad_actions_registered { false };
 };
 
 }
