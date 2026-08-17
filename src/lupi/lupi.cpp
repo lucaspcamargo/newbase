@@ -39,12 +39,18 @@ namespace {
 
 renderer_service* rs() { return entt::locator<renderer_service*>::has_value() ? entt::locator<renderer_service*>::value() : nullptr; }
 ui_manager*      uim() { return entt::locator<ui_manager*>::has_value()       ? entt::locator<ui_manager*>::value()       : nullptr; }
-input*           ins() { return entt::locator<input*>::has_value()           ? entt::locator<input*>::value()            : nullptr; }
+
+input* ins()
+{
+    static const auto id = entt::hashed_string{"input"}.value();
+    auto sys = engine::instance().system_from_id(id);
+    return sys ? static_cast<input*>(sys.get()) : nullptr;
+}
 
 // Player 0 keyboard mapping (see doc/system_lupi.md); players 1-2 and
-// button ids 6-11 are reserved/unbound in this MVP. Always active,
-// independent of whether a gamepad or the `input` system are around — see
-// k_lupi_gp_actions below for the joypad side of player 0's bindings.
+// button ids 6-11 are reserved/unbound in this MVP. Fallback only — used
+// when the `input` system isn't registered at all (entt::locator<input*>);
+// see k_lupi_gp_buttons below for the primary path.
 struct key_binding { int button_id; SDL_Scancode key1; SDL_Scancode key2; };
 constexpr key_binding k_player0_keys[] = {
     {0, SDL_SCANCODE_LEFT,  SDL_SCANCODE_A}, // LEFT
@@ -60,66 +66,30 @@ constexpr key_binding k_player0_keys[] = {
 };
 
 // ---------------------------------------------------------------------------
-// Player 0 gamepad mapping, via the `input` system's action API — only used
-// when that system is actually registered (entt::locator<input*>), so a
-// build without it falls back to keyboard-only, unchanged. These are lupi's
-// own private actions (distinct ids from `input`'s "default actions" set),
-// deliberately registered with NO keyboard scancodes of their own: keyboard
-// input for lupi stays exclusively on k_player0_keys above, never routed
-// through `input`, so the two paths can never double up or diverge.
+// Player 0 mapping onto the `input` system's own default action map (see
+// input::setup_default_actions() in src/input/input.cpp) — used whenever
+// that system is registered and has those actions set up; k_player0_keys
+// above is only a fallback for when it isn't. lupi doesn't register any
+// actions of its own — the default action map already covers gamepad *and*
+// keyboard, so it doubles as the "virtual SNES controller" the real Lupi
+// console's own input maps onto (see doc/system_lupi.md).
 //
 // Button layout has no authoritative source (lupinho's own gamepad-constant
 // table is internally inconsistent/buggy — BTN_Z gets assigned twice, and
 // BTN_X isn't wired to a gamepad button at all), so this follows AGENTS.md's
-// categorization instead: BTN_Z/BTN_X as the two primary face buttons,
-// BTN_F/BTN_G as the other two, BTN_Q/BTN_E as the two shoulder bumpers.
-struct gp_button_binding { int button_id; entt::hashed_string action_id; gamepad_button gp_btn; };
-constexpr gp_button_binding k_lupi_gp_buttons[] = {
-    {4,  entt::hashed_string{"lupi_btn_z"}, gamepad_button::BTN_SOUTH},
-    {5,  entt::hashed_string{"lupi_btn_x"}, gamepad_button::BTN_WEST},
-    {12, entt::hashed_string{"lupi_btn_f"}, gamepad_button::BTN_EAST},
-    {13, entt::hashed_string{"lupi_btn_g"}, gamepad_button::BTN_NORTH},
-    {14, entt::hashed_string{"lupi_btn_q"}, gamepad_button::BTN_BUMPER_L},
-    {15, entt::hashed_string{"lupi_btn_e"}, gamepad_button::BTN_BUMPER_R},
+// categorization onto a SNES-style face-button layout (south=B, east=A,
+// west=Y, north=X): BTN_Z/BTN_X as the two primary action buttons (B/Y),
+// BTN_F/BTN_G as the other two (A/X), BTN_Q/BTN_E as the two shoulder bumpers.
+struct action_button_binding { int button_id; entt::hashed_string action_id; };
+constexpr action_button_binding k_lupi_gp_buttons[] = {
+    {4,  entt::hashed_string{"btn_south"}}, // BTN_Z -> SNES B
+    {5,  entt::hashed_string{"btn_west"}},  // BTN_X -> SNES Y
+    {12, entt::hashed_string{"btn_east"}},  // BTN_F -> SNES A
+    {13, entt::hashed_string{"btn_north"}}, // BTN_G -> SNES X
+    {14, entt::hashed_string{"bumper_l"}},  // BTN_Q -> SNES L
+    {15, entt::hashed_string{"bumper_r"}},  // BTN_E -> SNES R
 };
-constexpr entt::hashed_string k_lupi_gp_dir{"lupi_dir"};
-
-// Registered once, lazily, the first time `input` is observed available —
-// not from lupi::init(), since system init order between `lupi` and `input`
-// isn't guaranteed.
-void register_lupi_gamepad_actions(input* in)
-{
-    for (const auto& b : k_lupi_gp_buttons) {
-        in->action_add(input_action{
-            /*.id =*/ b.action_id,
-            /*.gp_btns =*/ {b.gp_btn},
-            /*.gp_axii =*/ {},
-            /*.kbd_scancodes =*/ {},
-            /*.directional =*/ false,
-            /*.dir_gp_btns =*/ {},
-            /*.dir_gp_axii =*/ {},
-            /*.dir_kbd_scancodes =*/ {},
-        });
-    }
-    in->action_add(input_action{
-        /*.id =*/ k_lupi_gp_dir,
-        /*.gp_btns =*/ {},
-        /*.gp_axii =*/ {gamepad_axis::GPA_ANALOG_LEFT_X, gamepad_axis::GPA_ANALOG_LEFT_Y},
-        /*.kbd_scancodes =*/ {},
-        /*.directional =*/ true,
-        /*.dir_gp_btns =*/ {
-            {gamepad_button::BTN_DPAD_UP,    input_direction::IDIR_UP},
-            {gamepad_button::BTN_DPAD_DOWN,  input_direction::IDIR_DOWN},
-            {gamepad_button::BTN_DPAD_LEFT,  input_direction::IDIR_LEFT},
-            {gamepad_button::BTN_DPAD_RIGHT, input_direction::IDIR_RIGHT},
-        },
-        /*.dir_gp_axii =*/ {
-            {gamepad_axis::GPA_ANALOG_LEFT_X, input_axis::IAXIS_X},
-            {gamepad_axis::GPA_ANALOG_LEFT_Y, input_axis::IAXIS_Y},
-        },
-        /*.dir_kbd_scancodes =*/ {},
-    });
-}
+constexpr entt::hashed_string k_lupi_gp_dir{"dir"};
 
 }
 
@@ -298,30 +268,28 @@ bool lupi::step(step_phase phase)
         Uint64 t0 = SDL_GetPerformanceCounter();
 
         _d->btn.pressure_last_frame = _d->btn.pressure_this_frame;
-        const bool* keys = SDL_GetKeyboardState(nullptr);
-        for (const auto& kb : k_player0_keys) {
-            bool down = keys[kb.key1] || keys[kb.key2];
-            _d->btn.pressure_this_frame[0][kb.button_id] = down ? 255 : 0;
-        }
 
-        // Gamepad, via the `input` system's action API when it's around —
-        // ORs into whatever the keyboard loop above already set, so either
-        // source can hold a button down; never replaces/clears it.
         if (auto* in = ins()) {
-            if (!_d->gamepad_actions_registered) {
-                register_lupi_gamepad_actions(in);
-                _d->gamepad_actions_registered = true;
-            }
-            for (const auto& b : k_lupi_gp_buttons) {
-                if (in->action_is_pressed(b.action_id.value()))
-                    _d->btn.pressure_this_frame[0][b.button_id] = 255;
-            }
+            // Primary path: `input`'s own default action map already covers
+            // both gamepad and keyboard — see k_lupi_gp_buttons above for why
+            // this doubles as the "virtual SNES controller" the real Lupi
+            // console's own input maps onto (see doc/system_lupi.md).
+            for (const auto& b : k_lupi_gp_buttons)
+                _d->btn.pressure_this_frame[0][b.button_id] = in->action_is_pressed(b.action_id.value()) ? 255 : 0;
+
             glm::vec3 dir = in->action_direction(k_lupi_gp_dir.value());
             constexpr float kDirThreshold = 0.5f; // digital-from-analog trigger point
-            if (dir.x < -kDirThreshold) _d->btn.pressure_this_frame[0][0] = 255; // LEFT
-            if (dir.x >  kDirThreshold) _d->btn.pressure_this_frame[0][1] = 255; // RIGHT
-            if (dir.y < -kDirThreshold) _d->btn.pressure_this_frame[0][2] = 255; // UP
-            if (dir.y >  kDirThreshold) _d->btn.pressure_this_frame[0][3] = 255; // DOWN
+            _d->btn.pressure_this_frame[0][0] = dir.x < -kDirThreshold ? 255 : 0; // LEFT
+            _d->btn.pressure_this_frame[0][1] = dir.x >  kDirThreshold ? 255 : 0; // RIGHT
+            _d->btn.pressure_this_frame[0][2] = dir.y < -kDirThreshold ? 255 : 0; // UP
+            _d->btn.pressure_this_frame[0][3] = dir.y >  kDirThreshold ? 255 : 0; // DOWN
+        } else {
+            // Fallback: `input` system isn't registered at all.
+            const bool* keys = SDL_GetKeyboardState(nullptr);
+            for (const auto& kb : k_player0_keys) {
+                bool down = keys[kb.key1] || keys[kb.key2];
+                _d->btn.pressure_this_frame[0][kb.button_id] = down ? 255 : 0;
+            }
         }
 
         lua_getglobal(_d->L, "update");
