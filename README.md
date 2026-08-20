@@ -3,7 +3,7 @@
 ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)
 
-A *new base* for making games and interactive stuff. Early release — usable, but evolving.
+A *new base* for making games and interactive stuff. Yet another ECS engine, with random experiments bolted in.
 
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom
@@ -27,7 +27,7 @@ ENGBR_SECTION-->
 ## Features
 
 For now, we have:
-- Data-driven Entity-Component-System architecture, with an RTTI system
+- Data-driven Entity-Component-System architecture, with RTTI
 - Integrated editor (WIP)
 - Lua scripting
 - SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
