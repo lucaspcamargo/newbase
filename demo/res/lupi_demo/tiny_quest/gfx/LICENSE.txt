@@ -1,0 +1,15 @@
+Tiny 16: Basic by Lanea Zimmerman (credited as "Sharm")
+https://opengameart.org/content/tiny-16-basic
+
+License: CC-BY 3.0 / CC-BY 4.0 / OGA-BY 3.0 (your choice)
+Please credit Lanea Zimmerman. The anti-DRM clause of CC-BY 3.0 is waived
+by the author.
+
+Files: basictiles.png, characters.png, things.png, dead.png, fontlarge.png,
+fontsmall1.png, fontsmall2.png
+
+Note: basictiles.png, characters.png, things.png and dead.png were padded
+with an extra top row + left column of solid #444444, matching the "lupi"
+compat system's magic-marker tile-slicing convention (see doc/system_lupi.md)
+so the sheets slice into 16x16 tiles automatically. No other pixel content
+was modified.
