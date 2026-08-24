@@ -1,27 +1,16 @@
--- Tiny Quest — a small JRPG vertical slice for the "lupi" compat system.
+-- Tiny Quest — a small JRPG vertical slice for the Lupi console (and our compat system)
 -- Art: Tiny 16: Basic by Lanea Zimmerman ("Sharm"), see gfx/LICENSE.txt.
---
--- Flow: title -> overworld (walk + talk to the NPC) -> stepping into the
--- tall grass to the east can trigger a battle -> win/lose -> back to
--- overworld.
+
+
 
 require("colors")
 require("title")
+require("draw_utils")
+require("map_utils")
 
-
-local function rgb555(r, g, b) return (r << 10) | (g << 5) | b end
-
-ui.palset(C_BATTLE_BG,  rgb555(10, 2, 2))
-ui.palset(C_FIELD_VOID, rgb555(2, 10, 2))
-ui.palset(C_TEXT,       rgb555(31, 31, 31))
-ui.palset(C_BOX_BORDER, rgb555(4, 4, 6))
-ui.palset(C_BOX_BG,     rgb555(6, 6, 10))
-ui.palset(C_HP_GOOD,    rgb555(4, 28, 4))
-ui.palset(C_HP_LOW,     rgb555(28, 4, 4))
-ui.palset(C_TITLE_BG,   rgb555(4, 4, 14))
 
 local CharSheet = Sprites.find("characters")
-local Overworld = require("maps.tiled_test")
+local Overworld = map_prepare(require("maps.tiled_test"))
 
 local TILE = 16
 local MAP_W, MAP_H = Overworld.metadata.width, Overworld.metadata.height
@@ -79,7 +68,6 @@ local Player = {
 local MOVE_FRAMES = 16
 
 local Dialogue = { lines = {}, idx = 1 }
-local Battle = {}
 
 Frame = 0
 Game = { state = "title" }
@@ -108,15 +96,6 @@ local function try_start_move()
     end
 end
 
-local function start_battle()
-    Battle.player_hp, Battle.player_hp_max = 20, 20
-    Battle.enemy_hp, Battle.enemy_hp_max = 12, 12
-    Battle.turn = "player"
-    Battle.message = "Uma Meleca selvagem apareceu!"
-    Battle.msg_timer = 60
-    Game.state = "battle"
-end
-
 local function update_move()
     if not Player.moving then return end
     Player.move_t = Player.move_t + 1
@@ -125,9 +104,6 @@ local function update_move()
     if t >= 1 then
         t = 1
         Player.moving = false
-        if in_encounter_zone(Player.col, Player.row) and math.random(1, 8) == 1 then
-            start_battle()
-        end
     end
     Player.px = (Player.from_col + (Player.col - Player.from_col) * t) * TILE
     Player.py = (Player.from_row + (Player.row - Player.from_row) * t) * TILE
@@ -136,8 +112,8 @@ end
 local function start_dialogue()
     Dialogue.lines = {
         "Ola, viajante!",
-        "Cuidado com a grama alta cercada!",
-        "Ha monstros escondidos...",
+        "Esta eh uma demo simples de JRPG.",
+        "Vamos construir em cima disto!",
     }
     Dialogue.idx = 1
     Game.state = "dialogue"
@@ -167,56 +143,6 @@ local function update_dialogue()
     end
 end
 
-local function update_battle()
-    if Battle.msg_timer > 0 then
-        Battle.msg_timer = Battle.msg_timer - 1
-        return
-    end
-
-    if Battle.turn == "player" then
-        if ui.btnp(BTN_Z) then
-            local dmg = math.random(3, 6)
-            Battle.enemy_hp = math.max(0, Battle.enemy_hp - dmg)
-            Battle.message = "Voce acertou e causou " .. dmg .. " de dano!"
-            Battle.msg_timer = 40
-            if Battle.enemy_hp <= 0 then
-                Battle.message = "A Meleca foi derrotada!"
-                Battle.msg_timer = 60
-                Battle.turn = "win"
-            else
-                Battle.turn = "enemy"
-                Battle.timer = 40
-            end
-        end
-    elseif Battle.turn == "enemy" then
-        Battle.timer = Battle.timer - 1
-        if Battle.timer <= 0 then
-            local dmg = math.random(2, 4)
-            Battle.player_hp = math.max(0, Battle.player_hp - dmg)
-            Battle.message = "Meleca te causou " .. dmg .. " de dano!"
-            Battle.msg_timer = 40
-            if Battle.player_hp <= 0 then
-                Battle.message = "Voce foi derrotado..."
-                Battle.msg_timer = 60
-                Battle.turn = "lose"
-            else
-                Battle.turn = "player"
-            end
-        end
-    elseif Battle.turn == "win" then
-        if ui.btnp(BTN_Z) then Game.state = "overworld" end
-    elseif Battle.turn == "lose" then
-        if ui.btnp(BTN_Z) then
-            Battle.player_hp = Battle.player_hp_max
-            Game.state = "overworld"
-        end
-    end
-end
-
-local function draw_textbox(x0, y0, x1, y1)
-    ui.rectfill(x0, y0, x1, y1, C_BOX_BG)
-    ui.rect(x0, y0, x1, y1, C_BOX_BORDER)
-end
 
 local function draw_overworld()
     ui.cls(C_FIELD_VOID)
@@ -234,8 +160,10 @@ end
 
 local function draw_dialogue()
     draw_overworld()
-    draw_textbox(20, 205, 460, 260)
+    draw_tile_box(8, 200, 29, 5 )
+    ui.print(Dialogue.lines[Dialogue.idx], 33, 221, C_TEXT_SHADE)
     ui.print(Dialogue.lines[Dialogue.idx], 32, 220, C_TEXT)
+    ui.print("Z: Continuar", 33, 245, C_TEXT_SHADE)
     ui.print("Z: Continuar", 32, 244, C_TEXT)
 end
 
@@ -247,27 +175,6 @@ local function draw_hpbar(x, y, hp, hp_max)
         ui.rectfill(x, y, x + fillw, y + 8, hp / hp_max > 0.3 and C_HP_GOOD or C_HP_LOW)
     end
 end
-
-local function draw_battle()
-    ui.cls(C_BATTLE_BG)
-    ui.tile(CharSheet, ENEMY_TILE, 220, 60)
-
-    ui.print("VOCE", 40, 190, C_TEXT)
-    draw_hpbar(40, 202, Battle.player_hp, Battle.player_hp_max)
-    ui.print("MELECA", 360, 30, C_TEXT)
-    draw_hpbar(360, 42, Battle.enemy_hp, Battle.enemy_hp_max)
-
-    draw_textbox(20, 225, 460, 260)
-    ui.print(Battle.message, 32, 232, C_TEXT)
-    if Battle.msg_timer <= 0 then
-        if Battle.turn == "player" then
-            ui.print("Z: Atacar", 32, 246, C_HP_GOOD)
-        elseif Battle.turn == "win" or Battle.turn == "lose" then
-            ui.print("Z: Continuar", 32, 246, C_HP_GOOD)
-        end
-    end
-end
-
 
 
 
@@ -283,8 +190,5 @@ function update(frame)
     elseif Game.state == "dialogue" then
         update_dialogue()
         draw_dialogue()
-    elseif Game.state == "battle" then
-        update_battle()
-        draw_battle()
     end
 end

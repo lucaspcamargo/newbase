@@ -8,4 +8,4 @@ if _rs then
     _rs:set_clear_color(0.05, 0.05, 0.05)
 end
 
-lupi_start("res/lupi_demo/lupi.yaml")
+lupi_start("res/lupi_demo/tiny_quest/lupi.yaml")
