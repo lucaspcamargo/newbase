@@ -242,7 +242,16 @@ static int l_ui_map(lua_State* L)
         const char* tileset_name = lua_tostring(L, -2);
         const char* image_stem   = lua_tostring(L, -1);
 
-        auto it = p->sprite_by_name.find(image_stem ? image_stem : "");
+        const std::string image_name = image_stem ? image_stem : "";
+        auto it = p->sprite_by_name.find(image_name);
+        if (it == p->sprite_by_name.end()) {
+            // Map data may contain the source path (for example,
+            // "../gfx/basictiles"), while sprites are registered by basename.
+            const size_t separator = image_name.find_last_of("/\\");
+            const std::string base_name = image_name.substr(
+                separator == std::string::npos ? 0 : separator + 1);
+            it = p->sprite_by_name.find(base_name);
+        }
         if (it == p->sprite_by_name.end()) {
             log::warn("[lupi] ui.map: sprite '%s' (tileset '%s') not found", image_stem, tileset_name);
             lua_pop(L, 1); // drop value, keep key for lua_next

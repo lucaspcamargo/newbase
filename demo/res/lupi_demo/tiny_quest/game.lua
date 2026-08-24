@@ -5,18 +5,12 @@
 -- tall grass to the east can trigger a battle -> win/lose -> back to
 -- overworld.
 
+require("colors")
+require("title")
+
+
 local function rgb555(r, g, b) return (r << 10) | (g << 5) | b end
 
--- A handful of flat UI colors, set once here (not per-frame), at indices
--- high enough to sit clear of whatever the sprite auto-scan allocated.
-local C_BATTLE_BG  = 248
-local C_FIELD_VOID = 249
-local C_TEXT       = 250
-local C_BOX_BORDER = 251
-local C_BOX_BG     = 252
-local C_HP_GOOD    = 253
-local C_HP_LOW     = 254
-local C_TITLE_BG   = 255
 ui.palset(C_BATTLE_BG,  rgb555(10, 2, 2))
 ui.palset(C_FIELD_VOID, rgb555(2, 10, 2))
 ui.palset(C_TEXT,       rgb555(31, 31, 31))
@@ -27,7 +21,7 @@ ui.palset(C_HP_LOW,     rgb555(28, 4, 4))
 ui.palset(C_TITLE_BG,   rgb555(4, 4, 14))
 
 local CharSheet = Sprites.find("characters")
-local Overworld = require("maps.overworld")
+local Overworld = require("maps.tiled_test")
 
 local TILE = 16
 local MAP_W, MAP_H = Overworld.metadata.width, Overworld.metadata.height
@@ -39,34 +33,43 @@ local WALKABLE = { [64] = true, [72] = true, [12] = true } -- grass, path, flowe
 
 local function tile_id_at(col, row)
     if col < 0 or row < 0 or col >= MAP_W or row >= MAP_H then return nil end
-    local raw = Overworld.ground["basictiles"][row * MAP_W + col + 1]
+    local raw = Overworld.base["basictiles"][row * MAP_W + col + 1]
+    if not raw then return nil end
+    return raw & 0x3FF
+end
+
+local function obj_tile_id_at(col, row)
+    if col < 0 or row < 0 or col >= MAP_W or row >= MAP_H then return nil end
+    local raw = Overworld.obj["basictiles"][row * MAP_W + col + 1]
     if not raw then return nil end
     return raw & 0x3FF
 end
 
 local function is_walkable(col, row)
     local id = tile_id_at(col, row)
-    return id ~= nil and WALKABLE[id] == true
+    local obj_id = obj_tile_id_at(col, row)
+    print("obj tile id at ", col, ", ", row, ": ", obj_id)
+    return obj_id == nil -- and WALKABLE[id] == true
 end
 
 local function in_encounter_zone(col, row)
-    return col >= 12 and col <= 14 and row >= 3 and row <= 9
+    return col >= 24 and col <= 27 and row >= 12 and row <= 14
 end
 
 -- characters.png content-tile ids (see gfx/LICENSE.txt for the sheet).
 local WALK_FRAMES = {
-    down  = { 0, 1, 2 },
-    left  = { 12, 13, 14 },
-    right = { 24, 25, 26 },
-    up    = { 36, 37, 38 },
+    down  = { 3, 4, 5 },
+    left  = { 15, 16, 17 },
+    right = { 27, 28, 29 },
+    up    = { 39, 40, 41 },
 }
 local DIRS = {
     down = { 0, 1 }, up = { 0, -1 }, left = { -1, 0 }, right = { 1, 0 },
 }
-local NPC_TILE = 4 -- second character's "down" idle frame
+local NPC_TILE = 7 -- second character's "down" idle frame
 local ENEMY_TILE = 49 -- slime, idle frame
 
-local NPC = { col = 10, row = 6 }
+local NPC = { col = 20, row = 7 }
 
 local Player = {
     col = 5, row = 9, from_col = 5, from_row = 9,
@@ -93,11 +96,15 @@ local function try_start_move()
     Player.dir = dir
     local d = DIRS[dir]
     local nc, nr = Player.col + d[1], Player.row + d[2]
-    if is_walkable(nc, nr) and not (nc == NPC.col and nr == NPC.row) then
+    local walkable = is_walkable(nc, nr)
+    local contains_npc = (nc == NPC.col and nr == NPC.row)
+    if walkable and not contains_npc then
         Player.moving = true
         Player.move_t = 0
         Player.from_col, Player.from_row = Player.col, Player.row
         Player.col, Player.row = nc, nr
+    else
+        print("not_moving, walkable=", walkable, ", contains_npc=", contains_npc)
     end
 end
 
@@ -105,7 +112,7 @@ local function start_battle()
     Battle.player_hp, Battle.player_hp_max = 20, 20
     Battle.enemy_hp, Battle.enemy_hp_max = 12, 12
     Battle.turn = "player"
-    Battle.message = "A wild slime appears!"
+    Battle.message = "Uma Meleca selvagem apareceu!"
     Battle.msg_timer = 60
     Game.state = "battle"
 end
@@ -128,9 +135,9 @@ end
 
 local function start_dialogue()
     Dialogue.lines = {
-        "Hi there, traveler!",
-        "Careful in the tall grass to",
-        "the east... monsters lurk there!",
+        "Ola, viajante!",
+        "Cuidado com a grama alta cercada!",
+        "Ha monstros escondidos...",
     }
     Dialogue.idx = 1
     Game.state = "dialogue"
@@ -170,10 +177,10 @@ local function update_battle()
         if ui.btnp(BTN_Z) then
             local dmg = math.random(3, 6)
             Battle.enemy_hp = math.max(0, Battle.enemy_hp - dmg)
-            Battle.message = "You hit for " .. dmg .. "!"
+            Battle.message = "Voce acertou e causou " .. dmg .. " de dano!"
             Battle.msg_timer = 40
             if Battle.enemy_hp <= 0 then
-                Battle.message = "The slime was defeated!"
+                Battle.message = "A Meleca foi derrotada!"
                 Battle.msg_timer = 60
                 Battle.turn = "win"
             else
@@ -186,10 +193,10 @@ local function update_battle()
         if Battle.timer <= 0 then
             local dmg = math.random(2, 4)
             Battle.player_hp = math.max(0, Battle.player_hp - dmg)
-            Battle.message = "Slime hits you for " .. dmg .. "!"
+            Battle.message = "Meleca te causou " .. dmg .. " de dano!"
             Battle.msg_timer = 40
             if Battle.player_hp <= 0 then
-                Battle.message = "You were defeated..."
+                Battle.message = "Voce foi derrotado..."
                 Battle.msg_timer = 60
                 Battle.turn = "lose"
             else
@@ -213,20 +220,23 @@ end
 
 local function draw_overworld()
     ui.cls(C_FIELD_VOID)
-    ui.map(Overworld.ground, OFFSET_X, OFFSET_Y)
+    ui.map(Overworld.base, OFFSET_X, OFFSET_Y)
+    ui.map(Overworld.obj, OFFSET_X, OFFSET_Y)
 
     ui.tile(CharSheet, NPC_TILE, OFFSET_X + NPC.col * TILE, OFFSET_Y + NPC.row * TILE)
 
     local frames = WALK_FRAMES[Player.dir]
     local frame = Player.moving and frames[1 + (Player.anim_frame % 3)] or frames[2]
     ui.tile(CharSheet, frame, OFFSET_X + math.floor(Player.px), OFFSET_Y + math.floor(Player.py))
+
+    ui.map(Overworld.cover, OFFSET_X, OFFSET_Y)
 end
 
 local function draw_dialogue()
     draw_overworld()
     draw_textbox(20, 205, 460, 260)
     ui.print(Dialogue.lines[Dialogue.idx], 32, 220, C_TEXT)
-    ui.print("Z: CONTINUE", 32, 244, C_TEXT)
+    ui.print("Z: Continuar", 32, 244, C_TEXT)
 end
 
 local function draw_hpbar(x, y, hp, hp_max)
@@ -242,35 +252,30 @@ local function draw_battle()
     ui.cls(C_BATTLE_BG)
     ui.tile(CharSheet, ENEMY_TILE, 220, 60)
 
-    ui.print("YOU", 40, 190, C_TEXT)
+    ui.print("VOCE", 40, 190, C_TEXT)
     draw_hpbar(40, 202, Battle.player_hp, Battle.player_hp_max)
-    ui.print("SLIME", 360, 30, C_TEXT)
+    ui.print("MELECA", 360, 30, C_TEXT)
     draw_hpbar(360, 42, Battle.enemy_hp, Battle.enemy_hp_max)
 
     draw_textbox(20, 225, 460, 260)
     ui.print(Battle.message, 32, 232, C_TEXT)
     if Battle.msg_timer <= 0 then
         if Battle.turn == "player" then
-            ui.print("Z: ATTACK", 32, 246, C_HP_GOOD)
+            ui.print("Z: Atacar", 32, 246, C_HP_GOOD)
         elseif Battle.turn == "win" or Battle.turn == "lose" then
-            ui.print("Z: CONTINUE", 32, 246, C_HP_GOOD)
+            ui.print("Z: Continuar", 32, 246, C_HP_GOOD)
         end
     end
 end
 
-local function draw_title()
-    ui.cls(C_TITLE_BG)
-    ui.print("TINY QUEST", 200, 110, C_TEXT)
-    if (Frame // 30) % 2 == 0 then
-        ui.print("PRESS Z TO START", 165, 140, C_TEXT)
-    end
-end
+
+
 
 function update(frame)
     Frame = Frame + 1
 
     if Game.state == "title" then
-        draw_title()
+        title_draw(Frame)
         if ui.btnp(BTN_Z) then Game.state = "overworld" end
     elseif Game.state == "overworld" then
         update_overworld()
