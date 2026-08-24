@@ -47,24 +47,6 @@ input* ins()
     return sys ? static_cast<input*>(sys.get()) : nullptr;
 }
 
-// Player 0 keyboard mapping (see doc/system_lupi.md); players 1-2 and
-// button ids 6-11 are reserved/unbound in this MVP. Fallback only — used
-// when the `input` system isn't registered at all (entt::locator<input*>);
-// see k_lupi_gp_buttons below for the primary path.
-struct key_binding { int button_id; SDL_Scancode key1; SDL_Scancode key2; };
-constexpr key_binding k_player0_keys[] = {
-    {0, SDL_SCANCODE_LEFT,  SDL_SCANCODE_A}, // LEFT
-    {1, SDL_SCANCODE_RIGHT, SDL_SCANCODE_D}, // RIGHT
-    {2, SDL_SCANCODE_UP,    SDL_SCANCODE_W}, // UP
-    {3, SDL_SCANCODE_DOWN,  SDL_SCANCODE_S}, // DOWN
-    {4, SDL_SCANCODE_Z,     SDL_SCANCODE_Z}, // BTN_Z
-    {5, SDL_SCANCODE_X,     SDL_SCANCODE_X}, // BTN_X
-    {12, SDL_SCANCODE_F,    SDL_SCANCODE_F}, // BTN_F
-    {13, SDL_SCANCODE_G,    SDL_SCANCODE_G}, // BTN_G
-    {14, SDL_SCANCODE_Q,    SDL_SCANCODE_Q}, // BTN_Q
-    {15, SDL_SCANCODE_E,    SDL_SCANCODE_E}, // BTN_E
-};
-
 // ---------------------------------------------------------------------------
 // Player 0 mapping onto the `input` system's own default action map (see
 // input::setup_default_actions() in src/input/input.cpp) — used whenever
@@ -116,23 +98,49 @@ bool lupi::init(ryml::ConstNodeRef cfg)
         _d->tex = r->create_texture(LUPI_SCREEN_W, LUPI_SCREEN_H);
     }
     if (auto* m = uim()) {
-        m->register_tool_window("lupi framebuffer", [this](bool* open) {
-            if (!ImGui::Begin("Lupi Framebuffer", open)) { ImGui::End(); return; }
-            if (_d->tex) {
-                constexpr float W = (float)LUPI_SCREEN_W, H = (float)LUPI_SCREEN_H;
-                ImVec2 avail = ImGui::GetContentRegionAvail();
-                float scale = std::min(avail.x / W, avail.y / H);
-                if (scale <= 0.f) scale = 1.f;
-                ImGui::Image((ImTextureID)_d->tex, ImVec2(W * scale, H * scale));
-            } else {
-                ImGui::TextDisabled("(no renderer service)");
+        m->register_tool_window("lupi_debug", [this](bool* open) {
+            if (!ImGui::Begin("Lupi Debug", open)) { ImGui::End(); return; }
+            ImGui::Checkbox("Fixed 60 FPS simulation", &_d->fixed_rate_enabled);
+            if(ImGui::TreeNodeEx("Framebuffer", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                if (_d->tex) {
+                    constexpr float W = (float)LUPI_SCREEN_W, H = (float)LUPI_SCREEN_H;
+                    ImVec2 avail = ImGui::GetContentRegionAvail();
+                    float scale = std::min(avail.x / W, avail.y / H);
+                    if (scale <= 0.f) scale = 1.f;
+                    ImGui::Image((ImTextureID)_d->tex, ImVec2(W * scale, H * scale));
+                } else {
+                    ImGui::TextDisabled("(no renderer service)");
+                }
+                ImGui::TreePop();
+            }
+            if(ImGui::TreeNodeEx("Palette", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                float curr_text_size = ImGui::GetStyle().FontSizeBase;
+                ImVec2 clr_size {curr_text_size, curr_text_size};
+                for(int i = 0; i < _d->pal.allocated.size(); i++)
+                {
+                    if(i % 32)
+                        ImGui::SameLine();
+                    char clr_btn_id[32];
+                    clr_btn_id[31] = '\0';
+                    snprintf(clr_btn_id, 31, "lupi_pal_%d", i);
+                    ImVec4 color = ImGui::ColorConvertU32ToFloat4(lupi_palette::bgr555_to_rgba8888(_d->pal.bgr555[i]));
+                    ImGui::ColorButton(clr_btn_id, color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_Uint8, clr_size);
+                }
+                ImGui::TreePop();
+            }
+            if(ImGui::TreeNode("Assets"))
+            {
+                ImGui::Text("(A table of parsed assets will be here in the future. Nothing for now.)");
+                ImGui::TreePop();
             }
             ImGui::End();
         });
     }
-    engine::instance().debug_action_register("Lupi Framebuffer", [](){
+    engine::instance().debug_action_register("Lupi Debug", [](){
         if (auto* m = uim())
-            m->toggle_tool_window("lupi framebuffer");
+            m->toggle_tool_window("lupi_debug");
     }, 10);
 
     // Optional convenience: auto-start a cart configured directly on the
@@ -168,6 +176,8 @@ bool lupi::start(const std::string& cart_path)
     _d->pal = lupi_palette{};
     _d->gfx = lupi_gfx_state{};
     _d->frame_counter = 0;
+    _d->simulation_last_counter = SDL_GetPerformanceCounter();
+    _d->simulation_accumulator = 0.0;
 
     // Palette index 0 is the transparency sentinel (matches lupi-codec's own
     // Palette[1] = "0x0000" — see colors_manager.lua) — seed it explicitly so
@@ -191,10 +201,11 @@ bool lupi::start(const std::string& cart_path)
     lupi_register_print(_d->L);
     lupi_register_require(_d->L, *_d);
 
-    // Real carts ship no asset manifest at all — auto-discover every .png
+    // Game sources ship no asset manifest at all. We auto-discover every .png
     // under the cart directory (Sprites/Palette globals) and compile every
     // Tiled map JSON (satisfies "maps.<name>" requires) before running any
     // cart Lua, since game.lua's very first lines depend on both.
+    // Basically, we need to do lupi-codec's work :)
     lupi_scan_cart_assets(_d->L, *_d);
     lupi_compile_cart_maps(_d->L, *_d);
 
@@ -247,6 +258,8 @@ void lupi::stop()
         log::info("[lupi] stopped");
     _d->running = false;
     _d->cart = nullptr;
+    _d->simulation_last_counter = 0;
+    _d->simulation_accumulator = 0.0;
 }
 
 bool lupi::running() const
@@ -267,15 +280,32 @@ bool lupi::step(step_phase phase)
     if (phase == GENERAL_UPDATE && _d->running) {
         Uint64 t0 = SDL_GetPerformanceCounter();
 
+        Uint64 now = SDL_GetPerformanceCounter();
+        if (_d->fixed_rate_enabled) {
+            constexpr double kSimulationStep = 1.0 / 60.0;
+            constexpr double kMaximumElapsed = 0.25;
+            double elapsed = double(now - _d->simulation_last_counter)
+                           / double(SDL_GetPerformanceFrequency());
+            _d->simulation_last_counter = now;
+            _d->simulation_accumulator += std::min(elapsed, kMaximumElapsed);
+        } else {
+            _d->simulation_last_counter = now;
+            _d->simulation_accumulator = 0.0;
+        }
+
         _d->btn.pressure_last_frame = _d->btn.pressure_this_frame;
+        _d->btn.pressure_this_frame = {};
 
         if (auto* in = ins()) {
             // Primary path: `input`'s own default action map already covers
             // both gamepad and keyboard — see k_lupi_gp_buttons above for why
             // this doubles as the "virtual SNES controller" the real Lupi
             // console's own input maps onto (see doc/system_lupi.md).
-            for (const auto& b : k_lupi_gp_buttons)
+            for (const auto& b : k_lupi_gp_buttons) {
                 _d->btn.pressure_this_frame[0][b.button_id] = in->action_is_pressed(b.action_id.value()) ? 255 : 0;
+                if (in->action_was_pressed(b.action_id.value()))
+                    _d->btn.pending_pressed[0][b.button_id] = true;
+            }
 
             glm::vec3 dir = in->action_direction(k_lupi_gp_dir.value());
             constexpr float kDirThreshold = 0.5f; // digital-from-analog trigger point
@@ -283,22 +313,38 @@ bool lupi::step(step_phase phase)
             _d->btn.pressure_this_frame[0][1] = dir.x >  kDirThreshold ? 255 : 0; // RIGHT
             _d->btn.pressure_this_frame[0][2] = dir.y < -kDirThreshold ? 255 : 0; // UP
             _d->btn.pressure_this_frame[0][3] = dir.y >  kDirThreshold ? 255 : 0; // DOWN
-        } else {
-            // Fallback: `input` system isn't registered at all.
-            const bool* keys = SDL_GetKeyboardState(nullptr);
-            for (const auto& kb : k_player0_keys) {
-                bool down = keys[kb.key1] || keys[kb.key2];
-                _d->btn.pressure_this_frame[0][kb.button_id] = down ? 255 : 0;
-            }
         }
 
-        lua_getglobal(_d->L, "update");
-        lua_pushinteger(_d->L, (lua_Integer)_d->frame_counter);
-        if (lua_pcall(_d->L, 1, 0, 0) != LUA_OK) {
-            log::error("[lupi] update() error in '%s': %s", _d->cart->chunkname.c_str(), lua_tostring(_d->L, -1));
-            lua_pop(_d->L, 1);
+        auto run_update = [&]() {
+            lua_getglobal(_d->L, "update");
+            lua_pushinteger(_d->L, (lua_Integer)_d->frame_counter);
+            if (lua_pcall(_d->L, 1, 0, 0) != LUA_OK) {
+                log::error("[lupi] update() error in '%s': %s", _d->cart->chunkname.c_str(), lua_tostring(_d->L, -1));
+                lua_pop(_d->L, 1);
+            }
+            ++_d->frame_counter;
+            for (auto& player : _d->btn.pending_pressed)
+                player.fill(false);
+        };
+
+        int simulation_steps = 0;
+        constexpr double kSimulationStep = 1.0 / 60.0;
+        constexpr int kMaximumCatchUpSteps = 5;
+        while (_d->fixed_rate_enabled
+               && _d->simulation_accumulator >= kSimulationStep
+               && simulation_steps++ < kMaximumCatchUpSteps) {
+            run_update();
+            _d->simulation_accumulator -= kSimulationStep;
         }
-        ++_d->frame_counter;
+        if (_d->fixed_rate_enabled
+            && simulation_steps == kMaximumCatchUpSteps
+            && _d->simulation_accumulator >= kSimulationStep) {
+            // Drop an excessive backlog after a pause or a long hitch. This
+            // keeps the game responsive instead of running stale simulation.
+            _d->simulation_accumulator = 0.0;
+        }
+        if (!_d->fixed_rate_enabled)
+            run_update();
 
         Uint64 t1 = SDL_GetPerformanceCounter();
         double ms = double(t1 - t0) * 1000.0 / double(SDL_GetPerformanceFrequency());

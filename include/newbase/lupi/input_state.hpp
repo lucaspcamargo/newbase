@@ -13,6 +13,7 @@ static constexpr int LUPI_MAX_PLAYERS  = 3;  // only player 0 is bound to real k
 struct lupi_button_state {
     std::array<std::array<uint8_t, LUPI_BUTTON_COUNT>, LUPI_MAX_PLAYERS> pressure_this_frame {};
     std::array<std::array<uint8_t, LUPI_BUTTON_COUNT>, LUPI_MAX_PLAYERS> pressure_last_frame {};
+    std::array<std::array<bool, LUPI_BUTTON_COUNT>, LUPI_MAX_PLAYERS> pending_pressed {};
 };
 
 struct lupi_mouse_state {

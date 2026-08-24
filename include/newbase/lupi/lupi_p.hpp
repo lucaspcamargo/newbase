@@ -70,6 +70,13 @@ struct lupi_p {
 
     uint64_t frame_counter { 0 };
 
+    // Fixed-rate simulation clock. The host may render and call step() at a
+    // different rate (for example, a 75 Hz vsync display), so Lua update()
+    // is driven from accumulated wall-clock time instead.
+    bool fixed_rate_enabled { true };
+    uint64_t simulation_last_counter { 0 };
+    double simulation_accumulator { 0.0 };
+
     // simple rolling stats for ui.stat()
     double last_step_ms { 0.0 };
     double cpu_ema      { 0.0 };

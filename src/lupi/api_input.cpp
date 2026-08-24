@@ -25,9 +25,8 @@ static int l_ui_btnp(lua_State* L)
     int player = (int)luaL_optinteger(L, 2, 0);
     lupi_p* p = lupi_self(L);
     if (!valid_id(id, player)) { lua_pushboolean(L, 0); return 1; }
-    uint8_t now  = p->btn.pressure_this_frame[player][id];
-    uint8_t prev = p->btn.pressure_last_frame[player][id];
-    if (now != 0 && prev == 0) lua_pushinteger(L, now);
+    uint8_t pressure = p->btn.pressure_this_frame[player][id];
+    if (p->btn.pending_pressed[player][id]) lua_pushinteger(L, pressure != 0 ? pressure : 255);
     else lua_pushboolean(L, 0);
     return 1;
 }
