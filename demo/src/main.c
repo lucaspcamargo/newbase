@@ -22,6 +22,45 @@ extern void nb_sgdk_main(bool);  // game entry point, renamed via -Dmain=nb_sgdk
 
 #include <stdio.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+// Query-string command-line arguments use repeated `arg` parameters, for
+// example: newbase_demo.html?arg=--demo&arg=5. URLSearchParams performs the
+// browser's standard percent-decoding before handing each token to C.
+EM_JS(int, nb_query_arg_count, (), {
+    return new URLSearchParams(window.location.search).getAll("arg").length;
+});
+
+EM_JS(char *, nb_query_arg, (int index), {
+    var values = new URLSearchParams(window.location.search).getAll("arg");
+    return index >= 0 && index < values.length ? stringToNewUTF8(values[index]) : 0;
+});
+
+static char **nb_emscripten_argv(int argc, char **argv, int *out_argc)
+{
+    int extra_count = nb_query_arg_count();
+    if (extra_count <= 0) {
+        *out_argc = argc;
+        return argv;
+    }
+
+    char **result = malloc((size_t)(argc + extra_count + 1) * sizeof(*result));
+    if (!result) {
+        *out_argc = argc;
+        return argv;
+    }
+
+    for (int i = 0; i < argc; ++i)
+        result[i] = argv[i];
+    for (int i = 0; i < extra_count; ++i)
+        result[argc + i] = nb_query_arg(i);
+    result[argc + extra_count] = NULL;
+    *out_argc = argc + extra_count;
+    return result;
+}
+#endif
+
 
 inline static enum SDL_AppResult bool_to_app_result(bool val)
 {
@@ -55,12 +94,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     _rtti_init_newbase();
 
+#ifdef __EMSCRIPTEN__
+    int effective_argc = argc;
+    char **effective_argv = nb_emscripten_argv(argc, argv, &effective_argc);
+#else
+    int effective_argc = argc;
+    char **effective_argv = argv;
+#endif
+
 #ifdef NEWBASE_SGDK
     nb_sgdk_set_main(nb_sgdk_main);
 #endif
 
 	(*appstate) = NULL;
-	if (!_nb_engine_init(appstate, argc, argv))
+    if (!_nb_engine_init(appstate, effective_argc, effective_argv))
 		return SDL_APP_FAILURE;
 	_nb_demo_register_systems();
 	return SDL_APP_CONTINUE;
