@@ -37,6 +37,7 @@ void lupi_draw_tile(lupi_p& p, const lupi_spritesheet& sheet, int tile_id, int x
 
 void lupi_register_ui(lua_State* L);      // ui.* drawing/stat/fillp/mid + Lua globals for constants
 void lupi_register_input(lua_State* L);   // ui.btn/btnp/mouse/peektext/readtext
+void lupi_register_io(lua_State* L, lupi_p& p); // read-only io.open backed by rman()
 void lupi_register_stubs(lua_State* L);   // sfx.* and ui.layout()/Box()/Text()/Image()/Custom() no-ops
 void lupi_register_print(lua_State* L);   // overrides global print() to route through nb::log::info
 

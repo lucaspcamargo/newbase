@@ -215,6 +215,23 @@ small C function, cached per-module the same way vanilla `require()` is:
   side-effect-only: they define globals, they don't `return` a table), then
   cached.
 
+## Read-only file access
+
+Inside a Lupi cart, `io.open()` is backed by newbase's resource manager rather
+than the host filesystem. It accepts cart-relative paths and read-only modes:
+
+```lua
+local file, err = io.open("gfx/tileset.json", "r")
+if file then
+    local contents = file:read("*a")
+    file:close()
+end
+```
+
+The supported modes are `"r"` and `"rb"`. `file:read("*a")`, `file:read("*l")`,
+`file:read("*L")`, and numeric byte counts are supported. Absolute paths,
+paths that escape the cart directory, and write modes are rejected.
+
 ## Palette overrides
 
 A real cart's own game code routinely hardcodes small "logical" palette

@@ -4,6 +4,7 @@ newbase_add_system(NAME lupi SOURCES
     ./lupi.cpp
     ./api_ui.cpp
     ./api_input.cpp
+    ./api_io.cpp
     ./api_stubs.cpp
     ./api_require.cpp
     ./draw.cpp
