@@ -10,7 +10,7 @@ local TYPE_MAP
 local BUILD_DATA = {
     -- dados para nosso tileset
     basictiles = {
-        [29] = { -- água
+        [29] = { -- água, exemplo
             type = "water"
         } 
     }
@@ -37,27 +37,49 @@ local function cache_try_find(type_key)
 end
 
 -- builds a field object from a tile in the "obj" layer
--- ts_data contains specific tile data given tile index, and must also contain a sprite ref (key "sprite")
-function fobj_build(tileset, ts_data, tidx, x, y)
+-- ts_data contains specific tile data given the tile index, and must also contain a sprite ref (key "sprite")
+-- extra_data is a table containing collected properties of point objects of the map, can be used as build data overrides
+function fobj_build(tileset, tidx, x, y, ts_data, extra_data)
 
-    ts_build_data = BUILD_DATA[tileset]
-    if ts_build_data == nil then
-        return nil
+    local build_data = {}
+
+    -- use data from BUILD_DATA as initial build data
+    local ts_build_data = BUILD_DATA[tileset]
+    local instr = ts_build_data and ts_build_data[tidx]
+    if instr ~= nil then
+        for key, value in pairs(instr) do
+            build_data[key] = value
+        end
     end
 
-    instr = ts_build_data[tidx]
-    if instr == nil then
-        return FObjTile:new( x, y, ts_data.sprite, tidx )
+    -- then add in data from tileset (ts_data)
+    local ts_tile_data = ts_data and ts_data[tidx]
+    if ts_tile_data ~= nil then
+        for key, value in pairs(ts_tile_data) do
+            build_data[key] = value
+        end
+    end
+
+    -- finally, override with fields from extra_data (map-tile-specific)
+    for key, value in pairs(extra_data or {}) do
+        build_data[key] = value
+    end
+
+    -- we now have finished object build data
+
+    -- fallback to FObjTile if type is unspecified
+    if build_data == nil or build_data.type == nil then
+        return FObjTile:new( x, y, ts_data.sprite, tidx, build_data )
     end
 
     -- we have valid instructions
-    type_key = instr.type
+    type_key = build_data.type
     type_ref = cache_try_find(type_key)
 
     if type_ref.class ~= nil then
         -- create fobj of specific type
-        return (type_ref.class):new( x, y, ts_data.sprite, tidx )
+        return (type_ref.class):new(x, y, ts_data.sprite, tidx, build_data)
     else
-        print("[fobj_factory] WARNING: cannot find fobj type: "..instr.type)
+        print("[fobj_factory] WARNING: cannot find fobj type: "..type_key)
     end
 end

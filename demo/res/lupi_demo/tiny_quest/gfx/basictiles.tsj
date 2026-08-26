@@ -1,11 +1,11 @@
 { "columns":8,
  "image":"basictiles.png",
- "imageheight":256,
+ "imageheight":320,
  "imagewidth":144,
  "margin":16,
  "name":"basictiles_base",
  "spacing":0,
- "tilecount":120,
+ "tilecount":152,
  "tiledversion":"1.12.2",
  "tileheight":16,
  "tiles":[
@@ -82,6 +82,15 @@
                 }]
         }, 
         {
+         "id":29,
+         "properties":[
+                {
+                 "name":"type",
+                 "type":"string",
+                 "value":"water"
+                }]
+        }, 
+        {
          "id":30,
          "properties":[
                 {
@@ -142,6 +151,61 @@
                  "name":"solid",
                  "type":"bool",
                  "value":true
+                }]
+        }, 
+        {
+         "id":56,
+         "properties":[
+                {
+                 "name":"solid",
+                 "type":"bool",
+                 "value":false
+                }]
+        }, 
+        {
+         "id":57,
+         "properties":[
+                {
+                 "name":"solid",
+                 "type":"bool",
+                 "value":false
+                }]
+        }, 
+        {
+         "id":60,
+         "properties":[
+                {
+                 "name":"anim",
+                 "type":"string",
+                 "value":"60:20;61:20"
+                }, 
+                {
+                 "name":"solid",
+                 "type":"bool",
+                 "value":true
+                }]
+        }, 
+        {
+         "id":61,
+         "properties":[
+                {
+                 "name":"anim",
+                 "type":"string",
+                 "value":"60:20;61:20"
+                }, 
+                {
+                 "name":"solid",
+                 "type":"bool",
+                 "value":true
+                }]
+        }, 
+        {
+         "id":86,
+         "properties":[
+                {
+                 "name":"type",
+                 "type":"string",
+                 "value":"npc"
                 }]
         }, 
         {

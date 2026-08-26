@@ -16,8 +16,6 @@ local WALK_FRAMES = {
 local DIRS = {
     down = { 0, 1 }, up = { 0, -1 }, left = { -1, 0 }, right = { 1, 0 },
 }
-local NPC_TILE = 7
-local NPC = { col = 20, row = 7 }
 local MOVE_FRAMES = 16
 
 local SceneField = setmetatable({}, BaseScene)
@@ -25,7 +23,7 @@ SceneField.__index = SceneField
 
 function SceneField:new()
     local scene = BaseScene.new(self)
-    scene.overworld = map_prepare(require("maps.tiled_test"))
+    scene.overworld = map_prepare(require("maps.tiled_test"), "./maps/tiled_test.json")
     scene.map_w = scene.overworld.metadata.width
     scene.map_h = scene.overworld.metadata.height
     scene.offset_x = math.floor((480 - scene.map_w * TILE_SZ) / 2)
@@ -94,9 +92,10 @@ function SceneField:try_start_move()
     player.dir = dir
     local delta = DIRS[dir]
     local next_col, next_row = player.col + delta[1], player.row + delta[2]
+    local fobj = self:find_fobj(next_col, next_row)
     local walkable = not map_is_solid(self.overworld, next_col, next_row)
-    local contains_npc = next_col == NPC.col and next_row == NPC.row
-    if walkable and not contains_npc then
+        and (not fobj or not fobj:is_solid())
+    if walkable then
         player.moving = true
         player.move_t = 0
         player.from_col, player.from_row = player.col, player.row
@@ -119,28 +118,13 @@ function SceneField:update_move()
     player.py = (player.from_row + (player.row - player.from_row) * progress) * TILE_SZ
 end
 
-function SceneField:start_dialogue()
-    self.dialogue.lines = {
-        "Ola, viajante!",
-        "Esta eh uma demo simples de JRPG.",
-        "Vamos construir em cima disto!",
-    }
-    self.dialogue.idx = 1
-    self.mode = "dialogue"
-end
-
 function SceneField:try_interact()
     local player = self.player
     if player.moving or not ui.btnp(BTN_Z) then return end
 
     local delta = DIRS[player.dir]
     local facing_col, facing_row = player.col + delta[1], player.row + delta[2]
-    if facing_col == NPC.col and facing_row == NPC.row then
-        self:start_dialogue()
-        return
-    end
-
-    fobj_here = self:find_fobj(facing_col, facing_row)
+    local fobj_here = self:find_fobj(facing_col, facing_row)
     if fobj_here and fobj_here:is_interactive() then
         fobj_here:interact(self.field_controller)
     end
@@ -165,8 +149,11 @@ end
 function SceneField:draw_overworld()
     local player = self.player
     ui.cls(C_FIELD_VOID)
-    ui.map(self.overworld.base, self.offset_x, self.offset_y)
-    ui.map(self.overworld.base_decor, self.offset_x, self.offset_y)
+
+    ui.camera(-self.offset_x, -self.offset_y)
+
+    ui.map(self.overworld.base, 0, 0)
+    ui.map(self.overworld.base_decor, 0, 0)
 
     -- now, draw field objects, sorted by y coord, then x coord
     local sorted_fobjs = {}
@@ -183,13 +170,14 @@ function SceneField:draw_overworld()
         fobj:draw()
     end
 
-    ui.tile(CharSheet, NPC_TILE, self.offset_x + NPC.col * TILE_SZ, self.offset_y + NPC.row * TILE_SZ)
-
     local frames = WALK_FRAMES[player.dir]
     local frame = player.moving and frames[1 + (player.anim_frame % 3)] or frames[2]
-    ui.tile(CharSheet, frame, self.offset_x + math.floor(player.px), self.offset_y + math.floor(player.py))
+    ui.tile(CharSheet, frame, math.floor(player.px), math.floor(player.py))
 
-    ui.map(self.overworld.cover, self.offset_x, self.offset_y)
+    ui.map(self.overworld.cover, 0, 0)
+
+    -- reset camera
+    ui.camera(0,0)
 end
 
 function SceneField:draw_dialogue()

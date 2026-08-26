@@ -9,6 +9,9 @@
 -- final console. Also, this needs to be tested in Lupinho, and adjustments may have to be made.
 -- I don't think the simulator is chdir'ing into /loaded_game/, where the game files live...
 
+-- Another thing is that the processed maps may have data stripped out of the original JSON.
+-- Anyway, just things to look into later.
+
 local json = require("lib/dkjson")
 local FObjTile = require("fobj_tile")
 require("fobj_factory")
@@ -88,6 +91,53 @@ function map_get_tset_data(tileset_name)
     return TILESET_DATA[tileset_name]
 end
 
+function map_read_point_objects(path, tile_width, tile_height)
+    local file, open_err = io.open(path, "r")
+    if not file then
+        error("failed to open map " .. tostring(path) .. ": " .. tostring(open_err))
+    end
+
+    local contents = file:read("*a")
+    file:close()
+
+    local map_data, _, decode_err = json.decode(contents)
+    if not map_data then
+        error("failed to decode map " .. tostring(path) .. ": " .. tostring(decode_err))
+    end
+
+    local points = {}
+    tile_width = tile_width or map_data.tilewidth
+    tile_height = tile_height or map_data.tileheight or tile_width
+    if not tile_width or not tile_height then
+        error("map " .. tostring(path) .. " has no tile dimensions")
+    end
+
+    for _, layer in ipairs(map_data.layers or {}) do
+        if layer.type == "objectgroup" then
+            for _, object in ipairs(layer.objects or {}) do
+                if object.point == true then
+                    local properties = {}
+                    for _, property in ipairs(object.properties or {}) do
+                        properties[property.name] = property.value
+                    end
+
+                    table.insert(points, {
+                        id = object.id,
+                        name = object.name,
+                        type = object.type,
+                        layer = layer.name,
+                        x = math.floor(object.x / tile_width),
+                        y = math.floor(object.y / tile_height),
+                        properties = properties,
+                    })
+                end
+            end
+        end
+    end
+
+    return points
+end
+
 function map_is_solid(map, x, y)
     local map_width = map.metadata.width
     local map_height = map.metadata.height
@@ -101,9 +151,23 @@ function map_is_solid(map, x, y)
     return map.data.solid[tile_index] == MAP_SOLID
 end
 
+local function point_object_props_in_tile(point_objects, tile_x, tile_y)
+    -- filters point objects inside this tile
+    -- merges their properties to a single table and returns it
+    local props = {}
 
+    for _, point_object in ipairs(point_objects or {}) do
+        if point_object.x == tile_x and point_object.y == tile_y then
+            for property_name, property_value in pairs(point_object.properties or {}) do
+                props[property_name] = property_value
+            end
+        end
+    end
 
-function map_prepare(original)
+    return props
+end
+
+function map_prepare(original, source_path)
 
     -- here we make a copy of the original map, and do all the processing we need on the copy
     -- we return the copy, and any extracted data
@@ -111,6 +175,13 @@ function map_prepare(original)
     local map_cpy = map_deep_copy(original)
 
     local map_w, map_h = map_cpy.metadata.width, map_cpy.metadata.height
+
+    if source_path then
+        map_cpy.point_objects = map_read_point_objects(source_path, map_cpy.metadata.tile_size)
+        print("[map_prepare] found " .. #(map_cpy.point_objects) .. " point objs in map")
+    else
+        map_cpy.point_objects = {}
+    end
 
     local solidity = {}
     for tile_index = 1, map_w * map_h do
@@ -164,12 +235,14 @@ function map_prepare(original)
                 -- if we find a tile in the obj layer, we create an instance of FObjTile at the x and y position
                 -- we use ts_data.sprite as the sprite
                 if tile_ts_index then
+                    point_obj_props = point_object_props_in_tile(map_cpy.point_objects, column-1, row-1)
                     new_obj = fobj_build(
                         tset_id,
-                        ts_data,
                         tile_ts_index,
                         column - 1,
-                        row - 1
+                        row - 1,
+                        ts_data,
+                        point_obj_props -- extra_data
                     )
                     if new_obj ~= nil then
                         table.insert(map_cpy.fobjs, new_obj)
