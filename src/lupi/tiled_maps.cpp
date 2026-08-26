@@ -292,6 +292,22 @@ void nb::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
         rel = rel.substr(0, rel.size() - 5); // strip ".json"
         std::replace(rel.begin(), rel.end(), '/', '.');
 
+        std::string tilesets;
+        for (const auto& ts : m.tilesets) {
+            if (!tilesets.empty()) tilesets += ", ";
+            tilesets += ts.image_stem.empty() ? ts.name : ts.image_stem;
+        }
+        p.assets.push_back({
+            "Map",
+            rel,
+            std::to_string(m.width) + "x" + std::to_string(m.height),
+            "tile " + std::to_string(m.tile_size) + ", " +
+                std::to_string(m.layers.size()) + " layers, tilesets: " + tilesets,
+            handle.size,
+            res_id,
+            handle.path
+        });
+
         push_compiled_map(L, m);
         lua_setfield(L, -2, rel.c_str());
         ++n;

@@ -471,6 +471,23 @@ void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
         std::string rel = path.substr(p.cart_dir.size());
         rel = rel.substr(0, rel.size() - 4); // strip ".png"
         p.sprite_by_name[stem_of(path)] = sheet;
+        const int image_height = sheet->image_width > 0
+            ? static_cast<int>(sheet->pixels.size() / static_cast<size_t>(sheet->image_width))
+            : 0;
+        const std::string extras = sheet->cols == 1 && sheet->rows == 1
+            ? "(no frames)"
+            : "tiles " + std::to_string(sheet->tile_width) + "x" + std::to_string(sheet->tile_height) +
+                  ", " + std::to_string(sheet->cols) + "x" + std::to_string(sheet->rows) +
+                  " (" + std::to_string(sheet->tile_count) + ")";
+        p.assets.push_back({
+            "Sprite",
+            stem_of(path),
+            std::to_string(sheet->image_width) + "x" + std::to_string(image_height),
+            extras,
+            rman().handles().at(res_id).size,
+            res_id,
+            path
+        });
         discovered.emplace_back(std::move(rel), std::move(sheet));
     }
     log::info("[lupi_scan_cart_assets] discovered %zu sprite(s) under '%s'",

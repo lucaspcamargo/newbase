@@ -17,6 +17,16 @@
 
 namespace nb {
 
+struct lupi_asset_info {
+    std::string kind;
+    std::string identifier;
+    std::string dimensions;
+    std::string extras;
+    std::size_t size { 0 };
+    entt::id_type resource_id { 0 };
+    std::string path;
+};
+
 struct lupi_p {
     lua_State* L { nullptr };
     bool running { false };
@@ -42,6 +52,7 @@ struct lupi_p {
     // convention — see doc/system_lupi.md). Also the internal source of
     // truth ui.map()'s tileset lookups use directly, without a Lua round-trip.
     std::unordered_map<std::string, std::shared_ptr<lupi_spritesheet>> sprite_by_name;
+    std::vector<lupi_asset_info> assets;
 
     // Snapshot of `pal` taken right after lupi_scan_cart_assets finishes
     // synthesizing it (sprite auto-quantization + palette_overrides.yaml +
@@ -74,6 +85,7 @@ struct lupi_p {
     // different rate (for example, a 75 Hz vsync display), so Lua update()
     // is driven from accumulated wall-clock time instead.
     bool fixed_rate_enabled { true };
+    double fixed_rate_snap_tolerance { 0.001 };
     uint64_t simulation_last_counter { 0 };
     double simulation_accumulator { 0.0 };
 

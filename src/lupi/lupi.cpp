@@ -13,6 +13,7 @@
 #include <imgui.h>
 #include <ryml_std.hpp>
 #include <algorithm>
+#include <cstdio>
 
 using namespace nb;
 
@@ -112,6 +113,9 @@ bool lupi::init(ryml::ConstNodeRef cfg)
                                 {
             if (!ImGui::Begin("Lupi Debug", open)) { ImGui::End(); return; }
             ImGui::Checkbox("Fixed 60 FPS simulation", &_d->fixed_rate_enabled);
+            if(_d->fixed_rate_enabled)
+                                    ImGui::InputDouble("60 FPS snap tolerance (s)", 
+                                        &_d->fixed_rate_snap_tolerance, 0.0001, 0.001, "%.4f");
             if(ImGui::TreeNodeEx("Framebuffer", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 if (_d->tex) {
@@ -155,7 +159,42 @@ bool lupi::init(ryml::ConstNodeRef cfg)
             }
             if(ImGui::TreeNode("Assets"))
             {
-                ImGui::Text("(A table of parsed assets will be here in the future. Nothing for now.)");
+                if (ImGui::BeginTable("lupi_assets", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                                     ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY,
+                                      ImVec2(0.0f, 240.0f)))
+                {
+                    ImGui::TableSetupColumn("Type");
+                    ImGui::TableSetupColumn("Lupi identifier");
+                    ImGui::TableSetupColumn("Dimensions");
+                    ImGui::TableSetupColumn("Extras");
+                    ImGui::TableSetupColumn("File size");
+                    ImGui::TableSetupColumn("Resource ID");
+                    ImGui::TableSetupColumn("Resman path");
+                    ImGui::TableHeadersRow();
+
+                    for (const auto& asset : _d->assets)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(asset.kind.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(asset.identifier.c_str());
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(asset.dimensions.c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(asset.extras.c_str());
+                        ImGui::TableSetColumnIndex(4);
+                        if (asset.size == std::string::npos)
+                            ImGui::TextUnformatted("unknown");
+                        else
+                            ImGui::Text("%zu B", asset.size);
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::Text("0x%08llx", static_cast<unsigned long long>(asset.resource_id));
+                        ImGui::TableSetColumnIndex(6);
+                        ImGui::TextUnformatted(asset.path.c_str());
+                    }
+                    ImGui::EndTable();
+                }
                 ImGui::TreePop();
             }
             ImGui::End(); });
@@ -195,6 +234,7 @@ bool lupi::start(const std::string &cart_path)
     _d->cart = cart;
     _d->cart_dir = cart->dir;
     _d->sprite_by_name.clear();
+    _d->assets.clear();
 
     _d->fb = lupi_framebuffer{};
     _d->pal = lupi_palette{};
@@ -367,6 +407,12 @@ bool lupi::step(step_phase phase)
         int simulation_steps = 0;
         constexpr double kSimulationStep = 1.0 / 60.0;
         constexpr int kMaximumCatchUpSteps = 5;
+        const double snap_tolerance = std::clamp(_d->fixed_rate_snap_tolerance, 0.0, kSimulationStep * 0.5);
+        if (_d->simulation_accumulator <= snap_tolerance)
+            _d->simulation_accumulator = 0.0;
+        else if (_d->simulation_accumulator < kSimulationStep &&
+                 kSimulationStep - _d->simulation_accumulator <= snap_tolerance)
+            _d->simulation_accumulator = kSimulationStep;
         while (_d->fixed_rate_enabled && _d->simulation_accumulator >= kSimulationStep && simulation_steps++ < kMaximumCatchUpSteps)
         {
             run_update();
