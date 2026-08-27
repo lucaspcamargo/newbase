@@ -211,8 +211,8 @@ static int l_ui_tile(lua_State* L)
 static int l_ui_map(lua_State* L)
 {
     luaL_checktype(L, 1, LUA_TTABLE);
-    int cam_x = optint(L,2,0);
-    int cam_y = optint(L,3,0);
+    int origin_x = optint(L,2,0);
+    int origin_y = optint(L,3,0);
 
     // Real compiled shape (confirmed against a real cart's map.lua/director.lua/
     // hud.lua, which index e.g. map.POI.pois[i] directly) — reproduced by our
@@ -276,8 +276,12 @@ static int l_ui_map(lua_State* L)
 
                 int i0 = cell_index - 1;
                 int row = i0 / width, col = i0 % width;
+
+                const int draw_x = col * tile_size + origin_x;
+                const int draw_y = row * tile_size + origin_y;
+
                 lupi_draw_tile(*p, sheet, local_id,
-                    col * tile_size + cam_x, row * tile_size + cam_y, flip_x, flip_y);
+                    draw_x, draw_y, flip_x, flip_y);
             }
         }
         lua_pop(L, 1); // drop this tileset's sub-table (or nil)

@@ -201,6 +201,13 @@ void nb::lupi_draw_tile(lupi_p& p, const lupi_spritesheet& sheet, int tile_id, i
     const uint8_t* origin = sheet.tile_origin(tile_id);
     if (!origin) return;
 
+    // check if tile is inside viewport, consider camera
+    const int screen_x = x - p.gfx.camera_x;
+    const int screen_y = y - p.gfx.camera_y;
+    if (screen_x + sheet.tile_width <= 0 || screen_x >= LUPI_SCREEN_W ||
+        screen_y + sheet.tile_height <= 0 || screen_y >= LUPI_SCREEN_H)
+        return;
+
     int stride = sheet.image_width;
     int tw = sheet.tile_width, th = sheet.tile_height;
     for (int row = 0; row < th; ++row) {
