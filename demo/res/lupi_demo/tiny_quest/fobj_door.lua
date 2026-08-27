@@ -3,6 +3,11 @@ local BaseFieldObj = require("base_fieldobj")
 local FObjDoor = setmetatable({}, BaseFieldObj)
 FObjDoor.__index = FObjDoor
 
+SKINS = {
+    [48] = {48, 136, 137, 138},
+    [49] = {48, 136, 137, 138},
+}
+
 function FObjDoor:new(x, y, sprite, tile, build_data)
 	local obj = BaseFieldObj.new(self, x, y)
 	obj.sprite = sprite

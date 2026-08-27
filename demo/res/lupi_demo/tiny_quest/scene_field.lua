@@ -12,7 +12,7 @@ local TRANSITION_DURATION = 40
 local SceneField = setmetatable({}, BaseScene)
 SceneField.__index = SceneField
 
-function SceneField:new(field_id)
+function SceneField:new(field_id, waypoint_id)
     local scene = BaseScene.new(self)
     scene.field_id = field_id
     scene.map = map_load(scene.field_id)
@@ -23,7 +23,18 @@ function SceneField:new(field_id)
     scene.frame = 0
     scene.mode = "transition_in"
     scene.debug = false
-    scene.player = FObj_Creature:new(5, 9, Sprites.find("characters"), nil, {
+    local start_x = 5
+    local start_y = 9
+    if waypoint_id then
+        found, x, y = map_locate_waypoint(scene.map, waypoint_id)
+        if found then
+            start_x = x
+            start_y = y
+        else
+            print("[scene_field] WARNING: waypoint not found: " .. waypoint_id)
+        end
+    end
+    scene.player = FObj_Creature:new(start_x, start_y, Sprites.find("characters"), nil, {
         skin = "boy",
         controllable = true,
     })
@@ -31,8 +42,8 @@ function SceneField:new(field_id)
     scene.fobjs = scene.map.fobjs
     table.insert(scene.fobjs, scene.player)
     scene.field_controller = {
-        find_fobj = function (x, y)
-            return scene:find_fobj(x, y)
+        find_fobj = function (x, y, to_ignore)
+            return scene:find_fobj(x, y, to_ignore)
         end,
         is_solid = function (x, y)
             return map_is_solid(scene.map, x, y)
@@ -44,8 +55,19 @@ function SceneField:new(field_id)
             scene.active_talker = speaker
             scene.mode = "dialogue"
         end,
-        in_dialogue = function()
+        in_dialogue_mode = function()
             return scene.mode == "dialogue"
+        end,
+        in_normal_mode = function()
+            return scene.mode == "map"
+        end,
+        map_change = function(target_map, target_wp)
+            scene.mode = "transition_out"
+            scene.transition_out_start = scene.frame
+            scene.transition_out_data = {
+                map = target_map,
+                wp = target_wp
+            }
         end
     }
     scene.first_update = true
@@ -73,7 +95,7 @@ function SceneField:update(frame)
     end
 
     if self.mode == "transition_out" and (self.transition_out_start + TRANSITION_DURATION) == frame then 
-        print("CHANGE MAP "..str(self.transition_out_data))        
+        self.next_scene = SceneField:new(self.transition_out_data.map, self.transition_out_data.wp)        
     end
 
     for _, fobj in ipairs(self.fobjs) do
@@ -219,16 +241,21 @@ function SceneField:draw_map()
     ui.map(self.map.base, 0, 0)
     ui.map(self.map.base_decor, 0, 0)
 
-    -- now, draw field objects, sorted by y coord, then x coord
+    -- now, draw field objects, sorted by , then by coord, then x coord
     local sorted_fobjs = {}
     for _, fobj in ipairs(self.fobjs) do
         table.insert(sorted_fobjs, fobj)
     end
     table.sort(sorted_fobjs, function(first, second)
-        if first.y == second.y then
-            return first.x < second.x
+        first_solid = first:is_solid()
+        second_solid = second:is_solid()
+        if first_solid == second_solid then
+            if first.y == second.y then
+                return first.x < second.x
+            end
+            return first.y < second.y
         end
-        return first.y < second.y
+        return not first_solid
     end)
     for _, fobj in ipairs(sorted_fobjs) do
         fobj:draw()
@@ -259,11 +286,12 @@ function SceneField:draw_debug()
     ui.print("CAM_X: " .. self.cam_x .. "  CAM_Y: " .. self.cam_y, 8, 56, C_TEXT)
 end
 
-function SceneField:find_fobj(x, y)
+function SceneField:find_fobj(x, y, to_ignore)
     -- try to find a field object at specified coordinates
     -- returns nil when there's nothing
+    --  to_ignore is an object to ignore, or nil
     for _, fobj in ipairs(self.fobjs) do
-        if fobj.x == x and fobj.y == y then
+        if fobj.x == x and fobj.y == y and fobj ~= to_ignore then
             return fobj
         end
     end

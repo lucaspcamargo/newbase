@@ -364,7 +364,12 @@ void ui_manager_simple::draw_perf()
                     SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING));
         ImGui::Separator();
 
-        if(ImGui::TreeNodeEx("Frame Times", ImGuiTreeNodeFlags_NoTreePushOnOpen))
+        
+        ImGui::Text("FPS: %.1f", io.Framerate);
+
+        static bool show_frame_details = false;
+        
+        if(show_frame_details)
         {
             int fc_end = engine::instance().frametime_data_offset();
             int fc_offset = fc_end + 1;
@@ -382,48 +387,49 @@ void ui_manager_simple::draw_perf()
     
             draw_frametimes_bar_graph(engine::instance().frametime_data(static_cast<int>(step_phase::_STEP_PHASE_COUNT)), fc_end);
         }
-
-        ImGui::Text("FPS: %.1f", io.Framerate);
+        
         //ImGui::Text("GUI: %d vtx, %d ind", io.MetricsRenderVertices, io.MetricsRenderIndices, io.MetricsRenderIndices / 3);
 #ifdef TRACY_ENABLED
         ImGui::Separator();
-        ImgGui::Text("Trace: %d", static_cast<int>(TracyIsConnected));
+        ImgGui::Text("Tracy: %d", static_cast<int>(TracyIsConnected));
 #endif
-        ImGui::Separator();    }
+        ImGui::Separator();
 
-    // have a button to trigger another debug action menu (hamburger icon)
-    if(ImGui::Button(ICON_FK_PLAY_CIRCLE " Actions"))
-        ImGui::OpenPopup("DebugActionsPopup");
-    
-    ImGui::SameLine();
+        // have a button to trigger another debug action menu (hamburger icon)
+        if(ImGui::Button(ICON_FK_PLAY_CIRCLE " Actions"))
+            ImGui::OpenPopup("DebugActionsPopup");
+        
+        ImGui::SameLine();
 
-    if(ImGui::Button(ICON_FK_ARROWS " Position"))
-        ImGui::OpenPopup("MovePopup");
+        if(ImGui::Button(ICON_FK_ARROWS " Position"))
+            ImGui::OpenPopup("MovePopup");
 
-    if(ImGui::BeginPopup("DebugActionsPopup"))
-    {
-        for(const auto& [idx, name]: engine::instance().debug_action_names())
+        if(ImGui::BeginPopup("DebugActionsPopup"))
         {
-            if (ImGui::MenuItem(name.c_str(), NULL, false))
+            ImGui::MenuItem("Show frame time details", NULL, &show_frame_details );
+            for(const auto& [idx, name]: engine::instance().debug_action_names())
             {
-                engine::instance().debug_action_trigger(idx);
+                if (ImGui::MenuItem(name.c_str(), NULL, false))
+                {
+                    engine::instance().debug_action_trigger(idx);
+                }
             }
+            ImGui::EndPopup();
         }
-        ImGui::EndPopup();
-    }
 
-    if(ImGui::BeginPopup("MovePopup"))
-    {
-        if(ImGui::Selectable("Top-Left", location ==0)) location = 0;
-        if(ImGui::MenuItem("Top-Right")) location = 1;
-        if(ImGui::MenuItem("Bottom-Left")) location = 2;
-        if(ImGui::MenuItem("Bottom-Right")) location = 3;
-        if(ImGui::MenuItem("Center")) location = -2;
-        if(ImGui::MenuItem("Free")) location = -1;
-        ImGui::EndPopup();
-    }
+        if(ImGui::BeginPopup("MovePopup"))
+        {
+            if(ImGui::Selectable("Top-Left", location ==0)) location = 0;
+            if(ImGui::MenuItem("Top-Right")) location = 1;
+            if(ImGui::MenuItem("Bottom-Left")) location = 2;
+            if(ImGui::MenuItem("Bottom-Right")) location = 3;
+            if(ImGui::MenuItem("Center")) location = -2;
+            if(ImGui::MenuItem("Free")) location = -1;
+            ImGui::EndPopup();
+        }
 
-    ImGui::End();
+        ImGui::End();
+    }
 
 
     // bottom hints

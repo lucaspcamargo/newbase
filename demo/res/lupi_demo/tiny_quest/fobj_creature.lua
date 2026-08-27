@@ -31,10 +31,10 @@ local SKIN_BASE = {
 	boy    = 4,
 	girl   = 7,
 	skelly = 10,
-	slime  = 48,
-	fly    = 51,
-	ghost  = 54,
-	spider = 57
+	slime  = 49,
+	fly    = 52,
+	ghost  = 55,
+	spider = 58
 }
 
 -- get a frame index for a character skin
@@ -105,7 +105,7 @@ function FObj_Creature:try_start_move(field_controller, direction)
 end
 
 function FObj_Creature:update(frame, field_controller)
-	if self.controllable and field_controller and not field_controller:in_dialogue() then
+	if self.controllable and field_controller and field_controller:in_normal_mode() then
 		self:try_start_move(field_controller)
 	end
 
@@ -119,6 +119,10 @@ function FObj_Creature:update(frame, field_controller)
 	if progress >= 1 then
 		progress = 1
 		self.moving = false
+		local stepped_on = field_controller.find_fobj(self.x, self.y, self) -- ignore self
+		if stepped_on then
+			stepped_on:on_creature_enter(self.controllable, field_controller)
+		end
 	end
 	self.px = (self.from_x + (self.x - self.from_x) * progress) * 16
 	self.py = (self.from_y + (self.y - self.from_y) * progress) * 16

@@ -263,6 +263,35 @@
                  "width":0,
                  "x":119.75,
                  "y":216.25
+                }, 
+                {
+                 "height":0,
+                 "id":9,
+                 "name":"",
+                 "opacity":1,
+                 "point":true,
+                 "properties":[
+                        {
+                         "name":"map_id",
+                         "type":"string",
+                         "value":"underground"
+                        }, 
+                        {
+                         "name":"type",
+                         "type":"string",
+                         "value":"portal"
+                        }, 
+                        {
+                         "name":"waypoint",
+                         "type":"string",
+                         "value":"storage2"
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":424.5,
+                 "y":215.5
                 }],
          "opacity":1,
          "properties":[
@@ -317,7 +346,7 @@
          "y":0
         }],
  "nextlayerid":6,
- "nextobjectid":9,
+ "nextobjectid":10,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

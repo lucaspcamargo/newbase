@@ -151,6 +151,18 @@ function map_is_solid(map, x, y)
     return map.data.solid[tile_index] == MAP_SOLID
 end
 
+function map_locate_waypoint(map, waypoint_id)
+    -- right now waypoints depend on looking for objects of type portal
+    -- this may change
+    for _, fobj in ipairs(map.fobjs) do
+        if fobj.target_wp == waypoint_id then
+            return true, fobj.x, fobj.y
+        end
+    end
+
+    return false, 0, 0
+end
+
 local function point_object_props_in_tile(point_objects, tile_x, tile_y)
     -- filters point objects inside this tile
     -- merges their properties to a single table and returns it

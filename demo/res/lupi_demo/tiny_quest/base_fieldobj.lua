@@ -22,6 +22,12 @@ function BaseFieldObj:is_interactive()
 	return false
 end
 
+function BaseFieldObj:on_creature_enter(is_player, field_controller)
+end
+
+function BaseFieldObj:on_creature_leave(is_player, field_controller)
+end
+
 function BaseFieldObj:interact(field_controller, from_dir)
 end
 
