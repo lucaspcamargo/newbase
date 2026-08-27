@@ -28,7 +28,7 @@ function FObjWater:is_interactive()
 	return true
 end
 
-function FObjWater:interact(field_controller)
+function FObjWater:interact(field_controller, from_dir)
 	field_controller.dialogue({
 		"Poxa, eu nao sei nadar :("
 	})

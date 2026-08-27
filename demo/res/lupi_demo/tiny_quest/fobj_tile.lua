@@ -50,7 +50,7 @@ function FObjTile:is_interactive()
     return self.interactive
 end
 
-function FObjTile:interact(field_controller)
+function FObjTile:interact(field_controller, from_dir)
     if not self.interactive then
         return
     end

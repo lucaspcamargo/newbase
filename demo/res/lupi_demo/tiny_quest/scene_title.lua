@@ -3,10 +3,9 @@ local SceneField = require("scene_field")
 require("colors")
 require("draw_utils")
 
-
-local FONT_CHR_W = 16
 local fnt_blue = Sprites.find("fontlarge-blue")
 local fnt_yellow = Sprites.find("fontlarge-yellow")
+local fnt = nil -- use default font
 
 local SceneTitle = setmetatable({}, BaseScene)
 SceneTitle.__index = SceneTitle
@@ -34,16 +33,20 @@ end
 
 function SceneTitle:draw()
     ui.cls(C_BLACK)
-    draw_tile_box(176-32, 100-28, 12, 6)
-    font_text_draw(fnt_blue, "PEQUENA", FONT_CHR_W, 176+8, 100)
-    font_text_draw(fnt_yellow, "AVENTURA", FONT_CHR_W, 176, 100+24)
+    draw_tile_box(176-32, 80-28, 12, 6)
+    largefont_text_draw(fnt_blue, "PEQUENA", 176+8, 80)
+    largefont_text_draw(fnt_yellow, "AVENTURA", 176, 80+24)
+
+    local font_char_w = font_get_char_width(fnt)
     if (self.frame // 30) % 2 == 0 then
-        local prompt = "APERTE Z PARA INICIAR"
-        ui.print(prompt, 480/2 - ((#prompt)*6/2), 180, C_TEXT)
+        local prompt = "Aperte [Z] para começar"
+        local prompt_x = 480/2 - ((#prompt)*font_char_w/2)
+        font_text_draw(fnt, prompt, prompt_x, 170)
     end
 
-    local copyright = "(C) CAMARGUINHO 2026 - ARTE POR SHARM"
-    ui.print(copyright, 480/2 - ((#copyright)*6/2), 270-16, C_TEXT)
+    local copyright = "(C) Camarguinho 2026 - arte por Sharm"
+    local copyright_x = 480/2 - ((#copyright)*font_char_w/2)
+    font_text_draw(fnt, copyright, copyright_x, 270-24)
 end
 
 return SceneTitle

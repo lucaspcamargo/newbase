@@ -8,7 +8,7 @@ function BaseFieldObj:new(x, y)
 	}, self)
 end
 
-function BaseFieldObj:update(frame)
+function BaseFieldObj:update(frame, field_controller)
 end
 
 function BaseFieldObj:draw()
@@ -22,7 +22,7 @@ function BaseFieldObj:is_interactive()
 	return false
 end
 
-function BaseFieldObj:interact(field_controller)
+function BaseFieldObj:interact(field_controller, from_dir)
 end
 
 return BaseFieldObj

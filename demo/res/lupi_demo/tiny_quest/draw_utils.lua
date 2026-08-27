@@ -50,9 +50,11 @@ end
 
 
 -- desenha texto utilizando um sprite como a fonte
-function font_text_draw(font, text, chr_width, x, y)
+-- usado para os fontes grandes do Tiny16
+function largefont_text_draw(font, text, x, y, chr_width)
     local curr_x = x;
     local curr_y = y;
+	chr_width = chr_width or 16
 
     for i = 1, #text do
         local char = text:sub(i, i)
@@ -71,3 +73,39 @@ function font_text_draw(font, text, chr_width, x, y)
         curr_x = curr_x + chr_width
     end
 end
+
+local FONT_DEFAULT_NAME = "font_default"
+local font_char_map = {}
+
+-- desenha texto usando os indices da fonte gerada por make_font.py
+function font_text_draw(fontname, text, x, y, chr_width, max_chars)
+	fontname = fontname or FONT_DEFAULT_NAME
+	font_spr = Sprites.find(fontname)
+	font_char_map[fontname] = font_char_map[fontname] or require("gfx/"..fontname)
+	chr_width = chr_width or font_char_map[fontname].char_w
+	local curr_x = x
+
+	local char_count = 0
+	for _, codepoint in utf8.codes(text) do
+		char_count = char_count + 1
+		if max_chars and char_count > max_chars then
+			break
+		end
+		local char = utf8.char(codepoint)
+		local char_idx = font_char_map[fontname][char]
+		if char_idx ~= nil then
+			ui.tile(font_spr, char_idx, curr_x, y)
+		end
+		curr_x = curr_x + chr_width
+		if font_char_map[fontname].outlined then
+			curr_x = curr_x - 1
+		end
+	end
+end
+
+function font_get_char_width(fontname)
+	fontname = fontname or FONT_DEFAULT_NAME
+	font_char_map[fontname] = font_char_map[fontname] or require("gfx/"..fontname)
+	return font_char_map[fontname].char_w - (font_char_map[fontname].outlined and 1 or 0)
+end
+

@@ -246,9 +246,6 @@ function map_prepare(original, source_path)
                     )
                     if new_obj ~= nil then
                         table.insert(map_cpy.fobjs, new_obj)
-                        if new_obj:is_solid() then
-                            solidity[tile_arr_index] = MAP_SOLID
-                        end
                     end
                 end
             end

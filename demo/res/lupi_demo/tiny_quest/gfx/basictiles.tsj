@@ -136,6 +136,25 @@
                 }]
         }, 
         {
+         "id":48,
+         "properties":[
+                {
+                 "name":"dialogue",
+                 "type":"string",
+                 "value":"Est\u00e1 trancada..."
+                }, 
+                {
+                 "name":"locked",
+                 "type":"bool",
+                 "value":false
+                }, 
+                {
+                 "name":"type",
+                 "type":"string",
+                 "value":"door"
+                }]
+        }, 
+        {
          "id":54,
          "properties":[
                 {
