@@ -26,7 +26,7 @@ function SceneTitle:update(frame)
     if self.exit_timer then
         self.exit_timer = self.exit_timer - 1
         if self.exit_timer == 0 then
-            self.next_scene = SceneField:new()
+            self.next_scene = SceneField:new("tiled_test")
         end
     end
 end

@@ -24,6 +24,7 @@ function update(frame)
 
     if next_scene ~= nil then
         curr_scene = next_scene
+        curr_frame = 0
         print("[game] scene change")
         next_scene = nil
         colors_fade_in()

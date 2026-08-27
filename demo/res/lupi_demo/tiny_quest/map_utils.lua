@@ -257,3 +257,7 @@ function map_prepare(original, source_path)
     }
     return map_cpy
 end
+
+function map_load(map_id)
+    return map_prepare(require("maps."..map_id), "./maps/"..map_id..".json")
+end

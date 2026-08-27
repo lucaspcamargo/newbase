@@ -30,7 +30,7 @@ end
 
 function FObjWater:interact(field_controller, from_dir)
 	field_controller.dialogue({
-		"Poxa, eu nao sei nadar :("
+		"Poxa, eu não sei nadar :("
 	})
 end
 

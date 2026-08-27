@@ -27,7 +27,7 @@ local custom_colors = {
 	[C_TEXT_SHADE] = rgb555(2, 2, 2),
 	[C_HP_GOOD]    = rgb555(4, 28, 4),
 	[C_HP_LOW]     = rgb555(28, 4, 4),
-	[C_BLACK]      = rgb555(1, 0, 0),
+	[C_BLACK]      = rgb555(0, 0, 0),
 }
 
 for index, color in pairs(custom_colors) do
@@ -63,13 +63,7 @@ function colors_fade_out(frames)
 	fade_in = false
 end
 
-function colors_update()
-	if fade_frames == 0 then return end
-
-	fade_frame = math.min(fade_frame + 1, fade_frames)
-	local amount = fade_frame / fade_frames
-	if not fade_in then amount = 1 - amount end
-
+function colors_set_faded(amount)
 	for index = 1, 256 do
 		local color = Palette[index]
 		if color ~= nil then
@@ -81,6 +75,24 @@ function colors_update()
     for index, color in pairs(custom_colors) do
 		ui.palset(index, fade_color(color, amount))
 	end
+end
+
+function colors_reset()
+	fade_frames = 0
+	fade_frame = 0
+	fade_in = false
+	colors_set_faded(1.0)
+end
+
+
+function colors_update()
+	if fade_frames == 0 then return end
+
+	fade_frame = math.min(fade_frame + 1, fade_frames)
+	local amount = fade_frame / fade_frames
+	if not fade_in then amount = 1 - amount end
+
+	colors_set_faded(amount)
 
 	if fade_frame == fade_frames then
 		fade_frames = 0
