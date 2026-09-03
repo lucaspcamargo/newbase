@@ -112,6 +112,16 @@ function(newbase_prepare_executable)
             )
             message("[newbase_prepare_executable] got systems from '${_auto_config}' for '${arg_TARGET}': ${arg_SYSTEMS}")
             set(rtti_extra_depends "${_auto_config}")
+
+            # A configured YAML file is commonly produced from config.yaml.in.
+            # Depend on the source template too, so changing the system list
+            # invalidates the RTTI entry-point generator without relying only
+            # on a configure pass to notice the intermediate file.
+            get_filename_component(_auto_config_name "${_auto_config}" NAME)
+            set(_auto_config_template "${CMAKE_CURRENT_SOURCE_DIR}/${_auto_config_name}.in")
+            if(EXISTS "${_auto_config_template}")
+                list(APPEND rtti_extra_depends "${_auto_config_template}")
+            endif()
         endif()
     endif()
 

@@ -175,6 +175,7 @@ set_target_properties(newbase PROPERTIES
 add_subdirectory(src/audio)
 add_subdirectory(src/clock)
 add_subdirectory(src/editor)
+add_subdirectory(src/fluid_2d)
 add_subdirectory(src/input)
 add_subdirectory(src/physics2d)
 add_subdirectory(src/particle_system)
