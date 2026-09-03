@@ -438,8 +438,7 @@ void ui_manager_simple::draw_perf()
 
     for(const auto& [idx, name]: engine::instance().debug_action_names())
     {
-        char c = idx == 0? '`' : '0' + idx;
-        bottom_text += idx == 0 ? "[" + std::string(1, c) + "]  " + name : "[F" + std::string(1, c) + "] " + name;
+        bottom_text += idx == 0 ? "[`]  " + name : "[F" + std::to_string(idx) + "] " + name;
         bottom_text += "      ";
     }
 

@@ -8,6 +8,7 @@
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
+#include <newbase/ui/overlay.hpp>
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/reflection/contexts.hpp>
@@ -17,6 +18,7 @@
 #include <imgui.h>
 #include <IconsForkAwesome.h>
 #include <unordered_map>
+#include <memory>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -53,6 +55,7 @@ struct nb::physics2d_p
 
     bool debug_draw_enabled {false};
     b2DebugDraw debug_draw {};
+    std::unique_ptr<class physics2d_debug_overlay> debug_overlay;
 
     // contact events — populated during PHYSICS_UPDATE, read by scripts during PREPARE
     struct contact_pair { entt::entity a; entt::entity b; };
@@ -92,15 +95,53 @@ struct nb::physics2d_p
     }
 };
 
+class nb::physics2d_debug_overlay : public ui_overlay
+{
+public:
+    explicit physics2d_debug_overlay(physics2d &owner) : _owner(owner) {}
+
+    void draw() const override
+    {
+        auto *data = _owner._d;
+        if(!data->debug_draw_enabled || B2_IS_NULL(data->world_id))
+            return;
+
+        renderer_service* renderer = entt::locator<renderer_service*>::value();
+        if(!renderer)
+            return;
+
+        renderer_service::extents_2d extents;
+        if(!renderer->get_2d_extents(extents))
+            return;
+
+        const float cx = (extents.right + extents.left) / 2.0f;
+        const float cy = (extents.top + extents.bottom) / 2.0f;
+        const float sx = extents.width / extents.xspan;
+        const float sy = extents.height / extents.yspan;
+        const float screen_center_x = extents.screen_x / extents.ui_scale + extents.width / (2.f * extents.ui_scale);
+        const float screen_center_y = extents.screen_y / extents.ui_scale + extents.height / (2.f * extents.ui_scale);
+        physics2d_pre_debug_draw(data->debug_draw, cx, cy, sx, sy, data->world_scale,
+            extents.ui_scale, screen_center_x, screen_center_y);
+        b2World_Draw(data->world_id, &data->debug_draw);
+    }
+
+private:
+    physics2d &_owner;
+};
+
 physics2d::physics2d()
 {
     log::info("[physics2d] constructing");
     _d = new physics2d_p();
+    _d->debug_overlay = std::make_unique<physics2d_debug_overlay>(*this);
 }
 
 physics2d::~physics2d()
 {
     log::info("[physics2d] destroying");
+
+    if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
+        ui_mgr->unregister_overlay("physics2d_debug_draw");
 
     if(B2_IS_NON_NULL(_d->world_id))
     {
@@ -148,6 +189,9 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
     {
         ui_mgr->register_tool_window("physics2d", [this](bool *open){
             _draw_tool_window(open);
+        });
+        ui_mgr->register_overlay("physics2d_debug_draw", [this]() {
+            _d->debug_overlay->draw();
         });
     }
 
@@ -279,29 +323,6 @@ bool physics2d::step(step_phase phase)
 
         // character movers
         _step_characters(reg, dt);
-    }
-    else if(phase == step_phase::PRE_RENDER)
-    {
-        if(_d->debug_draw_enabled)
-        {
-            renderer_service* vg = entt::locator<renderer_service*>::value();
-            if(vg)
-            {
-                renderer_service::extents_2d extents;
-                if(vg->get_2d_extents(extents))
-                {
-                    float cx = (extents.right+extents.left)/2.0f;
-                    float cy = (extents.top+extents.bottom)/2.0f;
-                    float sx = extents.width/extents.xspan;
-                    float sy = extents.height/extents.yspan;
-                    const float scr_cx = extents.screen_x / extents.ui_scale + extents.width  / (2.f * extents.ui_scale);
-                    const float scr_cy = extents.screen_y / extents.ui_scale + extents.height / (2.f * extents.ui_scale);
-                    physics2d_pre_debug_draw(_d->debug_draw, cx, cy, sx, sy, _d->world_scale, extents.ui_scale, scr_cx, scr_cy);
-                    b2World_Draw(_d->world_id, &_d->debug_draw);
-                }
-            }
-
-        }
     }
     return true;
 }

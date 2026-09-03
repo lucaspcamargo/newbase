@@ -8,4 +8,10 @@ if _rs then
     _rs:set_clear_color(0.05, 0.05, 0.05)
 end
 
+input_set_overlay_dpad(true)
+
 lupi_start("res/lupi_demo/tiny_quest/lupi.yaml")
+
+script_on_destroy(function()
+    input_set_overlay_dpad(false)
+end)

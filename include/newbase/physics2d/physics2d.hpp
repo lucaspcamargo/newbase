@@ -63,6 +63,8 @@ public:
     void drag_end(int drag_id);
 
 private:
+    friend class physics2d_debug_overlay;
+
     void _draw_tool_window(bool *close);
     void _step_characters(entt::registry &reg, float dt);
 

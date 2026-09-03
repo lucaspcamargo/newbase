@@ -1,7 +1,9 @@
 #include <newbase/input/input.hpp>
+#include <newbase/input/overlay.hpp>
 #include <newbase/log.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_video.h> // SDL_GetWindowFromID/SDL_GetWindowSize, to turn normalized finger coords into window pixels
 #include <entt/entt.hpp>
@@ -53,6 +55,12 @@ struct nb::input_p
     bool pointer_pending_released {false};
     SDL_FingerID active_finger {0};
     bool has_active_finger {false};
+
+    bool overlay_force {false};
+    bool overlay_enabled {false};
+    bool wants_overlay {false};
+    bool overlay_dpad {false};
+    input_overlay overlay;
 };
 
 input::input()
@@ -62,6 +70,8 @@ input::input()
 
 input::~input()
 {
+    if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
+        ui_mgr->unregister_overlay("input_overlay");
     delete _d;
 }
 
@@ -73,6 +83,19 @@ SDL_InitFlags input::sdl_subsystems(ryml::ConstNodeRef cfg)
 bool input::init(ryml::ConstNodeRef cfg) 
 {
     log::info("[input] init");
+
+    bool overlay_force = false;
+    bool overlay_enabled = false;
+    bool overlay_dpad = false;
+    if(!cfg.invalid() && !cfg.empty())
+    {
+        if(cfg.has_child("force"))
+            cfg["force"] >> overlay_force;
+        if(cfg.has_child("enabled"))
+            cfg["enabled"] >> overlay_enabled;
+        if(cfg.has_child("overlay_dpad"))
+            cfg["overlay_dpad"] >> overlay_dpad;
+    }
 
     if(cfg.invalid() || cfg.empty())
     {
@@ -96,6 +119,23 @@ bool input::init(ryml::ConstNodeRef cfg)
 
     SDL_SetGamepadEventsEnabled(true);
     log::info("[input] enabled gamepads");
+
+    _d->overlay_force = overlay_force;
+    _d->overlay_enabled = overlay_enabled;
+    _d->overlay_dpad = overlay_dpad;
+    if((overlay_force || overlay_enabled) && !_d->overlay.init())
+    {
+        log::warn("[input] overlay unavailable; continuing without touch controls");
+        _d->overlay_force = false;
+        _d->overlay_enabled = false;
+    }
+    _d->overlay.set_enabled(_d->overlay_force || _d->overlay_enabled);
+    _d->overlay.set_dpad_mode(_d->overlay_dpad);
+    entt::locator<ui_manager*>::value()->register_overlay("input_overlay", [this]() {
+        _d->overlay.set_visible(_d->overlay_force ||
+                                (_d->overlay_enabled && _d->wants_overlay));
+        _d->overlay.draw();
+    });
 
     return true;
 }
@@ -200,6 +240,15 @@ bool input::step(step_phase phase)
 
 bool input::event(SDL_Event *evt) 
 {
+    if(evt->type == SDL_EVENT_FINGER_DOWN || evt->type == SDL_EVENT_FINGER_MOTION ||
+       evt->type == SDL_EVENT_FINGER_UP || evt->type == SDL_EVENT_FINGER_CANCELED)
+        _d->wants_overlay = true;
+    else if((evt->type == SDL_EVENT_MOUSE_MOTION && evt->motion.which != SDL_TOUCH_MOUSEID) ||
+            (evt->type == SDL_EVENT_MOUSE_BUTTON_DOWN && evt->button.which != SDL_TOUCH_MOUSEID) ||
+            (evt->type == SDL_EVENT_MOUSE_BUTTON_UP && evt->button.which != SDL_TOUCH_MOUSEID))
+        _d->wants_overlay = false;
+
+    _d->overlay.event(*evt);
     if(evt->type == SDL_EVENT_GAMEPAD_ADDED)
     {
         log::info("[input] event: gamepad added: %u", evt->gdevice.which);
@@ -469,6 +518,43 @@ bool input::pointer_was_released() const
     return _d->pointer.was_released;
 }
 
+bool input::overlay_enabled() const
+{
+    return _d->overlay_enabled;
+}
+
+void input::set_overlay_enabled(bool enabled)
+{
+    if(enabled && !_d->overlay.init())
+        return;
+    _d->overlay_enabled = enabled;
+    _d->overlay.set_enabled(_d->overlay_force || enabled);
+}
+
+bool input::overlay_force() const
+{
+    return _d->overlay_force;
+}
+
+void input::set_overlay_force(bool force)
+{
+    if(force && !_d->overlay.init())
+        return;
+    _d->overlay_force = force;
+    _d->overlay.set_enabled(force || _d->overlay_enabled);
+}
+
+bool input::overlay_dpad() const
+{
+    return _d->overlay_dpad;
+}
+
+void input::set_overlay_dpad(bool dpad)
+{
+    _d->overlay_dpad = dpad;
+    _d->overlay.set_dpad_mode(dpad);
+}
+
 void input::gamepad_add(uint32_t joy_id)
 {
     // a new gamepad was added, register it
@@ -707,6 +793,22 @@ extern "C" void _rtti_init_input()
             .custom<rtti::func_info>(rtti::func_info{"pointer_was_pressed"})
         .func<&nb::input::pointer_was_released>("pointer_was_released"_hs)
             .custom<rtti::func_info>(rtti::func_info{"pointer_was_released"})
+        .func<&nb::input::overlay_enabled>("overlay_enabled"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"overlay_enabled"})
+        .func<&nb::input::set_overlay_enabled>("set_overlay_enabled"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"set_overlay_enabled"})
+        .func<&nb::input::overlay_force>("overlay_force"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"overlay_force"})
+        .func<&nb::input::set_overlay_force>("set_overlay_force"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"set_overlay_force"})
+        .func<&nb::input::overlay_dpad>("overlay_dpad"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"overlay_dpad"})
+        .func<&nb::input::set_overlay_dpad>("set_overlay_dpad"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"set_overlay_dpad"})
+        .func<&nb::input::overlay_dpad>("overlay_dpad"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"overlay_dpad"})
+        .func<&nb::input::set_overlay_dpad>("set_overlay_dpad"_hs)
+            .custom<rtti::func_info>(rtti::func_info{"set_overlay_dpad"})
         .func<&nb::input::rumble>("rumble"_hs)
             .custom<rtti::func_info>(rtti::func_info{"rumble"});
     entt::meta_factory<std::shared_ptr<nb::input>>{rtti::ctx_systems()}

@@ -102,6 +102,9 @@ bool lupi::init(ryml::ConstNodeRef cfg)
 {
     _d->rgba_scratch.resize(static_cast<size_t>(LUPI_SCREEN_W) * LUPI_SCREEN_H);
 
+    if(auto *input_system = ins())
+        input_system->set_overlay_dpad(true);
+
     // --- GPU texture + debug tool window (persistent for the system's lifetime) ---
     if (auto *r = rs())
     {

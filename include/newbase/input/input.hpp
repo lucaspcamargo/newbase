@@ -48,6 +48,13 @@ public:
     bool pointer_was_pressed() const;
     bool pointer_was_released() const;
 
+    bool overlay_enabled() const;
+    void set_overlay_enabled(bool enabled);
+    bool overlay_force() const;
+    void set_overlay_force(bool force);
+    bool overlay_dpad() const;
+    void set_overlay_dpad(bool dpad);
+
     // we need api to identify different input devices
     // so that it can be assigned to different players
     // and also action state per player, which changes the above

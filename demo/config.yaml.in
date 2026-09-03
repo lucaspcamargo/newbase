@@ -10,6 +10,9 @@ systems:
   editor: {}
   input:
     default_actions: true
+    force: false
+    enabled: true
+    overlay_dpad: false
   clock: {}
   particle_system: {}
   sprite_anim: {}
