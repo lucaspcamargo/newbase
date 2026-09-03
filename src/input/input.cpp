@@ -1,3 +1,4 @@
+#include <newbase/engine.hpp>
 #include <newbase/input/input.hpp>
 #include <newbase/input/overlay.hpp>
 #include <newbase/log.hpp>
@@ -5,9 +6,14 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_video.h> // SDL_GetWindowFromID/SDL_GetWindowSize, to turn normalized finger coords into window pixels
 #include <entt/entt.hpp>
+#include <imgui.h>
+#include <algorithm>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -17,6 +23,26 @@ static gamepad_axis _conv_gp_axis(SDL_GamepadAxis axis);
 static void _apply_dir_axis(glm::vec3 &arr, input_axis axis, float value);
 static void _apply_dir(glm::vec3 &arr, input_direction dir);
 static glm::vec2 _finger_to_window_pos(const SDL_TouchFingerEvent &tf);
+
+static const char *_gamepad_button_name(gamepad_button button)
+{
+    static constexpr const char *names[] = {
+        "none", "south", "east", "west", "north", "bumper L", "bumper R",
+        "trigger L", "trigger R", "left stick", "right stick", "dpad down",
+        "dpad right", "dpad left", "dpad up", "start", "select", "meta"
+    };
+    auto index = static_cast<size_t>(button);
+    return index < std::size(names) ? names[index] : "unknown";
+}
+
+static const char *_gamepad_axis_name(gamepad_axis axis)
+{
+    static constexpr const char *names[] = {
+        "none", "left X", "left Y", "right X", "right Y", "trigger L", "trigger R"
+    };
+    auto index = static_cast<size_t>(axis);
+    return index < std::size(names) ? names[index] : "unknown";
+}
 
 struct gamepad_data
 {
@@ -71,7 +97,10 @@ input::input()
 input::~input()
 {
     if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
+    {
         ui_mgr->unregister_overlay("input_overlay");
+        ui_mgr->unregister_tool_window("input_debug");
+    }
     delete _d;
 }
 
@@ -136,6 +165,104 @@ bool input::init(ryml::ConstNodeRef cfg)
                                 (_d->overlay_enabled && _d->wants_overlay));
         _d->overlay.draw();
     });
+
+    if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
+    {
+        ui_mgr->register_tool_window("input_debug", [this](bool *open) {
+            if(!ImGui::Begin("Input Debug", open))
+            {
+                ImGui::End();
+                return;
+            }
+
+            ImGui::Text("Keyboard: %zu pressed", _d->kbd_is_pressed.size());
+            ImGui::SameLine();
+            ImGui::Text("Pointer: %s (%.0f, %.0f)", _d->pointer.is_pressed ? "pressed" : "released",
+                        _d->pointer.position.x, _d->pointer.position.y);
+            ImGui::Text("Overlay: %s", (_d->overlay_force || (_d->overlay_enabled && _d->wants_overlay)) ? "enabled" : "disabled");
+
+            if(ImGui::BeginTable("input_gamepads", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                                     ImGuiTableFlags_ScrollY, ImVec2(0.0f, 130.0f)))
+            {
+                ImGui::TableSetupColumn("ID");
+                ImGui::TableSetupColumn("Name");
+                ImGui::TableSetupColumn("Player");
+                ImGui::TableSetupColumn("Features");
+                ImGui::TableSetupColumn("State");
+                ImGui::TableHeadersRow();
+                for(const auto &[id, gamepad] : _d->gamepads)
+                {
+                    const auto &data = _d->gp_data.at(id);
+                    std::string pressed;
+                    for(size_t i = 1; i < GAMEPAD_BUTTON_COUNT; ++i)
+                        if(data.state.is_pressed[i])
+                            pressed += std::string{_gamepad_button_name(static_cast<gamepad_button>(i))} + " ";
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%u", id);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(SDL_GetGamepadName(gamepad) ?: "unknown");
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%d", data.player_index);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%s%s%s", data.has_rumble ? "rumble " : "",
+                                data.has_gyro ? "gyro " : "", data.has_accel ? "accel" : "");
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::TextUnformatted(pressed.empty() ? "-" : pressed.c_str());
+                }
+                ImGui::EndTable();
+            }
+
+            if(ImGui::BeginTable("input_actions", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                                     ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY,
+                                 ImVec2(0.0f, 300.0f)))
+            {
+                ImGui::TableSetupColumn("Action");
+                ImGui::TableSetupColumn("Keyboard");
+                ImGui::TableSetupColumn("Gamepad buttons");
+                ImGui::TableSetupColumn("Gamepad axes");
+                ImGui::TableSetupColumn("State");
+                ImGui::TableSetupColumn("Direction");
+                ImGui::TableHeadersRow();
+
+                std::vector<entt::id_type> action_ids;
+                action_ids.reserve(_d->actions.size());
+                for(const auto &[id, action] : _d->actions)
+                    action_ids.push_back(id);
+                std::sort(action_ids.begin(), action_ids.end());
+
+                for(auto id : action_ids)
+                {
+                    const auto &action = _d->actions.at(id);
+                    const auto state_it = _d->action_states.find(id);
+                    const input_action_state state = state_it != _d->action_states.end() ? state_it->second : input_action_state{};
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(action.id.operator const char *());
+                    ImGui::TableSetColumnIndex(1);
+                    for(auto scancode : action.kbd_scancodes)
+                        ImGui::Text("%s", SDL_GetScancodeName(static_cast<SDL_Scancode>(scancode)));
+                    ImGui::TableSetColumnIndex(2);
+                    for(auto button : action.gp_btns)
+                        ImGui::Text("%s", _gamepad_button_name(button));
+                    ImGui::TableSetColumnIndex(3);
+                    for(auto axis : action.gp_axii)
+                        ImGui::Text("%s", _gamepad_axis_name(axis));
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::Text("%s%s%s", state.is_pressed ? "pressed " : "",
+                                state.was_pressed ? "down " : "", state.was_released ? "up" : "");
+                    ImGui::TableSetColumnIndex(5);
+                    ImGui::Text("%.2f, %.2f, %.2f", state.direction.x, state.direction.y, state.direction.z);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::End();
+        });
+    }
+    engine::instance().debug_action_register("Input Tools", [] {
+        if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
+            ui_mgr->toggle_tool_window("input_debug");
+    }, 7);
 
     return true;
 }
