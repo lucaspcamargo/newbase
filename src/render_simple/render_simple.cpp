@@ -768,6 +768,7 @@ float render_simple::cam_2d_scale()
 bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
 {
     // Prefer the first configured render layer's camera
+    // TODO better control fo this mapping
     const auto &layers = engine::instance().render_layers();
     if(!layers.empty())
     {
@@ -786,13 +787,29 @@ bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
             }
             float span_x = vp.w / zoom;
             float span_y = vp.h / zoom;
+
+            // on android, the ui style and font are scaled
+            // but the internal imgui scale remains at 1.0
+#ifdef ANDROID
+            static constexpr float ui_scale = 1.0f;
+#else
+            float ui_scale = _scale;
+#endif
             extents = { vp.w, vp.h, span_x, span_y,
                 cx - span_x * 0.5f, cy - span_y * 0.5f,
                 cx + span_x * 0.5f, cy + span_y * 0.5f,
-                _scale, vp.x, vp.y };
+                ui_scale, vp.x, vp.y };
             return true;
         }
     }
+
+    // on android, the ui style and font are scaled
+    // but the internal imgui scale remains at 1.0
+#ifdef ANDROID
+    static constexpr float ui_scale = 1.0f;
+#else
+    float ui_scale = _scale;
+#endif
 
     // Fallback: use the default viewport's current rect.
     auto dvp_it = _viewports.find(_default_vp);
@@ -808,7 +825,7 @@ bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
     extents = { dvp_w, dvp_h, span_x, span_y,
         cx - span_x * 0.5f, cy - span_y * 0.5f,
         cx + span_x * 0.5f, cy + span_y * 0.5f,
-        _scale, dvp_x, dvp_y };
+        ui_scale, dvp_x, dvp_y };
     return true;
 }
 
