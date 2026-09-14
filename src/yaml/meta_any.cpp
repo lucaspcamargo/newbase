@@ -26,7 +26,7 @@ void prop_to_yaml(ryml::NodeRef map, c4::csubstr key, const entt::meta_any& val)
 
 bool prop_from_yaml(ryml::ConstNodeRef scalar, entt::meta_any& out, const entt::meta_any& hint)
 {
-    if (!scalar.valid() || !scalar.has_val()) return false;
+    if (scalar.invalid() || !scalar.has_val()) return false;
 
     if (hint.try_cast<float>())
     {

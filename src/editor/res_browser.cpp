@@ -124,7 +124,7 @@ void res_browser::_draw_tree_node(const entt::registry& reg, entt::entity e)
         if (type)
         {
             const rtti::type_info* info = type.custom();
-            const char* type_name = (info && info->identifier._val) ? info->identifier.c_str() : "?";
+            const char* type_name = (info && info->identifier._val[0]) ? info->identifier.c_str() : "?";
             ImGui::TextDisabled("%s", type_name);
         }
     }

@@ -4,6 +4,7 @@
 #include <newbase/log.hpp>
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_iostream.h>
+#include <ryml_std.hpp>
 
 namespace nb::res_storage {
 

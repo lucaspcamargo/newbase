@@ -36,14 +36,14 @@ namespace nb {
 
     bool try_load_float(ryml::ConstNodeRef in, float &dst)
     {
-        if (!in.valid() || !in.has_val()) return false;
+        if (in.invalid() || !in.has_val()) return false;
         in >> dst;
         return true;
     }
 
     bool try_load_bool(ryml::ConstNodeRef in, bool &dst)
     {
-        if (!in.valid() || !in.has_val()) return false;
+        if (in.invalid() || !in.has_val()) return false;
         std::string s;
         in >> s;
         dst = (s == "true" || s == "1" || s == "yes");
@@ -52,13 +52,13 @@ namespace nb {
 
     bool try_load_vec2(ryml::ConstNodeRef in, glm::vec2 &dst)
     {
-        if (!in.valid() || !in.is_seq() || in.num_children() < 2) return false;
+        if (in.invalid() || !in.is_seq() || in.num_children() < 2) return false;
         return load_vec2(in, dst);
     }
 
     bool try_load_vec4(ryml::ConstNodeRef in, glm::vec4 &dst)
     {
-        if (!in.valid() || !in.is_seq() || in.num_children() < 4) return false;
+        if (in.invalid() || !in.is_seq() || in.num_children() < 4) return false;
         return load_vec4(in, dst);
     }
 

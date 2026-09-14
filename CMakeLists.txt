@@ -236,13 +236,6 @@ add_subdirectory(tools)
 
 # BINARIES
 add_subdirectory(demo)    # our demo game/app
-add_subdirectory(runner)  # an application made to run games that don't need additional code
-add_executable(dpi_test src/etc/imgui_dpi_test.cpp ${IMGUI_SOURCES})
-target_link_libraries(dpi_test SDL3::SDL3)
-target_include_directories(dpi_test PRIVATE ${IMGUI_INCLUDES} src/ui)
-if(NEWBASE_WII)
-    target_compile_definitions(dpi_test PRIVATE IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
-endif()
 
 # if we are building on android ndk, adjust SDL linking
 
@@ -251,6 +244,7 @@ if(DEFINED ANDROID_NDK)
     message("[newbase] Android: ensuring 16kb page boundary for SDL3 main lib (${REAL_SDL3}) and newbase")
     target_link_options( ${REAL_SDL3} PRIVATE "-Wl,-z,max-page-size=16384")
     target_link_options( newbase PRIVATE "-Wl,-z,max-page-size=16384")
+    target_compile_definitions( newbase PUBLIC ANDROID ) # TODO recently changed to __ANDROID__, adapt in source
 endif()
 
 # EXPORTS
