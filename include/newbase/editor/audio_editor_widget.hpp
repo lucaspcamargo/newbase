@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/audio/types.hpp>
+#include <newbase/sys/audio/types.hpp>
 #include <cstddef>
 #include <vector>
 

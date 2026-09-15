@@ -83,7 +83,9 @@ add_library(tinygettext STATIC ${TINYGETTEXT_SOURCES})
 set_target_properties(tinygettext PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 target_include_directories(tinygettext PUBLIC vendored/tinygettext/include)
 # tinygettext SDL mode uses #include "SDL.h" (SDL2 style); shim it to SDL3
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/tinygettext_sdl_shim/SDL.h" "#include <SDL3/SDL.h>\n")
+file(GENERATE 
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/tinygettext_sdl_shim/SDL.h" 
+    CONTENT "#include <SDL3/SDL.h>\n")
 target_include_directories(tinygettext PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tinygettext_sdl_shim")
 target_compile_definitions(tinygettext PUBLIC TINYGETTEXT_WITH_SDL)
 target_link_libraries(tinygettext PUBLIC SDL3::SDL3)
@@ -100,28 +102,29 @@ add_library(newbase STATIC
 
     # engine base
     src/engine.cpp
-    src/scene.cpp
     src/layer.cpp
+    src/scene.cpp
     src/system_factory.cpp
 
     # components
-    src/components/builders.cpp
-    src/components/script_rtti.cpp
-    src/components/spatial_rtti.cpp
-    src/components/structure_rtti.cpp
-    src/components/sprite_rtti.cpp
     src/components/body2d_rtti.cpp
+    src/components/builders.cpp
     src/components/camera_rtti.cpp
+    src/components/character2d_rtti.cpp
     src/components/layers_rtti.cpp
     src/components/mesh2d_rtti.cpp
     src/components/particle_emitter_rtti.cpp
+    src/components/script_rtti.cpp
+    src/components/spatial_rtti.cpp
+    src/components/sprite_rtti.cpp
+    src/components/structure_rtti.cpp
+    src/components/textext_rtti.cpp
     src/components/tilemap_rtti.cpp
-    src/components/character2d_rtti.cpp
 
     # graphplan
     src/graphplan/domain.cpp
-    src/graphplan/plan.cpp
     src/graphplan/editor.cpp
+    src/graphplan/plan.cpp
 
     # i18n
     src/i18n/i18n.cpp
@@ -172,29 +175,29 @@ set_target_properties(newbase PROPERTIES
 )
 
 # CORE SYSTEMS
-add_subdirectory(src/audio)
-add_subdirectory(src/clock)
-add_subdirectory(src/editor)
-add_subdirectory(src/fluid_2d)
-add_subdirectory(src/input)
-add_subdirectory(src/physics2d)
-add_subdirectory(src/particle_system)
-add_subdirectory(src/sensors)
-add_subdirectory(src/sprite_anim)
-add_subdirectory(src/textext)
-add_subdirectory(src/render_simple)
-add_subdirectory(src/render_gpu)
-add_subdirectory(src/script_lua)
-add_subdirectory(src/sgdk)
-add_subdirectory(src/spatial)
-add_subdirectory(src/tilemap)
+add_subdirectory(src/systems/audio)
+add_subdirectory(src/systems/clock)
+add_subdirectory(src/systems/editor)
+add_subdirectory(src/systems/fluid_2d)
+add_subdirectory(src/systems/input)
+add_subdirectory(src/systems/particle_system)
+add_subdirectory(src/systems/physics2d)
+add_subdirectory(src/systems/render_gpu)
+add_subdirectory(src/systems/render_simple)
+add_subdirectory(src/systems/script_lua)
+add_subdirectory(src/systems/sensors)
+add_subdirectory(src/systems/sgdk)
+add_subdirectory(src/systems/spatial)
+add_subdirectory(src/systems/sprite_anim)
+add_subdirectory(src/systems/textext)
+add_subdirectory(src/systems/tilemap)
 
 # OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)
-    add_subdirectory(src/steam)
+    add_subdirectory(src/systems/steam)
 endif()
 if(NEWBASE_LUPI)
-    add_subdirectory(src/lupi)
+    add_subdirectory(src/systems/lupi)
 endif()
 if(NEWBASE_ENABLE_MCP)
     if(DEFINED EMSCRIPTEN)
@@ -213,7 +216,7 @@ if(NEWBASE_ENABLE_MCP)
     set(HTTPLIB_USE_ZSTD_IF_AVAILABLE    OFF CACHE BOOL "" FORCE)
     set(HTTPLIB_COMPILE                  OFF CACHE BOOL "" FORCE) # header-only is fine at our call volume
     add_subdirectory(vendored/cpp-httplib EXCLUDE_FROM_ALL)
-    add_subdirectory(src/mcp)
+    add_subdirectory(src/systems/mcp)
 endif()
 
 

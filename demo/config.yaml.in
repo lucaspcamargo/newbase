@@ -24,10 +24,10 @@ systems:
     world_scale: 100
   steam:
     app_id: 480
-  sgdk: {}
+#  sgdk: {}
   lupi: {}
-  mcp:
-    port: 8765
+#  mcp:
+#    port: 8765
 resources:
   scanners:
     - type: "fs_raw"

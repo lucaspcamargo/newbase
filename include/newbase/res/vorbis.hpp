@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/res/resource.hpp>
-#include <newbase/audio/types.hpp>
+#include <newbase/sys/audio/types.hpp>
 #include <vector>
 
 namespace nb {

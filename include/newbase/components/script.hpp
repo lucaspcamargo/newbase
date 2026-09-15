@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/res/script.hpp>
-#include <newbase/script_lua/lua.hpp>
+#include <newbase/sys/script_lua/lua.hpp>
 #include <memory>
 
 namespace nb {

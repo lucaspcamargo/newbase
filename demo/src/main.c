@@ -7,7 +7,7 @@ void _nb_demo_register_systems(void);
 #include <newbase/utility/xdg.h>
 #endif
 #ifdef NEWBASE_SGDK
-#include <newbase/sgdk/api/sys.h>
+#include <newbase/sys/sgdk/api/sys.h>
 extern void nb_sgdk_main(bool);  // game entry point, renamed via -Dmain=nb_sgdk_main
 #endif
 
