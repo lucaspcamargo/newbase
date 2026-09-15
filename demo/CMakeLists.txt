@@ -1,8 +1,8 @@
-if(NEWBASE_EMSCRIPTEN)
+#if(NEWBASE_EMSCRIPTEN)
     set(NB_DEMO_RENDERER "render_simple")
-else()  
-    set(NB_DEMO_RENDERER "render_gpu")
-endif()
+#else()  
+#    set(NB_DEMO_RENDERER "render_gpu")
+#endif()
 configure_file(config.yaml.in "${CMAKE_CURRENT_BINARY_DIR}/config.yaml" @ONLY)
 
 newbase_add_executable(
