@@ -1,6 +1,6 @@
 local _rs = svc_renderer_service()
 if _rs then
-    _rs:cam_2d_setup(0, 0, 1920, 1080)
+    _rs:cam_2d_setup(0, 0, 800, 800)
     _rs:set_clear_color(0.373, 0.553, 0.827)
 end
 physics2d_set_gravity(vec2.new(0, 200))
@@ -53,6 +53,16 @@ end
 
 local drag_id = nil
 
+local accel_id = sensors_id_find_by_type(1)
+if accel_id ~= -1 then
+    if not sensors_open(accel_id) then
+        print("accel no open")
+        accel_id = -1
+    end
+else
+    print("no accel")
+end
+
 clock_update_add(function(delta)
     local ppos = input_pointer_position()
     local wpos = screen_to_world(ppos.x, ppos.y)
@@ -69,5 +79,11 @@ clock_update_add(function(delta)
             physics2d_drag_end(drag_id)
             drag_id = nil
         end
+    end
+
+    -- accelerometer gravity
+    if accel_id ~= -1 then
+        local g = sensors_get_data_vec4(accel_id)
+        physics2d_set_gravity(vec2.new(-g.x*100.0, g.y*100.0))
     end
 end)

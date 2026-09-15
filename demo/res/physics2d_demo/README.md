@@ -5,6 +5,6 @@ Click and drag (or touch and drag) any body to pick it up and fling it around.
 
 Press **`F8`** to open the Physics2D tools panel and enable physics debug draw to visualize collision shapes.
 
-### Assets
-
-- **Sprites:** Original artwork created for this demo
+If your device has an accelerometer sensor, 
+it may be used to control the scene's gravity. 
+(You may need to lock the device's display orientation, though.)
