@@ -10,14 +10,20 @@ The things that are still meant to be done. Some have
     + [ ] Remove system-specific resources and components from core
     + [ ] Decouple rtexture from SDL_Texture. Texture specialization is a renderer task.
 - Editor
-    + [ ] Scene editing and loading
+    + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs
+- Resources
+    + [ ] Load jobs
+        + [ ] Resource dependencies in components and other resources(scene->cscript->rscript->rtexture, for example)
+    + [ ] Background loading
+    + [ ] Organize loaders with resource types
 - Rendering
     * [~] Generalize 2D rendering
-    + [ ] Shared window code
-    + [ ] Make render_simple use generalized 2D rendering
-    + [ ] Blend modes
-    + [ ] Get render_gpu into a basic working state. Depends on the above rendering tasks.
+    + [~] Shared window code
+    + [~] Make render_simple use generalized 2D rendering
+    + [ ] Blend modes in sprites and textures, like in cgeom2d
+    + [ ] Implement ImGui backend specific to newbase, stop using the sample code.
+    + [ ] Rewrite render_gpu to use the new stuff and get 2D working right.
     + [ ] Shader system
     + [ ] Materials system + shader derivation
     + [ ] "Classic" fixed-function-like materials system
@@ -31,6 +37,7 @@ The things that are still meant to be done. Some have
     + [ ] Integrate RmlUi
     + [ ] Integrate LVGL
     + [ ] Integrate Nuklear
+    + [ ] Change demo to have in-game UI. Pick which one is best for the job.
 - Lua Scripting
     + [ ] Mechanism for automatic callback cleanup
     + [ ] Wire up enum RTTI when they are in place
@@ -41,4 +48,5 @@ The things that are still meant to be done. Some have
 - SGDK
     + [ ] Get it working for god's sake
 - QOL
-    + [ ] Add subdirectory for system headers and sources (newbase system)
+    + [X] Organize newbase systems in subdirectories (newbase system)
+    + [ ] Group system-specific components and resources with their systems

@@ -178,6 +178,11 @@ namespace nb {
         tex->tex            = nullptr;
         tex->uploaded       = false;
         tex->reload_surface = load_texture_surface;
+        if(tex->surf)
+        {
+            tex->width  = tex->surf->w;
+            tex->height = tex->surf->h;
+        }
         return tex;
     }
 

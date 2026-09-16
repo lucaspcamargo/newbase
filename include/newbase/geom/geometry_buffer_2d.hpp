@@ -5,7 +5,6 @@
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <vector>
-#include <cstdint>
 
 namespace nb {
 
@@ -19,7 +18,7 @@ struct geometry_buffer_2d
     using vertex = render::vertex2d;
 
     std::vector<vertex> vertices;
-    std::vector<int>    indices;  // empty = vertices drawn as sequential triangles
+    std::vector<uint16_t>    indices;  // empty = vertices drawn as sequential triangles
 
     void clear() { vertices.clear(); indices.clear(); }
     bool empty() const { return vertices.empty(); }
@@ -27,7 +26,7 @@ struct geometry_buffer_2d
     // Append a quad (two triangles), corners: top-left, top-right, bottom-left, bottom-right.
     void push_quad(vertex tl, vertex tr, vertex bl, vertex br)
     {
-        const int base = static_cast<int>(vertices.size());
+        const uint16_t base = static_cast<uint16_t>(vertices.size());
         vertices.push_back(tl);
         vertices.push_back(tr);
         vertices.push_back(bl);

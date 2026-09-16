@@ -100,7 +100,7 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh, const std::strin
 
     mesh.geom       = std::move(geom);
     mesh.tex        = ts.tex;
-    mesh.blend_mode = blend_mode_2d::ALPHA;
+    mesh.blend_mode = render::blendmode2d::BLEND;
     mesh.visible    = true;
 }
 

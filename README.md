@@ -80,7 +80,7 @@ Functionality is grouped in systems, that can be linked to the final executable 
 
 Here is a high-level description of the currently-implemented systems:
 
-### render_simple
+### render_2d
 
 This is a simple video rendering system based on SDL3's Render system. It can draw textured sprites and geometry, with color modulation, in 2D. Its relative simplicity, from relying on SDL3's renderers, means it can work atop all of SDL3's render backends: Vulkan, OpenGL \[ES\], DX, Metal, software, all of them. This ensures that whatever platform is targeted, we can rely on SDL for basic 2D rendering support, with proper hardware acceleration in all major platforms.
 

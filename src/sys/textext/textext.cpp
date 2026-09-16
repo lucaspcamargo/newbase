@@ -30,7 +30,7 @@ bool textext::step(step_phase phase)
             mesh.geom = std::make_shared<geometry_buffer_2d>();
         mesh.geom->clear();
         mesh.tex        = ct.font->atlas;
-        mesh.blend_mode = blend_mode_2d::ALPHA;
+        mesh.blend_mode = render::blendmode2d::BLEND;
         mesh.visible    = true;
 
         const auto& font = *ct.font;

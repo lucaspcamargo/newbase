@@ -101,6 +101,7 @@ namespace nb::render {
         uint32_t base_vertex {0};
         uint32_t index_start {0};
         uint32_t index_count {0};
+        uint32_t vtx_count {0};
         int32_t texture {-1};
         blendmode2d blend {blendmode2d::NONE};
         void *clip;
@@ -109,6 +110,13 @@ namespace nb::render {
     /**
      * This is our batcher class. We use a final implementation with no virtual
      * dispatch for best performance. We also use rule-of-zero for simplicity.
+     *
+     * TODO as a future optimization, we may add a mechanism to allow for direct
+     *      data writes by the users. This should follow a API protocol that gives
+     *      the users references to the buffers, and whether indices
+     *      have to be written with an offset.
+     *
+     *      This would avoid the need for the extra copy.
      */
     class batcher2d final
     {
@@ -125,6 +133,12 @@ namespace nb::render {
          */
         void add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
                       std::shared_ptr<rtexture> tex = nullptr, blendmode2d blend = blendmode2d::NONE, void *clip = nullptr);
+
+        /// const ref getter for draw data
+        const data2d & data() const { return m_data; }
+
+        /// const ref getter for draw commands
+        const std::vector<command2d>& commands()const { return m_comms; }
 
     private:
         data2d m_data {};

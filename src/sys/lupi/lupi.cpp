@@ -296,7 +296,9 @@ bool lupi::start(const std::string &cart_path)
     {
         _d->screen_tex = std::make_shared<rtexture>(entt::hashed_string{"lupi_screen_texture"}.value());
         _d->screen_tex->tex = static_cast<SDL_Texture *>(_d->tex);
-        _d->screen_tex->uploaded = true; // skip render_simple's lazy surf->tex upload — already have a live texture
+        _d->screen_tex->width = _d->screen_tex->tex->w;
+        _d->screen_tex->height = _d->screen_tex->tex->h;
+        _d->screen_tex->uploaded = true;
         _d->screen_sprite = std::make_shared<rsprite>(entt::hashed_string{"lupi_screen_sprite"}.value());
         _d->screen_sprite->tex = _d->screen_tex;
     }
@@ -439,7 +441,7 @@ bool lupi::step(step_phase phase)
         _d->fps_ema = _d->fps_ema * 0.9 + std::min(fps, 60.0) * 0.1;
     }
 
-    if (phase == RENDER)
+    if (phase == PRE_RENDER)
     {
         // Palette index 0 always renders fully transparent, regardless of
         // whatever color ui.palset(0, ...) has set it to — confirmed against

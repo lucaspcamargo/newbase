@@ -1,14 +1,16 @@
 #pragma once
 
 #include <newbase/system.hpp>
+#include <newbase/scene.hpp>
+#include <newbase/layer.hpp>
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/services/picker_service.hpp>
 #include <newbase/utility/glm.hpp>
-#include <newbase/components/spatial.hpp>
-#include <newbase/components/camera.hpp>
-#include <unordered_map>
+#include <memory>
 
 namespace nb {
+
+struct render_simple_p;
 
 class render_simple : public system, public renderer_service, public picker_service
 {
@@ -23,9 +25,9 @@ public:
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
     entt::id_type metatype_id() override { return entt::hashed_string{"render_simple"}.value(); }
 
-    int   window_width()  const override { return _wx; }
-    int   window_height() const override { return _wy; }
-    float display_scale() const override { return _scale; }
+    int   window_width()  const override;
+    int   window_height() const override;
+    float display_scale() const override;
 
     // Legacy single-camera setup. Still functional as a fallback when no render
     // layers are configured.
@@ -55,36 +57,24 @@ public:
     void destroy_texture(texture_handle tex) override;
 
 private:
-    struct viewport_entry {
-        int x, y, w, h;
-        bool clear;
-        float r, g, b, a;
-    };
 
-    // Draw one sprite into the given viewproj transform, applying the layer mask check.
+    // Draws sprites into the given viewproj transform, applying the layer mask check.
     void _draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj,
-                     uint32_t layer_mask, const viewport_entry &vp);
+                     uint32_t layer_mask);
+
+    // draws a scene using the given layer's masking, and the given viewprojection matrix
+    // uses batcher2d and collect2d to do it
+    // SDL_Renderer does not use NDC, so viewproj must map to render target pixel coordinates
+    // caller is responsble for viewport clearing and clipping setup
+    void _draw_scene(scene &scn, const glm::mat4x4 &viewproj, const render_layer &l);
+
+    // given a viewport handle, calculates target top-left and bottom-right points for geometry transformation
+    // we pass the layer because default/invalid viewport depends on target dimensions if any
+    std::pair<glm::vec2, glm::vec2> _get_viewport_bounds(const render_layer &l);
 
     void on_scene_change() override;
 
-    SDL_Window    *_win;
-    SDL_Renderer  *_render;
-    float          _scale;
-    int            _wx, _wy;
-    float          _clear_r{0.f}, _clear_g{0.f}, _clear_b{0.f};
-
-    // fallback camera used when no render layers are configured
-    cspatial _fallback_spatial {};
-    ccamera  _fallback_camera  {};
-
-    std::unordered_map<viewport_handle, viewport_entry> _viewports;
-    viewport_handle _next_vp_handle { 1 }; // 0 is VIEWPORT_INVALID
-
-    // The default viewport covers the window's scene area.
-    // It is auto-sized to the full window on init and resize unless
-    // a caller has explicitly overridden it via update_viewport().
-    viewport_handle _default_vp       { VIEWPORT_INVALID };
-    bool            _default_vp_owned { false }; // true once set by an external caller
+    std::unique_ptr<render_simple_p> _d;
 };
 
 }

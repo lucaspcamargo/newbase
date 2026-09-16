@@ -13,6 +13,9 @@ struct rtexture : public resource {
     SDL_Surface *surf {nullptr};
     SDL_Texture *tex {nullptr};
 
+    int width {0};
+    int height {0};
+
     // Optional: reload the CPU surface from the resource manager (set by the loader).
     // Returns a freshly allocated SDL_Surface* that the caller owns, or nullptr on failure.
     SDL_Surface* (*reload_surface)(entt::id_type asset_id) {nullptr};

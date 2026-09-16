@@ -17,6 +17,7 @@ option(NEWBASE_SDL_STATIC "Build (or use) SDL as a static library" ON)
 option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executables (.desktop and Flatpak manifest)" OFF)
 option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during runtime" OFF)
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
+option(NEWBASE_DEMO "Build demo application" ON)
 option(NEWBASE_ENABLE_DXC "Compile in DirectXShaderCompiler (DXC) support for SDL_shadercross, needed for D3D12/DXIL shaders" ${WIN32})
 option(NEWBASE_ENABLE_MCP "Enable the embedded MCP (Model Context Protocol) server system, exposing engine introspection/control over HTTP" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
@@ -133,6 +134,8 @@ add_library(newbase STATIC
     # rendering (common)
     src/render/batcher2d.cpp
     src/render/collector2d.cpp
+    src/render/pick2d.cpp
+    src/render/window.cpp
 
     # resource system
     src/res/manager.cpp
@@ -239,11 +242,15 @@ configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONL
 target_include_directories(newbase PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
 
-# TOOLS (host-only utilities; skipped automatically when cross-compiling)
-add_subdirectory(tools)
+# TOOLS
+if(NOT CMAKE_CROSSCOMPILING)
+    add_subdirectory(tools)
+endif()
 
 # BINARIES
-add_subdirectory(demo)    # our demo game/app
+if(NEWBASE_DEMO)
+    add_subdirectory(demo)    # our demo game/app
+endif()
 
 # if we are building on android ndk, adjust SDL linking
 

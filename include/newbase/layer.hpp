@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
 #include <entt/entt.hpp>
 #include <newbase/services/renderer_service.hpp>
 

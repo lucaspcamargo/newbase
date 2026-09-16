@@ -56,6 +56,7 @@ void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const u
         for(uint32_t i = 0; i < icount; i++)
             m_data.inds.push_back(inds[i] + offset);  // not sure this is vectorized, but should be
         lastcmd.index_count += icount;
+        lastcmd.vtx_count += vcount;
     }
     else
     {
@@ -70,6 +71,7 @@ void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const u
                 bvtx,
                 bidx,
                 icount,
+                vcount,
                 tidx,
                 blend,
                 clip
