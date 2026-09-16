@@ -3,7 +3,9 @@
 ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)
 
-A *new base* for making games and interactive stuff. Yet another ECS engine, with random experiments bolted in.
+A *new base* for making games and interactive stuff. Yet another ECS engine, with random experiments bolted on.
+
+<!--TODO add a cool screenshot here pls-->
 
 > “...maybe the real treasure was all the engines we made along the way!”
 > -- Bob Nystrom
@@ -23,6 +25,13 @@ Here's a build of the engine's `demo` app, that you can run right away:
 
 *Nice. (I hope? Please let me know is something is amiss. Works on my machine :)*
 ENGBR_SECTION-->
+
+<!--ENGBR_TOGGLE-->
+## Demo
+
+You can run the engine directly on your broser. Check out the [project page's demo section](https://camargo.eng.br/projects/newbase/README.html#demo).
+It is also availaable on [itch.io](https://camarguinho.itch.io/newbase-demo).
+<!--ENGBR_TOGGLE-->
 
 ## Features
 
