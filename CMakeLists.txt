@@ -130,6 +130,10 @@ add_library(newbase STATIC
     src/i18n/i18n.cpp
     src/i18n/locale_detect.cpp
 
+    # rendering (common)
+    src/render/batcher2d.cpp
+    src/render/collector2d.cpp
+
     # resource system
     src/res/manager.cpp
     src/res/loaders.cpp
@@ -182,7 +186,6 @@ add_subdirectory(src/sys/fluid_2d)
 add_subdirectory(src/sys/input)
 add_subdirectory(src/sys/particle_system)
 add_subdirectory(src/sys/physics2d)
-add_subdirectory(src/sys/render_common)
 add_subdirectory(src/sys/render_gpu)
 add_subdirectory(src/sys/render_simple)
 add_subdirectory(src/sys/script_lua)

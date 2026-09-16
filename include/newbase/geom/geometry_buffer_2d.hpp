@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/utility/glm.hpp>
-#include <newbase/sys/render_common/batcher2d.hpp>
+#include <newbase/render/batcher2d.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <vector>
@@ -9,9 +9,11 @@
 
 namespace nb {
 
-// CPU-side 2D geometry buffer. No renderer dependency — plain data.
+// CPU-side 2D geometry buffer. No renderer dependency, just plain data.
 // Can be used by static geometry resources and dynamic per-frame geometry.
-// We used to roll our own vertex type, but now we reuse it from batcher2d
+// We used to roll our own vertex type, but now we reuse it from batcher2d.
+// We may rework (or get rid of) this when we have more general ways to store and represent geometry.
+
 struct geometry_buffer_2d
 {
     using vertex = render::vertex2d;

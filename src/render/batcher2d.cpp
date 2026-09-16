@@ -1,5 +1,5 @@
 #include <cstdint>
-#include <newbase/sys/render_common/batcher2d.hpp>
+#include <newbase/render/batcher2d.hpp>
 
 using namespace nb;
 

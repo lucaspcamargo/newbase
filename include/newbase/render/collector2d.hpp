@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/sys/render_common/batcher2d.hpp>
+#include <newbase/render/batcher2d.hpp>
 #include <newbase/layer.hpp>
 #include <newbase/scene.hpp>
 
