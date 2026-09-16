@@ -159,7 +159,7 @@ add_library(newbase STATIC
     src/ui/meta_any_editor.cpp
     src/ui/resource_field_widget.cpp
 
-    # dependencies
+    # compiled-in dependencies
     src/stb_impl.c
     ${IMGUI_SOURCES}
     ${TRACY_SOURCES}
@@ -182,6 +182,7 @@ add_subdirectory(src/sys/fluid_2d)
 add_subdirectory(src/sys/input)
 add_subdirectory(src/sys/particle_system)
 add_subdirectory(src/sys/physics2d)
+add_subdirectory(src/sys/render_common)
 add_subdirectory(src/sys/render_gpu)
 add_subdirectory(src/sys/render_simple)
 add_subdirectory(src/sys/script_lua)

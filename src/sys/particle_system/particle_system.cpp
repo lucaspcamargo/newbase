@@ -171,8 +171,8 @@ static void _rebuild_geometry(cparticle_emitter& e)
         auto corner = [&](float lx, float ly) -> geometry_buffer_2d::vertex {
             return {
                 .pos   = { pos.x + lx * cr - ly * sr, pos.y + lx * sr + ly * cr },
-                .uv    = { lx > 0.f ? 1.f : 0.f, ly > 0.f ? 1.f : 0.f },
-                .color = col
+                .color = col,
+                .uv    = { lx > 0.f ? 1.f : 0.f, ly > 0.f ? 1.f : 0.f }
             };
         };
 

@@ -49,10 +49,10 @@ bool textext::step(step_phase phase)
                 float x1 = x0 + g->bw;
                 float y1 = y0 + g->bh;
 
-                geometry_buffer_2d::vertex tl { {x0, y0}, {g->u0, g->v0}, ct.color };
-                geometry_buffer_2d::vertex tr { {x1, y0}, {g->u1, g->v0}, ct.color };
-                geometry_buffer_2d::vertex bl { {x0, y1}, {g->u0, g->v1}, ct.color };
-                geometry_buffer_2d::vertex br { {x1, y1}, {g->u1, g->v1}, ct.color };
+                geometry_buffer_2d::vertex tl { {x0, y0}, ct.color, {g->u0, g->v0} };
+                geometry_buffer_2d::vertex tr { {x1, y0}, ct.color, {g->u1, g->v0} };
+                geometry_buffer_2d::vertex bl { {x0, y1}, ct.color, {g->u0, g->v1} };
+                geometry_buffer_2d::vertex br { {x1, y1}, ct.color, {g->u1, g->v1} };
                 mesh.geom->push_quad(tl, tr, bl, br);
             }
 

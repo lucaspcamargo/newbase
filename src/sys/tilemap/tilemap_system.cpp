@@ -90,10 +90,10 @@ static void build_tile_mesh(const rtilemap& map, cmesh2d& mesh, const std::strin
             const float py = static_cast<float>(row) * th;
 
             geom->push_quad(
-                {{ px,      py      }, uv_tl, color },
-                {{ px + tw, py      }, uv_tr, color },
-                {{ px,      py + th }, uv_bl, color },
-                {{ px + tw, py + th }, uv_br, color }
+                {{ px,      py      }, color, uv_tl },
+                {{ px + tw, py      }, color, uv_tr },
+                {{ px,      py + th }, color, uv_bl },
+                {{ px + tw, py + th }, color, uv_br }
             );
         }
     }
