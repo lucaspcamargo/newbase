@@ -61,6 +61,10 @@ namespace nb::render {
      * 
      * But we keep the shared_ptr's in a flat vector to avoid 
      * moving them around too much.
+     *
+     * You may want to call reserve() on the vectors with some
+     * nice defaults, or keep the data buffers around per draw
+     * layer so that they stabilize.
      */
     struct data2d
     {
@@ -68,8 +72,21 @@ namespace nb::render {
         std::vector<uint16_t> inds;
 
         // ordered texture set, for quick indexing and reuse :)
+        // we keep the shared_ptr references on a flat structure for speed,
+        // while also keeping an unordered map for quick index lookup by value
         std::vector<std::shared_ptr<rtexture>> tex;
         std::unordered_map<rtexture*, size_t> tex_set;
+
+        inline void clear()
+        {
+            // clear data buffers. research shows
+            // this preserves vector capacities,
+            // so should be ok to call every frame
+            inds.clear();
+            verts.clear();
+            tex_set.clear();
+            tex.clear();
+        }
     };
 
     /**
@@ -81,8 +98,8 @@ namespace nb::render {
      */
     struct command2d
     {
-        int32_t base_vertex {-1};
-        int32_t index_start {-1};
+        uint32_t base_vertex {0};
+        uint32_t index_start {0};
         uint32_t index_count {0};
         int32_t texture {-1};
         blendmode2d blend {blendmode2d::NONE};
@@ -106,7 +123,7 @@ namespace nb::render {
          * May append to the previous drawing command if the texture and blendmode are the same.
          * Other optimizations may be implemented in the future.
          */
-        void add_geom(vertex2d *verts, uint32_t vcount, uint16_t *inds, uint32_t icount,
+        void add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
                       std::shared_ptr<rtexture> tex = nullptr, blendmode2d blend = blendmode2d::NONE, void *clip = nullptr);
 
     private:
