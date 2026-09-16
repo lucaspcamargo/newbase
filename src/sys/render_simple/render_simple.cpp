@@ -532,29 +532,65 @@ void render_simple::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const
         const uint16_t *ind0 = data.inds.data() + cmd.index_start;
         constexpr auto v_stride = sizeof(render::vertex2d);
 
-        // TODO blend mode, clip handling
-
         auto rtex = cmd.texture != -1? data.tex[cmd.texture].get() : nullptr;
         auto sdltex = rtex? rtex->tex : nullptr;
 
         if (!sdltex && !rtex->uploaded && rtex->surf)
         {
             rtex->tex = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
-            SDL_SetTextureScaleMode(rtex->tex, SDL_SCALEMODE_NEAREST);
-            rtex->uploaded = true;
+            if(sdltex)
+            {
+                SDL_SetTextureScaleMode(rtex->tex, SDL_SCALEMODE_NEAREST);
+                rtex->uploaded = true;
+            }
+            else
+                log::warn("[render_simple] texture upload failure for 0x%08x", rtex->id());
+
+            // even on upload failure, we destroy the surface, to prevent continuous failure every frame
             SDL_DestroySurface(rtex->surf);
             rtex->surf = nullptr;
         }
-        if (!rtex->uploaded) continue; // skip rendering textures that fail to upload
+        // if (!rtex->uploaded) continue; // we could skip rendering textures that fail to upload, or not
 
+        // NOTE We could simplify these blend mode shenanigans by:
+        //  -- always restoring draw blend mode in the end
+        //  -- always setting texture blend mode before rendering, as we are the only ones who should be rendering them
+        // It matters little, though, since SDL is doing it's own batching underneath anyway...
 
+        SDL_BlendMode blend_prev {};
+        SDL_BlendMode blend_now = static_cast<SDL_BlendMode>(cmd.blend);
+        if(sdltex)
+        {
+            SDL_GetTextureBlendMode(sdltex, &blend_prev);
+            SDL_SetTextureBlendMode(sdltex, blend_now);
+        }
+        else
+        {
+            SDL_GetRenderDrawBlendMode(_d->_render, &blend_prev);
+            SDL_SetRenderDrawBlendMode(_d->_render, blend_now);
+        }
+
+        // OUR DRAW CALL
         SDL_RenderGeometryRaw(_d->_render, sdltex,
                               static_cast<const float*>(&(vtx0->pos.x)), v_stride,
                               reinterpret_cast<const SDL_FColor*>(&(vtx0->color.x)), v_stride,
                               static_cast<const float*>(&(vtx0->uv.x)), v_stride,
                               cmd.vtx_count, ind0, cmd.index_count, 2
                               );
+
+        // restore previous blend mode, whatever that was
+        if(sdltex)
+        {
+            SDL_SetTextureBlendMode(sdltex, blend_prev);
+        }
+        else
+        {
+            SDL_SetRenderDrawBlendMode(_d->_render, blend_prev);
+        }
     }
+
+    SDL_SetRenderDrawBlendMode(_d->_render, SDL_BLENDMODE_BLEND);
+
 }
 
 

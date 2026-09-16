@@ -18,10 +18,10 @@ The things that are still meant to be done. Some have
     + [ ] Background loading
     + [ ] Organize loaders with resource types
 - Rendering
-    * [~] Generalize 2D rendering
-    + [~] Shared window code
-    + [~] Make render_simple use generalized 2D rendering
-    + [ ] Blend modes in sprites and textures, like in cgeom2d
+    * [X] Generalize 2D rendering
+    + [X] Shared window code
+    + [X] Make render_simple use generalized 2D rendering
+    + [~] Blend modes in sprites and textures, like in cgeom2d (support in 2d renderer done)
     + [ ] Implement ImGui backend specific to newbase, stop using the sample code.
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right.
     + [ ] Shader system
