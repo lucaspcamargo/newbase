@@ -20,10 +20,6 @@
 
     In the future, we should have our own ImGui backend that uses this directly,
     mostly for reducing duplicate code and to stop using the sample backend code.
-
-    Opaque<=>Transparent fillrate optimization could also be supported (opaque front-to-back 
-    + transparent back-to-front), but we need to also support SDL_Renderer, that has no
-    z-buffer, so let's leave that for later. Most 2D rendering is blended anyway.
 */
 
 
@@ -79,7 +75,9 @@ namespace nb::render {
     /**
      * This is a single drawing command, with a base vertex index (for data2d::verts),
      * and a span of indices to render (for data2d::inds).
-     * The texture index
+     * The texture index can be -1 for "no texture".
+     * clip is used to store a reference to a clipping region.
+     * The clip data is opaque and renderer-dependant.
      */
     struct command2d
     {
@@ -88,6 +86,7 @@ namespace nb::render {
         uint32_t index_count {0};
         int32_t texture {-1};
         blendmode2d blend {blendmode2d::NONE};
+        void *clip;
     };
 
     /**
@@ -97,19 +96,21 @@ namespace nb::render {
     class batcher2d final
     {
     public:
+        /**
+         * Clears the internal data buffers.
+         */
         void clear();
-        void add_quad(); // TODO
-        void add_geom(); // TODO
+
+        /**
+         * Adds geometry to the data buffers, and a drawing command with the given texture and blendmode.
+         * May append to the previous drawing command if the texture and blendmode are the same.
+         * Other optimizations may be implemented in the future.
+         */
+        void add_geom(vertex2d *verts, uint32_t vcount, uint16_t *inds, uint32_t icount,
+                      std::shared_ptr<rtexture> tex = nullptr, blendmode2d blend = blendmode2d::NONE, void *clip = nullptr);
 
     private:
-        data2d data;
-        std::vector<command2d> comms;
+        data2d m_data {};
+        std::vector<command2d> m_comms {};
     };
-
-
-    // TODO a class that takes a render layer and a camera and such, 
-    // goes over a scene registry, and feeds all geometry to the batcher
-    // Basically we need to move code from render_simple to it
-    // Then make render_simple use it, as a first user.
-    // After all that, we go back to render_gpu and make it work properly too. 
-};
+}

@@ -14,6 +14,7 @@ The things that are still meant to be done. Some have
     + [ ] Multiple scenes in separate tabs
 - Rendering
     * [~] Generalize 2D rendering
+    + [ ] Shared window code
     + [ ] Make render_simple use generalized 2D rendering
     + [ ] Blend modes
     + [ ] Get render_gpu into a basic working state. Depends on the above rendering tasks.
