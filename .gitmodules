@@ -50,3 +50,9 @@
 [submodule "vendored/cpp-httplib"]
 	path = vendored/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "vendored/cgltf"]
+	path = vendored/cgltf
+	url = https://github.com/jkuhlmann/cgltf.git
+[submodule "vendored/meshoptimizer"]
+	path = vendored/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
