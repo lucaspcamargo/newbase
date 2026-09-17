@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <libudev.h>
 #include <newbase/render/collector2d.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/layers.hpp>
