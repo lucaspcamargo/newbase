@@ -79,18 +79,7 @@ void texture_editor_widget::apply(resource* res)
     auto* rt = static_cast<rtexture*>(res);
     if (rt->surf) SDL_DestroySurface(rt->surf);
     rt->surf = SDL_DuplicateSurface(_canvas);
-
-    // hear me out
-    // it's arguable we may not always want to do this, but...
-    // let me give it a go
-    // at some point rtexture needs to become much more complex and opinionated than this... or not :)
-    // As I understand, the GUI can only use it's own textures for rendering (created via the renderer service), no imgui renderer troubles
-    // decreed that the renderer must know how to cope with this for now
-    // It can be our little unspoken bounding agreement promise interface thinguie...
-    // ...or basically, the interface of the component
-    SDL_DestroyTexture(rt->tex);
-    rt->tex = nullptr;
-    rt->uploaded = false; // betty_boop_oops.gif
+    rt->uploaded = false; // renderer must update existing internal texture and reupload surface
 }
 
 void texture_editor_widget::open(SDL_Surface* source)

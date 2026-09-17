@@ -1,9 +1,10 @@
+#include <newbase/sys/lupi/lupi.hpp>
+#include "newbase/sys/lupi/framebuffer.hpp"
+#include <newbase/sys/input/input.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
-#include <newbase/sys/lupi/lupi.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/services/renderer_service.hpp>
-#include <newbase/sys/input/input.hpp>
 #include <newbase/log.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/components/spatial.hpp>
@@ -295,9 +296,9 @@ bool lupi::start(const std::string &cart_path)
     if (!_d->screen_tex)
     {
         _d->screen_tex = std::make_shared<rtexture>(entt::hashed_string{"lupi_screen_texture"}.value());
-        _d->screen_tex->tex = static_cast<SDL_Texture *>(_d->tex);
-        _d->screen_tex->width = _d->screen_tex->tex->w;
-        _d->screen_tex->height = _d->screen_tex->tex->h;
+        _d->screen_tex->rptr = _d->tex;
+        _d->screen_tex->width = LUPI_SCREEN_W;
+        _d->screen_tex->height = LUPI_SCREEN_H;
         _d->screen_tex->uploaded = true;
         _d->screen_sprite = std::make_shared<rsprite>(entt::hashed_string{"lupi_screen_sprite"}.value());
         _d->screen_sprite->tex = _d->screen_tex;

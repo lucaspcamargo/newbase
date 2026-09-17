@@ -466,7 +466,7 @@ void editor::_draw_overlay()
                 {
                     const glm::vec4 &csr = spr->current_source_rect;
                     if (csr.z > 0.f) dims = {csr.z, csr.w};
-                    else if (sr.tex && sr.tex->uploaded) dims = {(float)sr.tex->tex->w, (float)sr.tex->tex->h};
+                    else if (sr.tex && sr.tex->uploaded) dims = {(float)sr.tex->width, (float)sr.tex->height};
                     else continue;
                 }
                 const float ql = -sr.anchor.x * dims.x, qt = -sr.anchor.y * dims.y;

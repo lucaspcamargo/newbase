@@ -23,6 +23,7 @@
 #include <newbase/render/collector2d.hpp>
 
 #include "SDL3/SDL_render.h"
+#include "SDL3/SDL_surface.h"
 #include "glm/fwd.hpp"
 #include "imgui.h"
 //#include "imgui_internal.h" // for ImGuiViewport
@@ -533,14 +534,25 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
         constexpr auto v_stride = sizeof(render::vertex2d);
 
         auto rtex = cmd.texture != -1? data.tex[cmd.texture].get() : nullptr;
-        auto sdltex = rtex? rtex->tex : nullptr;
+        auto sdltex = rtex? static_cast<SDL_Texture*>(rtex->rptr) : nullptr;
 
-        if (!sdltex && !rtex->uploaded && rtex->surf)
+        // if we need to do an upload
+        if (!rtex->uploaded && rtex->surf)
         {
-            rtex->tex = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
             if(sdltex)
             {
-                SDL_SetTextureScaleMode(rtex->tex, SDL_SCALEMODE_NEAREST);
+                // if a texture already exists, update it
+                // DO NOT change the format of a texture's surface, btw
+                SDL_UpdateTexture(sdltex, nullptr, rtex->surf->pixels, rtex->surf->pitch);
+            }
+            else
+            {
+                // otherwise, create a new one
+                rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
+            }
+            if(sdltex)
+            {
+                SDL_SetTextureScaleMode(sdltex, SDL_SCALEMODE_LINEAR);
                 rtex->uploaded = true;
             }
             else
@@ -663,8 +675,8 @@ entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
                 const glm::vec4 &csr = sprite->current_source_rect;
                 if (csr.z > 0.f)
                     dims = { csr.z, csr.w };
-                else if (spr.tex && spr.tex->uploaded)
-                    dims = { (float)spr.tex->tex->w, (float)spr.tex->tex->h };
+                else if (spr.tex && spr.tex->uploaded && spr.tex->rptr)
+                    dims = { (float)static_cast<SDL_Texture*>(spr.tex->rptr)->w, (float)static_cast<SDL_Texture*>(spr.tex->rptr)->h };
                 else continue;
             }
 
@@ -885,6 +897,7 @@ renderer_service::texture_handle render_2d::create_texture(int w, int h)
 
 void render_2d::update_texture(texture_handle tex, const void* pixels, int pitch)
 {
+    assert(tex);
     SDL_UpdateTexture(static_cast<SDL_Texture*>(tex), nullptr, pixels, pitch);
 }
 

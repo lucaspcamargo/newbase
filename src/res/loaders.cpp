@@ -175,8 +175,10 @@ namespace nb {
         log::info("[rloader_texture] loading: %x", id);
         auto tex = std::make_shared<rtexture>(id);
         tex->surf           = load_texture_surface(id);
-        tex->tex            = nullptr;
+        tex->rptr            = nullptr;
         tex->uploaded       = false;
+        tex->width = tex->surf->w;
+        tex->height = tex->surf->h;
         tex->reload_surface = load_texture_surface;
         if(tex->surf)
         {
@@ -620,8 +622,10 @@ namespace nb {
 
         auto atlas_tex          = std::make_shared<rtexture>(entt::hashed_string{ttf_path.c_str()}.value());
         atlas_tex->surf         = surf;
+        atlas_tex->width        = surf->w;
+        atlas_tex->height       = surf->h;
         atlas_tex->uploaded     = false;
-        atlas_tex->tex          = nullptr;
+        atlas_tex->rptr         = nullptr;
         atlas_tex->reload_surface = nullptr;
         ret->atlas = atlas_tex;
 
