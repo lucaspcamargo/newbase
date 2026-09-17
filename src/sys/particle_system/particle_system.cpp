@@ -232,7 +232,7 @@ bool particle_system::step(step_phase phase)
         mesh->geom        = emitter.geom;
         mesh->tex         = emitter.res->tex;
         mesh->blend_mode  = (emitter.res->blend_mode == particle_blend_mode::ADD)
-                            ? render::blendmode2d::ADD : render::blendmode2d::BLEND;
+                            ? render::blendmode::ADD : render::blendmode::BLEND;
         mesh->pixel_snap  = emitter.pixel_snap;
     }
 

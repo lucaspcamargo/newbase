@@ -98,7 +98,7 @@ void render::collector2d::collect(batcher2d &target, scene& scene, const render_
 
             const uint16_t inds[6] = {0, 2, 1, 1, 2, 3};
 
-            target.add_geom(vertices, 4, inds, 6, tex, blendmode2d::BLEND); // TODO blendmodes
+            target.add_geom(vertices, 4, inds, 6, tex, sprite->blend);
         }
         else if (auto* mesh = reg.try_get<const cmesh2d>(id))
         {

@@ -11,6 +11,7 @@
 namespace nb {
 
 struct render_2d_p;
+class rtexture;
 
 class render_2d : public system, public renderer_service, public picker_service
 {
@@ -52,15 +53,17 @@ public:
     viewport_handle default_viewport() const override;
     void reset_default_viewport() override;
 
+    // opaque texture management interface from renderer_service
+    // for UI usage and simpler rendering purposes
+    // we guarantee that the handle can be used as an ImGui TexID
     texture_handle create_texture(int w, int h) override;
     void update_texture(texture_handle tex, const void* pixels, int pitch) override;
     void destroy_texture(texture_handle tex) override;
 
 private:
-
-    // Draws sprites into the given viewproj transform, applying the layer mask check.
-    void _draw_scene(entt::registry &reg, const glm::mat4x4 &viewproj,
-                     uint32_t layer_mask);
+    // tries to ensure a texture is ready for rendering, uploading it
+    // if possible. for internal use, so raw pointer is ok
+    void _prepare_texture(rtexture *tex);
 
     // draws a scene using the given layer's masking, and the given viewprojection matrix
     // uses batcher2d and collect2d to do it

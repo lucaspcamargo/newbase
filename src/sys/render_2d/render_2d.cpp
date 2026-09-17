@@ -12,7 +12,7 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
-#include <newbase/ui/imgui_style.hpp>
+#include <newbase/ui/imgui_nb.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/log.hpp>
 
@@ -45,6 +45,7 @@ using namespace nb;
 using entt::operator""_hs;
 
 
+
 struct viewport_entry {
     int x, y, w, h;
     bool clear;
@@ -74,12 +75,13 @@ struct nb::render_2d_p
     viewport_handle _default_vp       { VIEWPORT_INVALID };
     bool            _default_vp_owned { false }; // true once set by an external caller
                                                  // if false, we will take care of it instead
-
     std::vector<SDL_Vertex> _xform_buf {};
     bool _has_ui {false};
 
     render::batcher2d batcher;
     render::collector2d collector;
+
+    SDL_ScaleMode default_tex_scalemode {SDL_SCALEMODE_NEAREST};
 
     // try to get a pointer to a registered viewport
     // or nullptr, if invalid or non-existant
@@ -92,69 +94,18 @@ struct nb::render_2d_p
             return &(it->second);
         return nullptr;
     }
+
 };
 
 
+// destructor callback registered in rtexture instances
+static void _texture_cleanup(rtexture &tex, void*);
 
 // HACK: temporary editor grid — to be replaced with a proper grid layer/component
 static void _draw_editor_grid_hack(SDL_Renderer *render,
     float cam_cx, float cam_cy, float zoom,
-    int vp_x, int vp_y, int vp_w, int vp_h)
-{
-    // Grid levels in world units. Each is 16x the previous.
-    constexpr float STEPS[]       = { 1.f, 16.f, 64.f, 256.f, 1024.f };
-    constexpr Uint8 MAX_ALPHA[]   = { 35,   45,   60,    75,    90   };
-    constexpr int   NUM_LEVELS    = 5;
-    constexpr float FADE_IN_MIN   = 4.f;   // screen px below which lines disappear
-    constexpr float FADE_IN_FULL  = 24.f;  // screen px at which lines reach full alpha
+    int vp_x, int vp_y, int vp_w, int vp_h);
 
-    const float vp_cx = vp_x + vp_w * 0.5f;
-    const float vp_cy = vp_y + vp_h * 0.5f;
-    const float wl = (vp_x        - vp_cx) / zoom + cam_cx;
-    const float wr = (vp_x + vp_w - vp_cx) / zoom + cam_cx;
-    const float wt = (vp_y        - vp_cy) / zoom + cam_cy;
-    const float wb = (vp_y + vp_h - vp_cy) / zoom + cam_cy;
-
-    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
-
-    for (int li = 0; li < NUM_LEVELS; ++li)
-    {
-        const float step      = STEPS[li];
-        const float screen_px = step * zoom;
-        if (screen_px < FADE_IN_MIN) continue;
-
-        const float t     = std::min(1.f, (screen_px - FADE_IN_MIN) / (FADE_IN_FULL - FADE_IN_MIN));
-        const Uint8 alpha = static_cast<Uint8>(t * MAX_ALPHA[li]);
-        if (alpha < 2) continue;
-
-        SDL_SetRenderDrawColor(render, 180, 180, 200, alpha);
-
-        const float x0 = floorf(wl / step) * step;
-        for (float wx = x0; wx <= wr; wx += step)
-        {
-            float sx = (wx - cam_cx) * zoom + vp_cx;
-            SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
-        }
-
-        const float y0 = floorf(wt / step) * step;
-        for (float wy = y0; wy <= wb; wy += step)
-        {
-            float sy = (wy - cam_cy) * zoom + vp_cy;
-            SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
-        }
-    }
-
-    // World-space axes — always visible, higher alpha
-    SDL_SetRenderDrawColor(render, 180, 180, 230, 140);
-    const float ox = (0.f - cam_cx) * zoom + vp_cx;
-    const float oy = (0.f - cam_cy) * zoom + vp_cy;
-    if (ox >= vp_x && ox <= vp_x + vp_w)
-        SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
-    if (oy >= vp_y && oy <= vp_y + vp_h)
-        SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
-
-    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
-}
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
 #endif
@@ -464,9 +415,7 @@ bool render_2d::step(nb::step_phase phase)
         if(_d->_scale != 1.0f)
             SDL_SetRenderScale(_d->_render, _d->_scale, _d->_scale);
 #endif
-        // fixed overlays
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), _d->_render);
-        // reset render scale for HiDPI
 #ifndef ANDROID
         if(_d->_scale != 1.0f)
             SDL_SetRenderScale(_d->_render, 1.0f, 1.0f);
@@ -510,6 +459,42 @@ bool render_2d::event( SDL_Event * evt)
 }
 
 
+void render_2d::_prepare_texture(rtexture *rtex)
+{
+    assert(rtex);  // this shuldd never happen
+
+    auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
+
+    // if we need to do an upload
+    if (!rtex->uploaded && rtex->surf)
+    {
+        if(sdltex)
+        {
+            // if a texture already exists, update it
+            // DO NOT change the format of a rtexture's CPU surface, btw
+            SDL_UpdateTexture(sdltex, nullptr, rtex->surf->pixels, rtex->surf->pitch);
+        }
+        else
+        {
+            // otherwise, create a new one...
+            rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
+            // ...and register its cleanup on resource deletion
+            rtex->on_delete = &_texture_cleanup;
+            rtex->on_delete_uptr = _d.get();
+        }
+        if(sdltex)
+        {
+            SDL_SetTextureScaleMode(sdltex, _d->default_tex_scalemode);
+            rtex->uploaded = true;
+        }
+        else
+            log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
+
+        // even on upload failure, we destroy the surface, to prevent continuous failure every frame
+        SDL_DestroySurface(rtex->surf);
+        rtex->surf = nullptr;
+    }
+}
 
 
 void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
@@ -523,6 +508,14 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     _d->collector.collect(_d->batcher, scene, l, viewproj);
 
     const auto &data = _d->batcher.data();
+
+    // first, check on all textures used on the batches
+    for (auto &tex: data.tex)
+    {
+        _prepare_texture(tex.get());
+    }
+
+    // now go over batches and render them
     for (const auto &cmd: _d->batcher.commands())
     {
         assert(cmd.index_count);
@@ -536,32 +529,6 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
         auto rtex = cmd.texture != -1? data.tex[cmd.texture].get() : nullptr;
         auto sdltex = rtex? static_cast<SDL_Texture*>(rtex->rptr) : nullptr;
 
-        // if we need to do an upload
-        if (!rtex->uploaded && rtex->surf)
-        {
-            if(sdltex)
-            {
-                // if a texture already exists, update it
-                // DO NOT change the format of a texture's surface, btw
-                SDL_UpdateTexture(sdltex, nullptr, rtex->surf->pixels, rtex->surf->pitch);
-            }
-            else
-            {
-                // otherwise, create a new one
-                rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
-            }
-            if(sdltex)
-            {
-                SDL_SetTextureScaleMode(sdltex, SDL_SCALEMODE_LINEAR);
-                rtex->uploaded = true;
-            }
-            else
-                log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
-
-            // even on upload failure, we destroy the surface, to prevent continuous failure every frame
-            SDL_DestroySurface(rtex->surf);
-            rtex->surf = nullptr;
-        }
         // if (!rtex->uploaded) continue; // we could skip rendering textures that fail to upload, or not
 
         // NOTE We could simplify these blend mode shenanigans by:
@@ -889,10 +856,11 @@ void render_2d::reset_default_viewport()
                      _d->_fallback_camera.wmax, _d->_fallback_camera.hmax);
 }
 
-
 renderer_service::texture_handle render_2d::create_texture(int w, int h)
 {
-    return SDL_CreateTexture(_d->_render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
+    auto ret = SDL_CreateTexture(_d->_render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
+    SDL_SetTextureScaleMode(ret, _d->default_tex_scalemode);
+    return ret;
 }
 
 void render_2d::update_texture(texture_handle tex, const void* pixels, int pitch)
@@ -919,6 +887,76 @@ void render_2d::on_scene_change()
 int   render_2d::window_width()  const { return _d->_wx; }
 int   render_2d::window_height() const { return _d->_wy; }
 float render_2d::display_scale() const { return _d->_scale; }
+
+
+void _texture_cleanup(rtexture &tex, void*)
+{
+    if(tex.rptr)
+    {
+        SDL_DestroyTexture(static_cast<SDL_Texture*>(tex.rptr));
+        tex.rptr = nullptr; // for correctness
+    }
+}
+
+
+static void _draw_editor_grid_hack(SDL_Renderer *render,
+                                   float cam_cx, float cam_cy, float zoom,
+                                   int vp_x, int vp_y, int vp_w, int vp_h)
+{
+    // Grid levels in world units. Each is 16x the previous.
+    constexpr float STEPS[]       = { 1.f, 16.f, 64.f, 256.f, 1024.f };
+    constexpr Uint8 MAX_ALPHA[]   = { 35,   45,   60,    75,    90   };
+    constexpr int   NUM_LEVELS    = 5;
+    constexpr float FADE_IN_MIN   = 4.f;   // screen px below which lines disappear
+    constexpr float FADE_IN_FULL  = 24.f;  // screen px at which lines reach full alpha
+
+    const float vp_cx = vp_x + vp_w * 0.5f;
+    const float vp_cy = vp_y + vp_h * 0.5f;
+    const float wl = (vp_x        - vp_cx) / zoom + cam_cx;
+    const float wr = (vp_x + vp_w - vp_cx) / zoom + cam_cx;
+    const float wt = (vp_y        - vp_cy) / zoom + cam_cy;
+    const float wb = (vp_y + vp_h - vp_cy) / zoom + cam_cy;
+
+    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
+
+    for (int li = 0; li < NUM_LEVELS; ++li)
+    {
+        const float step      = STEPS[li];
+        const float screen_px = step * zoom;
+        if (screen_px < FADE_IN_MIN) continue;
+
+        const float t     = std::min(1.f, (screen_px - FADE_IN_MIN) / (FADE_IN_FULL - FADE_IN_MIN));
+        const Uint8 alpha = static_cast<Uint8>(t * MAX_ALPHA[li]);
+        if (alpha < 2) continue;
+
+        SDL_SetRenderDrawColor(render, 180, 180, 200, alpha);
+
+        const float x0 = floorf(wl / step) * step;
+        for (float wx = x0; wx <= wr; wx += step)
+        {
+            float sx = (wx - cam_cx) * zoom + vp_cx;
+            SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
+        }
+
+        const float y0 = floorf(wt / step) * step;
+        for (float wy = y0; wy <= wb; wy += step)
+        {
+            float sy = (wy - cam_cy) * zoom + vp_cy;
+            SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
+        }
+    }
+
+    // World-space axes — always visible, higher alpha
+    SDL_SetRenderDrawColor(render, 180, 180, 230, 140);
+    const float ox = (0.f - cam_cx) * zoom + vp_cx;
+    const float oy = (0.f - cam_cy) * zoom + vp_cy;
+    if (ox >= vp_x && ox <= vp_x + vp_w)
+        SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
+    if (oy >= vp_y && oy <= vp_y + vp_h)
+        SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
+
+    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
+}
 
 // RTTI metadata
 extern "C" void _rtti_init_render_2d()

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "newbase/render/types.hpp"
 #include <newbase/res/sprite.hpp>
 #include <glm/vec4.hpp>
 #include <memory>
@@ -11,6 +12,7 @@ namespace nb {
         bool      visible    { true };
         bool      pixel_snap { false };
         glm::vec4 color      { 1.f, 1.f, 1.f, 1.f };
+        render::blendmode   blend { render::blendmode::BLEND };
 
         // Animation state — managed by sprite_anim system
         std::string sequence;        // empty = first sequence

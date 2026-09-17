@@ -1,5 +1,6 @@
 #pragma once
 
+#include <newbase/render/types.hpp>
 #include <newbase/utility/glm.hpp>
 #include <newbase/res/fwd.hpp>
 #include <unordered_map>
@@ -24,20 +25,6 @@
 
 
 namespace nb::render {
-
-    /**
-     * Blend mode to use in drawing commands.
-     * We keep compatibility here with SDL_BlendMode for simplicity.
-     */
-    enum class blendmode2d : uint32_t
-    {
-        NONE    = 0x0,
-        BLEND   = 0x1,
-        ADD     = 0x2,
-        MOD     = 0x4,
-        MUL     = 0x8,
-        INVALID = 0x7FFFFFFF
-    };
 
     /**
      * This is the data for a single vertex to be rendered.
@@ -103,7 +90,7 @@ namespace nb::render {
         uint32_t index_count {0};
         uint32_t vtx_count {0};
         int32_t texture {-1};
-        blendmode2d blend {blendmode2d::NONE};
+        blendmode blend {blendmode::NONE};
         void *clip;
     };
 
@@ -132,7 +119,7 @@ namespace nb::render {
          * Other optimizations may be implemented in the future.
          */
         void add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
-                      std::shared_ptr<rtexture> tex = nullptr, blendmode2d blend = blendmode2d::NONE, void *clip = nullptr);
+                      std::shared_ptr<rtexture> tex = nullptr, blendmode blend = blendmode::NONE, void *clip = nullptr);
 
         /// const ref getter for draw data
         const data2d & data() const { return m_data; }
