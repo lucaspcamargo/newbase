@@ -1,4 +1,4 @@
-#include <newbase/sys/render_simple/render_simple.hpp>
+#include <newbase/sys/render_2d/render_2d.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/components/sprite.hpp>
 #include <newbase/components/mesh2d.hpp>
@@ -50,7 +50,7 @@ struct viewport_entry {
     float r, g, b, a;
 };
 
-struct nb::render_simple_p
+struct nb::render_2d_p
 {
     render::window rwin;
     SDL_Window    *_win {nullptr};
@@ -159,20 +159,20 @@ static SDL_Surface *_tracyCopy {nullptr};
 #endif
 
 
-render_simple::render_simple()
+render_2d::render_2d()
 {
-    log::info("[render_simple] constructed");
+    log::info("[render_2d] constructed");
     
-    _d = std::make_unique<render_simple_p>();
+    _d = std::make_unique<render_2d_p>();
 
     // register services
     entt::locator<renderer_service*>::emplace(this);
     entt::locator<picker_service*>::emplace(this);
 }
 
-render_simple::~render_simple()
+render_2d::~render_2d()
 {
-    log::info("[render_simple] destroying");
+    log::info("[render_2d] destroying");
     if(_d->_has_ui)
     {
         ImGui_ImplSDLRenderer3_Shutdown();
@@ -183,7 +183,7 @@ render_simple::~render_simple()
             ui_mgr->ui_destroy();
         }
         else
-            log::warn("[render_simple] could not locate ui service for destruction");
+            log::warn("[render_2d] could not locate ui service for destruction");
     }
     if(_d->_render)
     {
@@ -194,34 +194,34 @@ render_simple::~render_simple()
     // render::window is destroyed in tandem
     _d.reset();
 
-    log::info("[render_simple] destroyed");
+    log::info("[render_2d] destroyed");
 }
 
 
-SDL_InitFlags render_simple::sdl_subsystems(ryml::ConstNodeRef cfg)
+SDL_InitFlags render_2d::sdl_subsystems(ryml::ConstNodeRef cfg)
 {
     // TODO doesn't seem to work in runtime
     // No SDL hints have found for this either
     // also msvcpp does not like env manipulation on windows
     if(cfg.has_child("prefer") && !cfg["prefer"].invalid())
     {
-        log::info("[render_simple] current driver: %s", SDL_GetCurrentVideoDriver());
+        log::info("[render_2d] current driver: %s", SDL_GetCurrentVideoDriver());
         bool already = getenv("SDL_VIDEODRIVER");
         std::string preferred;
         cfg["prefer"] >> preferred;
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, preferred.c_str());
-        log::info("[render_simple] preferring: %s%s", preferred.c_str(), already?" (overrides env)":"");
+        log::info("[render_2d] preferring: %s%s", preferred.c_str(), already?" (overrides env)":"");
     }
     return SDL_INIT_VIDEO;
 }
 
 
-bool render_simple::init(ryml::ConstNodeRef cfg)
+bool render_2d::init(ryml::ConstNodeRef cfg)
 {
-    log::info("[render_simple] init");
+    log::info("[render_2d] init");
     const auto num_drivers = SDL_GetNumRenderDrivers();
 
-    log::info("[render_simple] current driver: %s", SDL_GetCurrentVideoDriver());
+    log::info("[render_2d] current driver: %s", SDL_GetCurrentVideoDriver());
     
 
     if (cfg.has_child("dump_backkends"))
@@ -241,30 +241,30 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
              driver_names += " ";
         }
 
-        log::info("[render_simple] available drivers: %s", driver_names.c_str());
+        log::info("[render_2d] available drivers: %s", driver_names.c_str());
         }
     }
 
     if(!_d->rwin.create(cfg, SDL_WINDOW_OPENGL))
     {
-        log::error("[render_simple] window creation failed");
+        log::error("[render_2d] window creation failed");
         return false;
     }
 
     _d->_win = _d->rwin.get();
-    log::info("[render_simple] window scale: %f", _d->_scale);
+    log::info("[render_2d] window scale: %f", _d->_scale);
 
     _d->_render = SDL_CreateRenderer(_d->_win, nullptr);
-    log::info("[render_simple] renderer: %s", SDL_GetRendererName(_d->_render));
+    log::info("[render_2d] renderer: %s", SDL_GetRendererName(_d->_render));
 
     SDL_SetRenderVSync(_d->_render, 1);
     if (_d->_render == nullptr)
     {
-        log::error("[render_simple] SDL_CreateRenderer(): %s\n", SDL_GetError());
+        log::error("[render_2d] SDL_CreateRenderer(): %s\n", SDL_GetError());
         return false;
     }
     else
-        log::info("[render_simple] created renderer: %s", SDL_GetRendererName(_d->_render));
+        log::info("[render_2d] created renderer: %s", SDL_GetRendererName(_d->_render));
 
 #ifndef NEWBASE_WII
     SDL_SetWindowPosition(_d->_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
@@ -272,7 +272,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
 
     if(!_d->rwin.show())
     {
-        log::error("[render_simple] window show() filed: %s\n", SDL_GetError());
+        log::error("[render_2d] window show() filed: %s\n", SDL_GetError());
         return false;
     }
 
@@ -296,7 +296,7 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
         _d->_has_ui = ui_mgr->ui_init();
     }
     else
-        log::warn("[render_simple] could not init ui via ui_manager service");
+        log::warn("[render_2d] could not init ui via ui_manager service");
     
     if(_d->_has_ui)
     {
@@ -308,19 +308,19 @@ bool render_simple::init(ryml::ConstNodeRef cfg)
     }
     else
     {
-        log::warn("[render_simple] no ui, not initializing ImGui renderer");
+        log::warn("[render_2d] no ui, not initializing ImGui renderer");
     }
 
 
 
     // Create the persistent default viewport (full window, no clear).
     _d->_default_vp = create_viewport(0, 0, _d->_wx, _d->_wy, false);
-    log::info("[render_simple] default viewport: %u", _d->_default_vp);
+    log::info("[render_2d] default viewport: %u", _d->_default_vp);
 
     return true;
 }
 
-bool render_simple::step(nb::step_phase phase)
+bool render_2d::step(nb::step_phase phase)
 {
     if(phase == step_phase::PRE_UPDATE)
     {
@@ -483,7 +483,7 @@ bool render_simple::step(nb::step_phase phase)
     return true;
 }
 
-bool render_simple::event( SDL_Event * evt)
+bool render_2d::event( SDL_Event * evt)
 {
     ImGui_ImplSDL3_ProcessEvent(evt);
 
@@ -511,7 +511,7 @@ bool render_simple::event( SDL_Event * evt)
 
 
 
-void render_simple::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
+void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
 {
     _d->batcher.clear();
     _d->collector.clear();
@@ -544,7 +544,7 @@ void render_simple::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const
                 rtex->uploaded = true;
             }
             else
-                log::warn("[render_simple] texture upload failure for 0x%08x", rtex->id());
+                log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
 
             // even on upload failure, we destroy the surface, to prevent continuous failure every frame
             SDL_DestroySurface(rtex->surf);
@@ -594,7 +594,7 @@ void render_simple::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const
 }
 
 
-std::pair<glm::vec2, glm::vec2> render_simple::_get_viewport_bounds(const render_layer &l)
+std::pair<glm::vec2, glm::vec2> render_2d::_get_viewport_bounds(const render_layer &l)
 {
     // initialize with window dimensions
     glm::vec2 tl {0.0, 0.0};
@@ -612,7 +612,7 @@ std::pair<glm::vec2, glm::vec2> render_simple::_get_viewport_bounds(const render
 }
 
 
-entt::entity render_simple::pick(const render_layer &layer, float vp_x, float vp_y)
+entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
 {
     // TODO move to render::picker2d, generalizedd
     auto *sc = engine::instance().find_scene(layer.scene_id);
@@ -743,7 +743,7 @@ entt::entity render_simple::pick(const render_layer &layer, float vp_x, float vp
     return best;
 }
 
-void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
+void render_2d::cam_2d_setup(float cx, float cy, float wmax, float hmax)
 {
     _d->_fallback_spatial.pos = { cx, cy, 0.f };
     _d->_fallback_camera.wmax = wmax;
@@ -753,16 +753,16 @@ void render_simple::cam_2d_setup(float cx, float cy, float wmax, float hmax)
     float scale_y = _d->_wy / hmax;
     _d->_fallback_camera.zoom = std::min(scale_x, scale_y);
 
-    log::verb("[render_simple] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
+    log::verb("[render_2d] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
         cx, cy, wmax, hmax, _d->_fallback_camera.zoom);
 }
 
-float render_simple::cam_2d_scale()
+float render_2d::cam_2d_scale()
 {
     return _d->_fallback_camera.zoom;
 }
 
-bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
+bool render_2d::get_2d_extents(renderer_service::extents_2d &extents)
 {
     // Prefer the first configured render layer's camera
     // TODO better control fo this mapping
@@ -826,16 +826,16 @@ bool render_simple::get_2d_extents(renderer_service::extents_2d &extents)
     return true;
 }
 
-viewport_handle render_simple::create_viewport(int x, int y, int w, int h,
+viewport_handle render_2d::create_viewport(int x, int y, int w, int h,
                                                bool clear, float r, float g, float b, float a)
 {
     viewport_handle handle = _d->_next_vp_handle++;
     _d->_viewports[handle] = { x, y, w, h, clear, r, g, b, a };
-    log::info("[render_simple] viewport %u created: %dx%d@%d,%d", handle, w, h, x, y);
+    log::info("[render_2d] viewport %u created: %dx%d@%d,%d", handle, w, h, x, y);
     return handle;
 }
 
-void render_simple::update_viewport(viewport_handle vp, int x, int y, int w, int h)
+void render_2d::update_viewport(viewport_handle vp, int x, int y, int w, int h)
 {
     auto it = _d->_viewports.find(vp);
     if(it == _d->_viewports.end()) return;
@@ -855,17 +855,17 @@ void render_simple::update_viewport(viewport_handle vp, int x, int y, int w, int
     }
 }
 
-void render_simple::destroy_viewport(viewport_handle vp)
+void render_2d::destroy_viewport(viewport_handle vp)
 {
     _d->_viewports.erase(vp);
 }
 
-viewport_handle render_simple::default_viewport() const
+viewport_handle render_2d::default_viewport() const
 {
     return _d->_default_vp;
 }
 
-void render_simple::reset_default_viewport()
+void render_2d::reset_default_viewport()
 {
     _d->_default_vp_owned = false;
     if(_d->_default_vp != VIEWPORT_INVALID)
@@ -878,59 +878,59 @@ void render_simple::reset_default_viewport()
 }
 
 
-renderer_service::texture_handle render_simple::create_texture(int w, int h)
+renderer_service::texture_handle render_2d::create_texture(int w, int h)
 {
     return SDL_CreateTexture(_d->_render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
 }
 
-void render_simple::update_texture(texture_handle tex, const void* pixels, int pitch)
+void render_2d::update_texture(texture_handle tex, const void* pixels, int pitch)
 {
     SDL_UpdateTexture(static_cast<SDL_Texture*>(tex), nullptr, pixels, pitch);
 }
 
-void render_simple::destroy_texture(texture_handle tex)
+void render_2d::destroy_texture(texture_handle tex)
 {
     SDL_DestroyTexture(static_cast<SDL_Texture*>(tex));
 }
 
-void render_simple::set_clear_color(float r, float g, float b)
+void render_2d::set_clear_color(float r, float g, float b)
 {
     _d->_clear_r = r; _d->_clear_g = g; _d->_clear_b = b;
 }
 
-void render_simple::on_scene_change()
+void render_2d::on_scene_change()
 {
     _d->_clear_r = _d->_clear_g = _d->_clear_b = 0.f;
 }
 
-int   render_simple::window_width()  const { return _d->_wx; }
-int   render_simple::window_height() const { return _d->_wy; }
-float render_simple::display_scale() const { return _d->_scale; }
+int   render_2d::window_width()  const { return _d->_wx; }
+int   render_2d::window_height() const { return _d->_wy; }
+float render_2d::display_scale() const { return _d->_scale; }
 
 // RTTI metadata
-extern "C" void _rtti_init_render_simple()
+extern "C" void _rtti_init_render_2d()
 {
-    entt::meta_factory<nb::render_simple>{}
-        .type("render_simple"_hs)
-        .custom<rtti::type_info>(rtti::type_info{"render_simple", rtti::TYPE_CLASS_SYSTEM})
+    entt::meta_factory<nb::render_2d>{}
+        .type("render_2d"_hs)
+        .custom<rtti::type_info>(rtti::type_info{"render_2d", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
-        .func<&nb::render_simple::cam_2d_setup>("cam_2d_setup"_hs)
+        .func<&nb::render_2d::cam_2d_setup>("cam_2d_setup"_hs)
         .custom<rtti::func_info>(rtti::func_info{"cam_2d_setup"})
-        .func<&nb::render_simple::cam_2d_scale>("cam_2d_scale"_hs)
+        .func<&nb::render_2d::cam_2d_scale>("cam_2d_scale"_hs)
         .custom<rtti::func_info>(rtti::func_info{"cam_2d_scale"})
-        .func<&nb::render_simple::window_width>("window_width"_hs)
+        .func<&nb::render_2d::window_width>("window_width"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_width"})
-        .func<&nb::render_simple::window_height>("window_height"_hs)
+        .func<&nb::render_2d::window_height>("window_height"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_height"})
-        .func<&nb::render_simple::set_clear_color>("set_clear_color"_hs)
+        .func<&nb::render_2d::set_clear_color>("set_clear_color"_hs)
         .custom<rtti::func_info>(rtti::func_info{"set_clear_color"})
-        .func<&nb::render_simple::default_viewport>("default_viewport"_hs)
+        .func<&nb::render_2d::default_viewport>("default_viewport"_hs)
         .custom<rtti::func_info>(rtti::func_info{"default_viewport"})
-        .func<&nb::render_simple::display_scale>("display_scale"_hs)
+        .func<&nb::render_2d::display_scale>("display_scale"_hs)
         .custom<rtti::func_info>(rtti::func_info{"display_scale"});
-    entt::meta_factory<std::shared_ptr<nb::render_simple>>{rtti::ctx_systems()}
-        .type("render_simple_shared"_hs)
-        .ctor<&rtti::shared_ptr_builder<nb::render_simple>>()
+    entt::meta_factory<std::shared_ptr<nb::render_2d>>{rtti::ctx_systems()}
+        .type("render_2d_shared"_hs)
+        .ctor<&rtti::shared_ptr_builder<nb::render_2d>>()
         .conv<std::shared_ptr<nb::system>>();
 
     cspatial::_ensure_rtti();

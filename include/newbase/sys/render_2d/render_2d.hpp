@@ -10,20 +10,20 @@
 
 namespace nb {
 
-struct render_simple_p;
+struct render_2d_p;
 
-class render_simple : public system, public renderer_service, public picker_service
+class render_2d : public system, public renderer_service, public picker_service
 {
 public:
-    render_simple();
-    ~render_simple();
+    render_2d();
+    ~render_2d();
 
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(nb::step_phase) override;
     bool event(SDL_Event * ) override;
 
     SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
-    entt::id_type metatype_id() override { return entt::hashed_string{"render_simple"}.value(); }
+    entt::id_type metatype_id() override { return entt::hashed_string{"render_2d"}.value(); }
 
     int   window_width()  const override;
     int   window_height() const override;
@@ -74,7 +74,7 @@ private:
 
     void on_scene_change() override;
 
-    std::unique_ptr<render_simple_p> _d;
+    std::unique_ptr<render_2d_p> _d;
 };
 
 }

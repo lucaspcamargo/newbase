@@ -1,5 +1,5 @@
 #if(NEWBASE_EMSCRIPTEN)
-    set(NB_DEMO_RENDERER "render_simple")
+    set(NB_DEMO_RENDERER "render_2d")
 #else()  
 #    set(NB_DEMO_RENDERER "render_gpu")
 #endif()
