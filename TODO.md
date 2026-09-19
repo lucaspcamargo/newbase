@@ -29,7 +29,7 @@ The things that are still meant to be done. Some have
     + [ ] Cleanup render layer and viewport semantics, and create spec
         * [ ] Basic render-to-texture
     + [~] Implement ImGui backend specific to newbase, stop using the sample code.
-    + [ ] Don't leak SDL_Texture on resource cleanup.
+    + [X] Don't leak SDL_Texture on resource cleanup.
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
     + [ ] Shader system
         * [ ] Optional shader support in render_2d depending on backend
@@ -45,9 +45,13 @@ The things that are still meant to be done. Some have
     + [ ] Spatial sound support, 2D and 3D
     + [ ] Basic HRTF support in spatial functionality
     + [ ] "Maestro" system for handling dynamic music and transitions
-- Tooling UI
+- Tooling UI (ImGui)
+    + [ ] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
+        * To avoid constant texture reloads, we may cache loaded textures until the next frame.
+          Mostly a contingency, as UI that renders with textures should itself hold references to the textures it uses.
     + [ ] Unify tool window toggle, remove dedicated debug actions
     + [ ] Default dock layout mechanism for tool and editor windows
+    + [ ] Integrate imgui-text-editor for scripts and text files
 - In-Game UI
     + [ ] Integrate LVGL
     + [ ] Integrate RmlUi
@@ -69,5 +73,5 @@ The things that are still meant to be done. Some have
     + [ ] Platformer: A bit more polish, no need to go overboard though
     + [ ] Fast-rodent: Get it working with some cool resources from the web
     + [ ] Physics 2D: Fix picking on web and Android, audio and more stuff
-    + [ ] Move hello-world to the end
+    + [X] Move hello-world to the end
     

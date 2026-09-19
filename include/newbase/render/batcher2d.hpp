@@ -30,6 +30,10 @@ namespace nb::render {
      * This is the data for a single vertex to be rendered.
      * Even with glm's alignment requirements, it should be
      * 1:1 memory-compatible with SDL_Vertex.
+     *
+     * Using uint32_t for color was considered, but since we
+     * would need to convert back to float for SDL_Renderer
+     * all the same, it is what it is.
      */
     struct vertex2d
     {

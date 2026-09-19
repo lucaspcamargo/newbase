@@ -22,12 +22,12 @@ struct demo_entry {
 };
 
 static const demo_entry s_demos[] = {
-    { "Hello World", "res/hello_world/scene.et.yaml"_hs,   "res/hello_world/README.md"_hs   },
     { "Asteroids",   "res/asteroids/title.et.yaml"_hs,     "res/asteroids/README.md"_hs     },
     { "Physics 2D",  "res/physics2d_demo/scene.et.yaml"_hs,"res/physics2d_demo/README.md"_hs},
     { "Platformer",  "res/platformer/scene.et.yaml"_hs,    "res/platformer/README.md"_hs    },
     { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,   "res/fast_rodent/README.md"_hs,  true },
     { "Lupi",        "res/lupi_demo/scene.et.yaml"_hs,     "res/lupi_demo/README.md"_hs     },
+    { "Hello World", "res/hello_world/scene.et.yaml"_hs,   "res/hello_world/README.md"_hs   },
 };
 static constexpr int s_demo_count = static_cast<int>(sizeof(s_demos) / sizeof(s_demos[0]));
 

@@ -7,6 +7,8 @@
 #include <newbase/components/structure.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
+#include <newbase/render/window.hpp>
+#include <newbase/render/collector2d.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
 #include <newbase/res/manager.hpp>
@@ -16,19 +18,10 @@
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/log.hpp>
 
-// new render components
-// merge above after cleanup
-#include <newbase/render/window.hpp>
-#include <newbase/render/batcher2d.hpp>
-#include <newbase/render/collector2d.hpp>
-
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_surface.h"
 #include "glm/fwd.hpp"
-#include "imgui.h"
 //#include "imgui_internal.h" // for ImGuiViewport
-#include "backends/imgui_impl_sdl3.h"
-#include "../../ui/imgui_impl_sdlrenderer3.h"
 #include "newbase/layer.hpp"
 #include "newbase/services/renderer_service.hpp"
 #include <entt/entt.hpp>
@@ -95,6 +88,8 @@ struct nb::render_2d_p
         return nullptr;
     }
 
+    imgui_nb imgui;
+
 };
 
 
@@ -127,8 +122,7 @@ render_2d::~render_2d()
     log::info("[render_2d] destroying");
     if(_d->_has_ui)
     {
-        ImGui_ImplSDLRenderer3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
+        _d->imgui.teardown();
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
         if(ui_mgr)
         {
@@ -252,10 +246,8 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
     
     if(_d->_has_ui)
     {
-        // Setup Platform/Renderer backends
-        ImGui_ImplSDL3_InitForSDLRenderer(_d->_win, _d->_render);
-        ImGui_ImplSDLRenderer3_Init(_d->_render);
-
+        log::warn("[render_2d] ui init");
+        _d->imgui.init(_d->rwin);
         ui_mgr->ui_init_finish(_d->_scale);
     }
     else
@@ -277,12 +269,11 @@ bool render_2d::step(nb::step_phase phase)
     if(phase == step_phase::PRE_UPDATE)
     {
         ZoneScopedN("RenderPreUpdate");
-        // Start the Dear ImGui frame
-        ImGui_ImplSDLRenderer3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
+        // Start UI frame
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
         if(ui_mgr)
         {
+            _d->imgui.new_frame();
             ui_mgr->ui_new_frame(_d->_safe.x, _d->_safe.y, _d->_safe.w, _d->_safe.h);
         }
     }
@@ -402,24 +393,16 @@ bool render_2d::step(nb::step_phase phase)
         }
         
         // GUI
-        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
-        if(ui_mgr)
+        if(_d->_has_ui)
         {
+            SDL_SetRenderClipRect(_d->_render, nullptr);
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
             ZoneScopedN("RenderDrawUI");
             ui_mgr->draw_tool_windows();
             ui_mgr->draw_perf();
+            _d->imgui.render_flush();
+            _draw_batches(_d->imgui.render_data());
         }
-        ImGui::Render();
-
-#ifndef ANDROID
-        if(_d->_scale != 1.0f)
-            SDL_SetRenderScale(_d->_render, _d->_scale, _d->_scale);
-#endif
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), _d->_render);
-#ifndef ANDROID
-        if(_d->_scale != 1.0f)
-            SDL_SetRenderScale(_d->_render, 1.0f, 1.0f);
-#endif
 
 #ifdef TRACY_ENABLED
         // TODO
@@ -435,7 +418,10 @@ bool render_2d::step(nb::step_phase phase)
 
 bool render_2d::event( SDL_Event * evt)
 {
-    ImGui_ImplSDL3_ProcessEvent(evt);
+    if(_d->_has_ui)
+    {
+        _d->imgui.event(evt);
+    }
 
     bool window_update = _d->rwin.event(evt);
     if(window_update)
@@ -459,44 +445,6 @@ bool render_2d::event( SDL_Event * evt)
 }
 
 
-void render_2d::_prepare_texture(rtexture *rtex)
-{
-    assert(rtex);  // this shuldd never happen
-
-    auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
-
-    // if we need to do an upload
-    if (!rtex->uploaded && rtex->surf)
-    {
-        if(sdltex)
-        {
-            // if a texture already exists, update it
-            // DO NOT change the format of a rtexture's CPU surface, btw
-            SDL_UpdateTexture(sdltex, nullptr, rtex->surf->pixels, rtex->surf->pitch);
-        }
-        else
-        {
-            // otherwise, create a new one...
-            rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
-            // ...and register its cleanup on resource deletion
-            rtex->on_delete = &_texture_cleanup;
-            rtex->on_delete_uptr = _d.get();
-        }
-        if(sdltex)
-        {
-            SDL_SetTextureScaleMode(sdltex, _d->default_tex_scalemode);
-            rtex->uploaded = true;
-        }
-        else
-            log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
-
-        // even on upload failure, we destroy the surface, to prevent continuous failure every frame
-        SDL_DestroySurface(rtex->surf);
-        rtex->surf = nullptr;
-    }
-}
-
-
 void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
 {
     _d->batcher.clear();
@@ -505,18 +453,27 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     const auto bounds = _get_viewport_bounds(l);
     (void) bounds;
 
+    // use the standard 2d collector to go over scene and
+    // batch geometry data
     _d->collector.collect(_d->batcher, scene, l, viewproj);
 
-    const auto &data = _d->batcher.data();
+    // now go over batches and render them
+    _draw_batches(_d->batcher);
+}
 
-    // first, check on all textures used on the batches
+
+void render_2d::_draw_batches(render::batcher2d& batcher)
+{
+    const auto &data = batcher.data();
+
+    // first, ensure textures are ready
     for (auto &tex: data.tex)
     {
         _prepare_texture(tex.get());
     }
 
-    // now go over batches and render them
-    for (const auto &cmd: _d->batcher.commands())
+    // now we draw
+    for (const auto &cmd: batcher.commands())
     {
         assert(cmd.index_count);
         assert(cmd.index_start + cmd.index_count <= data.inds.size());
@@ -555,7 +512,7 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
                               reinterpret_cast<const SDL_FColor*>(&(vtx0->color.x)), v_stride,
                               static_cast<const float*>(&(vtx0->uv.x)), v_stride,
                               cmd.vtx_count, ind0, cmd.index_count, 2
-                              );
+        );
 
         // restore previous blend mode, whatever that was
         if(sdltex)
@@ -569,7 +526,44 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     }
 
     SDL_SetRenderDrawBlendMode(_d->_render, SDL_BLENDMODE_BLEND);
+}
 
+void render_2d::_prepare_texture(rtexture *rtex)
+{
+    assert(rtex);  // this shuldd never happen
+
+    auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
+
+    // if we need to do an upload
+    if (!rtex->uploaded && rtex->surf)
+    {
+        if(sdltex)
+        {
+            // destroy existing texture if needed
+            SDL_DestroyTexture(sdltex);
+            sdltex = nullptr;
+            rtex->rptr = nullptr;
+        }
+
+        // Always create a new texture
+        rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
+        log::warn("[render_2d] texture created for 0x%08x: %dx%d", rtex->id(), rtex->width, rtex->height);
+        // ...and register its cleanup on resource deletion
+        rtex->on_delete = &_texture_cleanup;
+        rtex->on_delete_uptr = _d.get();
+
+        if(sdltex)
+        {
+            SDL_SetTextureScaleMode(sdltex, _d->default_tex_scalemode);
+            rtex->uploaded = true;
+        }
+        else
+            log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
+
+        // even on upload failure, we destroy the surface, to prevent continuous failure every frame
+        SDL_DestroySurface(rtex->surf);
+        rtex->surf = nullptr;
+    }
 }
 
 

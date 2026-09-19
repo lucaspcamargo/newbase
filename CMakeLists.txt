@@ -160,6 +160,7 @@ add_library(newbase STATIC
     # ui
     src/ui/manager.cpp
     src/ui/overlay.cpp
+    src/ui/imgui_nb.cpp
     src/ui/imgui_style.cpp
     src/ui/layout.cpp
     src/ui/markdown.cpp

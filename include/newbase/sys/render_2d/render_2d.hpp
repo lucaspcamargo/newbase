@@ -3,6 +3,7 @@
 #include <newbase/system.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/layer.hpp>
+#include <newbase/render/batcher2d.hpp>
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/services/picker_service.hpp>
 #include <newbase/utility/glm.hpp>
@@ -70,6 +71,10 @@ private:
     // SDL_Renderer does not use NDC, so viewproj must map to render target pixel coordinates
     // caller is responsble for viewport clearing and clipping setup
     void _draw_scene(scene &scn, const glm::mat4x4 &viewproj, const render_layer &l);
+
+    // draws the current contents of the geometry batcher
+    // to the current render target
+    void _draw_batches(render::batcher2d& batcher);
 
     // given a viewport handle, calculates target top-left and bottom-right points for geometry transformation
     // we pass the layer because default/invalid viewport depends on target dimensions if any

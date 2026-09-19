@@ -1,6 +1,7 @@
 #include <newbase/render/window.hpp>
 #include <newbase/log.hpp>
 
+#include "SDL3/SDL_events.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_video.h"
 #include <ryml_std.hpp>
@@ -91,7 +92,7 @@ bool render::window::event(SDL_Event * evt)
 {
     assert(m_win && "You must create() the window first!");
 
-    if(evt->window.windowID == SDL_GetWindowID(m_win))
+    if(evt->window.windowID != SDL_GetWindowID(m_win))
         return false; // still need to match event type to be sure!
 
     if(evt->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
@@ -101,7 +102,7 @@ bool render::window::event(SDL_Event * evt)
         log::info("[window] resized to %dx%d", m_pw, m_ph);
         return true;
     }
-    else if(evt->type == SDL_EVENT_WINDOW_RESIZED)
+    else if(evt->type == SDL_EVENT_WINDOW_SAFE_AREA_CHANGED)
     {
         SDL_GetWindowSafeArea(m_win, &m_safe_area);
         log::info("[window] safe area: %dx%d@%d,%d", m_safe_area.w, m_safe_area.h, m_safe_area.x, m_safe_area.y);

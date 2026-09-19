@@ -107,12 +107,6 @@ bool ui_manager_simple::ui_init()
 
 void ui_manager_simple::ui_init_finish(float scale)
 {
-    // for android, scaling works a bit differently
-#ifdef ANDROID
-    ImGui::GetStyle().ScaleAllSizes(scale);
-    ImGui::GetIO().FontGlobalScale = scale;
-#endif
-
     imgui_style_fonts_setup(scale);
 }
 
