@@ -55,11 +55,23 @@ class window final
         int height() const {return m_ph;}
 
         /**
-         * Gets the current window ui scaling, as reported by the OS.
+         * Gets the current window UI scaling, as reported by the OS.
+         * This denotes how large to scale a typical UI, from logical pixels to physical pixels.
+         * On all platforms, this should be a reasonable scale factor: typically ~2.0 on hiDPI and ~1.0 in traditional resolutions.
          * Events need to be passed by the renderer in order to update this.
          * Even then, ui scale changes may be flaky.
          */
         float ui_scale() const {return m_ui_scale;}
+
+        /**
+         * Gets the current window event scaling, as reported by the OS.
+         * This can be used to convert event coordinates (mouse, pointer, etc) to pixel coordinates.
+         * On Windows, X11, and Android, as events are passed in pixel coordinates, this should be 1.0.
+         * On macOS and Wayland, as events are passed in logical coordinates, this can be larger than 1.0.
+         * Events need to be passed by the renderer in order to update this.
+         * Even then, ui scale changes may be flaky.
+         */
+        float event_scale() const {return m_event_scale;}
 
         /**
          * Get the safe area of this window.
@@ -71,7 +83,8 @@ class window final
          * Processes an SDL_Event that might be related to the window
          * @returns true if the event was related to the window, and internal state was updated, false otherwise
          */
-        bool event(SDL_Event * evt);
+        bool
+        event(SDL_Event * evt);
 
         /**
          * Shows the window and updates dimension and scale information.
@@ -83,6 +96,7 @@ private:
     SDL_Window *m_win {nullptr};
     int m_pw {0}, m_ph {0};
     float m_ui_scale {1.0};
+    float m_event_scale {1.0};
     SDL_Rect m_safe_area;
 };
 

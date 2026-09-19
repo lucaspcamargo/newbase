@@ -121,6 +121,7 @@ bool render::window::show()
     {
         SDL_GetWindowSizeInPixels(m_win, &m_pw, &m_ph);
         m_ui_scale = SDL_GetWindowDisplayScale(m_win);
+        m_event_scale = SDL_GetWindowPixelDensity(m_win);
         SDL_GetWindowSafeArea(m_win, &m_safe_area);
         log::info("[window] opened, size %dx%d, ui_scale %f, safe area: %dx%d@%d,%d",
                   m_pw, m_ph, m_ui_scale,
