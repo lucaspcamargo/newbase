@@ -37,6 +37,9 @@ struct nb::ui_manager_p
     std::string ini_path;
     ui_manager::open_resource_editor_fn open_resource_editor_cb;
     std::vector<std::pair<std::string, ui_manager::overlay_fn>> overlays;
+
+    glm::vec4 viewport_gui {0.0f};
+    glm::vec4 viewport_px {0.0f};
 };
 
 
@@ -192,6 +195,8 @@ void ui_manager_simple::update_viewports()
         static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
         static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy)
     };
+    _d->viewport_px = {ui_vp.x, ui_vp.y, ui_vp.w, ui_vp.h};
+    _d->viewport_gui = {work_pos.x, work_pos.y, work_size.x, work_size.y};
 
     for(auto &l: engine::instance().render_layers())
     {
@@ -200,6 +205,12 @@ void ui_manager_simple::update_viewports()
             l.viewport = ui_vp;
         }
     }
+}
+
+
+glm::vec4 ui_manager_simple::central_viewport(bool pixel_coords)
+{
+    return pixel_coords? _d->viewport_px : _d->viewport_gui;
 }
 
 bool ui_manager_simple::toggle_tool_window(const char *name)

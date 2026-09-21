@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/system.hpp>
+#include <newbase/layer.hpp>
 
 namespace nb {
 
@@ -22,6 +23,7 @@ public:
 private:
     void _draw_main_menu();
     void _draw_overlay();
+    void _draw_grid(const render_layer &l, render::batcher2d &batcher);
     void _sync_editor_cam_to_game();
     void _apply_override_layers();
     void _ensure_editor_cam();

@@ -26,12 +26,10 @@ local update_handle = clock_update_add(function(delta)
     local sp = c_spatial()
     if not sp then return end
 
-    local renderer_svc = svc_renderer_service()
-    if not renderer_svc then return end
-
-    local e  = renderer_svc:get_2d_extents()
-    local w  = e.xspan
-    local h  = e.yspan
+    local cam = get_camera(entity_find("camera"))
+    local e  = cam.cam2d:calc_world_bounds(0, 0, engine:render_layer_get(0).viewport) -- camera always at orgin here
+    local w = e.z
+    local h = e.w
     local nx = sp.pos.x
     local ny = sp.pos.y
 

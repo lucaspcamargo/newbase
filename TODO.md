@@ -28,10 +28,10 @@ The things that are still meant to be done. Some have
     + [X] Blend modes in sprites like in cgeom2d (support in 2d renderer done)
     + [~] Implement ImGui backend specific to newbase, stop using the sample code.
         * [X] Get basic support working
-        * [ ] Specify and implement clipping behavior
+        * [X] Specify and implement clipping behavior
         * [ ] Validate (and fix?) DPI handling on all platforms
     + [X] Clipping on render_2d (and ImGui)
-    + [ ] Cleanup render layer and viewport semantics, and create spec - see below section
+    + [~] Cleanup render layer and viewport semantics, and create spec - see below section
     * [ ] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
@@ -93,6 +93,6 @@ The things that are still meant to be done. Some have
     + [X] helpers to get camera_2d world bounds according to cam data and viewport
     + [X] update camera component and builder to contain new structure (2d and 3d data side by side is fine)
 - [X] Remove fallback camera and viewport path from render_2d
-- [ ] Remove get_2d_extents from renderer_service
-- [ ] Define overlay 
+- [~] Remove get_2d_extents and cam_2d_setup from renderer_service too
+- [ ] Refine overlay API
 - [ ] Update UI overlay callback signature and code

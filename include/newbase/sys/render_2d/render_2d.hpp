@@ -31,18 +31,9 @@ public:
     int   window_height() const override;
     float display_scale() const override;
 
-    // Legacy single-camera setup. Still functional as a fallback when no render
-    // layers are configured.
-    void cam_2d_setup(float cx, float cy, float wmax, float hmax) override;
-    float cam_2d_scale();
-
     // picker_service interface
     // TODO move to nb::render namespace, generalize, drop service
     entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
-
-    // renderer_service interface
-    // TODO remove this
-    bool get_2d_extents(renderer_service::extents_2d &extents) override;
 
     // opaque texture management interface from renderer_service
     // for UI usage and simpler rendering purposes
@@ -66,10 +57,6 @@ private:
     // to the current render target
     // clip is intersected with the command's clip if not NONE
     void _draw_batches(render::batcher2d& batcher, render::clip_t clip = render::CLIP_NONE);
-
-    // TODO remove this
-    // all viewports should be well-defined and know their target size
-    std::pair<glm::vec2, glm::vec2> _get_viewport_bounds(const render_layer &l);
 
     std::unique_ptr<render_2d_p> _d;
 };

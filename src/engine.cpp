@@ -1,4 +1,5 @@
 #include "entt/meta/policy.hpp"
+#include "newbase/render/camera.hpp"
 #include "newbase/render/types.hpp"
 #include <algorithm>
 #include <newbase/engine.hpp>
@@ -568,10 +569,25 @@ extern "C" void _rtti_init_engine()
     .data<&nb::render_layer::clear_g>("clear_g"_hs)
         .custom<rtti::data_info>(rtti::data_info{"clear_g"})
     .data<&nb::render_layer::clear_b>("clear_b"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear_b"})
-    .data<&nb::render_layer::use_grid>("use_grid"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"use_grid"});
+        .custom<rtti::data_info>(rtti::data_info{"clear_b"});
 
+
+    // TODO fit mode enum
+
+    entt::meta_factory<nb::render::camera_2d>{}
+    .type("render_camera_2d"_hs)
+        .custom<rtti::type_info>(rtti::type_info{.identifier="render_camera_2d", .type_class=rtti::TYPE_CLASS_NONE})
+    .ctor<>()
+    .data<&nb::render::camera_2d::scale, entt::as_ref_t>("scale"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"scale"})
+    .data<&nb::render::camera_2d::fit_mode, entt::as_ref_t>("fit_mode"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"fit_mode"})
+    .data<&nb::render::camera_2d::fit_world_dims, entt::as_ref_t>("fit_world_dims"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"fit_world_dims"})
+    .data<&nb::render::camera_2d::fit_anchor, entt::as_ref_t>("fit_anchor"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"fit_anchor"})
+    .func<&nb::render::camera_2d::calc_world_bounds>("calc_world_bounds"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"calc_world_bounds"});
 
     entt::meta_factory<nb::engine>{}
     .type("engine"_hs)

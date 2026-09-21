@@ -217,11 +217,11 @@ spawn_powerup_slowtime(-300, -200, -15,  20)
 
 -- cull shots that have left the viewport
 local h_cull = clock_update_add(function(delta)
-    local renderer_svc = svc_renderer_service()
-    if not renderer_svc then return end
-    local e  = renderer_svc:get_2d_extents()
-    local hw = e.xspan / 2
-    local hh = e.yspan / 2
+
+    local cam = get_camera(entity_find("camera"))
+    local e  = cam.cam2d:calc_world_bounds(0, 0, engine:render_layer_get(0).viewport) -- camera always at orgin here
+    local hw = e.z / 2
+    local hh = e.w / 2
 
     for eid, _ in pairs(shot_entities) do
         local sp = get_spatial(eid)

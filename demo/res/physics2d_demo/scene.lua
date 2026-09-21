@@ -14,7 +14,7 @@ if cam_eid then
     rl.clear_g    = 0.553
     rl.clear_b    = 0.827
     engine:add_render_layer(rl)
-    end
+end
 
 local BALL_ETREE = hs("res/physics2d_demo/ball.et.yaml")
 local BOX_ETREE  = hs("res/physics2d_demo/box.et.yaml")
@@ -46,20 +46,26 @@ end
 -- topmost body under it, and physics2d_drag_* drives a script-owned motor joint to follow it.
 
 local function screen_to_world(px, py)
-    local rs = svc_renderer_service()
-    if not rs then return vec2.new(0, 0) end
-    local e = rs:get_2d_extents()
+
+    return vec2.new(0,0)
+
+    -- below is disabled since get_2d_extents is gone
+    -- TODO rewrite
+
+--     local rs = svc_renderer_service()
+--     if not rs then return vec2.new(0, 0) end
+--     local e = rs:get_2d_extents()
 
     -- extents' width/height/screen_x/screen_y are physical pixels; ui_scale converts
     -- them to the same logical space that mouse/touch coordinates are reported in.
-    local ox = e.screen_x / e.ui_scale
-    local oy = e.screen_y / e.ui_scale
-    local w  = e.width    / e.ui_scale
-    local h  = e.height   / e.ui_scale
-
-    local fx = w > 0 and (px - ox) / w or 0
-    local fy = h > 0 and (py - oy) / h or 0
-    return vec2.new(e.left + fx * (e.right - e.left), e.top + fy * (e.bottom - e.top))
+--     local ox = e.screen_x / e.ui_scale
+--     local oy = e.screen_y / e.ui_scale
+--     local w  = e.width    / e.ui_scale
+--     local h  = e.height   / e.ui_scale
+--
+--     local fx = w > 0 and (px - ox) / w or 0
+--     local fy = h > 0 and (py - oy) / h or 0
+--     return vec2.new(e.left + fx * (e.right - e.left), e.top + fy * (e.bottom - e.top))
 end
 
 local drag_id = nil

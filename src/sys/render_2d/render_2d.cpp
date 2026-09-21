@@ -302,6 +302,17 @@ bool render_2d::step(nb::step_phase phase)
                 SDL_RenderFillRect(_d->render, &clip);
             }
 
+            if(layer.custom_2d_draw)
+            {
+                // this layer has a custom 2d drawing callback
+                // batch and render that instead
+                _d->batcher.clear();
+                render::clip_t clip_rect { (float) vp.x, (float) vp.y, (float) vp.w, (float) vp.h };
+                layer.custom_2d_draw(layer, _d->batcher);
+                _draw_batches(_d->batcher, clip_rect);
+                continue; // now go to next layer
+            }
+
             // Find camera and determine world bounds
             auto &reg = sc->registry();
             glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
@@ -311,7 +322,7 @@ bool render_2d::step(nb::step_phase phase)
                 auto *sp  = reg.try_get<cspatial>(layer.camera);
                 auto *cam = reg.try_get<ccamera>(layer.camera);
                 if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
-                if(cam) { world_bounds = render::camera_2d_calc_world_bounds(cam_cx, cam_cy, cam->cam2d, vp); }
+                if(cam) { world_bounds = cam->cam2d.calc_world_bounds(cam_cx, cam_cy, vp); }
                 //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
             }
 
@@ -325,23 +336,10 @@ bool render_2d::step(nb::step_phase phase)
             view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
             view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
 
-            // calculated view proection
+            // calculated view projection
             glm::mat4 viewproj = view * proj;
 
-            SDL_Rect clip_rect { vp.x, vp.y, vp.w, vp.h };
-            SDL_SetRenderClipRect(_d->render, &clip_rect);
-            if (layer.use_grid)
-            {
-                SDL_SetRenderDrawColor(_d->render,
-                    static_cast<Uint8>(layer.clear_r * 255),
-                    static_cast<Uint8>(layer.clear_g * 255),
-                    static_cast<Uint8>(layer.clear_b * 255), 255);
-                SDL_FRect fill { (float)vp.x, (float)vp.y, (float)vp.w, (float)vp.h };
-                SDL_RenderFillRect(_d->render, &fill);
-                // TODO refactor this _draw_editor_grid_hack(_d->render, cam_cx, cam_cy, zoom, vp.x, vp.y, vp.w, vp.h);
-            }
-            _draw_scene(*sc, viewproj, layer);
-            SDL_SetRenderClipRect(_d->render, nullptr);
+            _draw_scene(*sc, viewproj, layer); // takes care of clipping
         }
         
         // GUI
@@ -391,8 +389,12 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     _d->batcher.clear();
     _d->collector.clear();
 
-    const auto bounds = _get_viewport_bounds(l);
-    auto clip = render::clip_t{bounds.first.x, bounds.first.y, bounds.second.x, bounds.second.y,};
+    auto clip = render::clip_t{
+        static_cast<float>(l.viewport.x),
+        static_cast<float>(l.viewport.y),
+        static_cast<float>(l.viewport.w),
+        static_cast<float>(l.viewport.h)
+    };
 
     // use the standard 2d collector to go over scene and
     // batch geometry data
@@ -540,16 +542,6 @@ void render_2d::_prepare_texture(rtexture *rtex)
 }
 
 
-std::pair<glm::vec2, glm::vec2> render_2d::_get_viewport_bounds(const render_layer &l)
-{
-    const auto &vp = l.viewport;
-    const glm::vec2 pos = {vp.x, vp.y};
-    const glm::vec2 dims = {vp.w, vp.h};
-
-   return std::make_pair(pos, dims);
-}
-
-
 // TODO move to nb::render namespace, generalize, drop service
 // TODO generalize camera behavior and math in a single place and use that,
 //      also for rendering
@@ -683,58 +675,6 @@ entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
     return best;*/
 }
 
-void render_2d::cam_2d_setup(float cx, float cy, float wmax, float hmax)
-{
-    // TODO remove this dummy
-}
-
-float render_2d::cam_2d_scale()
-{
-    return 1.0f; // TODO remove this dummy
-}
-
-// TODO we will get rid of this HACK mess in a bit
-//      again, taking a camera and a viewport should give out a world rect
-bool render_2d::get_2d_extents(renderer_service::extents_2d &extents)
-{
-    const auto &layers = engine::instance().render_layers();
-    if(!layers.empty())
-    {
-        const auto &layer = layers.front();
-        auto *sc = engine::instance().find_scene(layer.scene_id);
-        if(sc)
-        {
-            auto &reg = sc->registry();
-            const auto &vp  = layer.viewport;
-            float cx = 0.f, cy = 0.f, zoom = 1.f;
-            if(layer.camera != entt::null)
-            {
-                if(auto *sp  = reg.try_get<cspatial>(layer.camera)) { cx = sp->pos.x; cy = sp->pos.y; }
-                if(auto *cam = reg.try_get<ccamera>(layer.camera))  { zoom = cam->cam2d.scale; }
-            }
-            float span_x = vp.w / zoom;
-            float span_y = vp.h / zoom;
-
-            // on android, the ui style and font are scaled
-            // but the internal imgui scale remains at 1.0
-            // this should never have happened
-#ifdef ANDROID
-            static constexpr float ui_scale = 1.0f;
-#else
-            float ui_scale = _d->ui_scale;
-#endif
-            extents = { vp.w, vp.h, span_x, span_y,
-                cx - span_x * 0.5f, cy - span_y * 0.5f,
-                cx + span_x * 0.5f, cy + span_y * 0.5f,
-                ui_scale, vp.x, vp.y };
-            return true;
-        }
-    }
-
-    return false;  // no layer, no extents
-}
-
-
 renderer_service::texture_handle render_2d::create_texture(int w, int h)
 {
     auto ret = SDL_CreateTexture(_d->render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
@@ -769,65 +709,6 @@ void _texture_cleanup(rtexture &tex, void*)
 }
 
 
-static void _draw_editor_grid_hack(SDL_Renderer *render,
-                                   float cam_cx, float cam_cy, float zoom,
-                                   int vp_x, int vp_y, int vp_w, int vp_h)
-{
-    // Grid levels in world units. Each is 16x the previous.
-    constexpr float STEPS[]       = { 1.f, 16.f, 64.f, 256.f, 1024.f };
-    constexpr Uint8 MAX_ALPHA[]   = { 35,   45,   60,    75,    90   };
-    constexpr int   NUM_LEVELS    = 5;
-    constexpr float FADE_IN_MIN   = 4.f;   // screen px below which lines disappear
-    constexpr float FADE_IN_FULL  = 24.f;  // screen px at which lines reach full alpha
-
-    const float vp_cx = vp_x + vp_w * 0.5f;
-    const float vp_cy = vp_y + vp_h * 0.5f;
-    const float wl = (vp_x        - vp_cx) / zoom + cam_cx;
-    const float wr = (vp_x + vp_w - vp_cx) / zoom + cam_cx;
-    const float wt = (vp_y        - vp_cy) / zoom + cam_cy;
-    const float wb = (vp_y + vp_h - vp_cy) / zoom + cam_cy;
-
-    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_BLEND);
-
-    for (int li = 0; li < NUM_LEVELS; ++li)
-    {
-        const float step      = STEPS[li];
-        const float screen_px = step * zoom;
-        if (screen_px < FADE_IN_MIN) continue;
-
-        const float t     = std::min(1.f, (screen_px - FADE_IN_MIN) / (FADE_IN_FULL - FADE_IN_MIN));
-        const Uint8 alpha = static_cast<Uint8>(t * MAX_ALPHA[li]);
-        if (alpha < 2) continue;
-
-        SDL_SetRenderDrawColor(render, 180, 180, 200, alpha);
-
-        const float x0 = floorf(wl / step) * step;
-        for (float wx = x0; wx <= wr; wx += step)
-        {
-            float sx = (wx - cam_cx) * zoom + vp_cx;
-            SDL_RenderLine(render, sx, (float)vp_y, sx, (float)(vp_y + vp_h));
-        }
-
-        const float y0 = floorf(wt / step) * step;
-        for (float wy = y0; wy <= wb; wy += step)
-        {
-            float sy = (wy - cam_cy) * zoom + vp_cy;
-            SDL_RenderLine(render, (float)vp_x, sy, (float)(vp_x + vp_w), sy);
-        }
-    }
-
-    // World-space axes — always visible, higher alpha
-    SDL_SetRenderDrawColor(render, 180, 180, 230, 140);
-    const float ox = (0.f - cam_cx) * zoom + vp_cx;
-    const float oy = (0.f - cam_cy) * zoom + vp_cy;
-    if (ox >= vp_x && ox <= vp_x + vp_w)
-        SDL_RenderLine(render, ox, (float)vp_y, ox, (float)(vp_y + vp_h));
-    if (oy >= vp_y && oy <= vp_y + vp_h)
-        SDL_RenderLine(render, (float)vp_x, oy, (float)(vp_x + vp_w), oy);
-
-    SDL_SetRenderDrawBlendMode(render, SDL_BLENDMODE_NONE);
-}
-
 // RTTI metadata
 extern "C" void _rtti_init_render_2d()
 {
@@ -835,10 +716,6 @@ extern "C" void _rtti_init_render_2d()
         .type("render_2d"_hs)
         .custom<rtti::type_info>(rtti::type_info{"render_2d", rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
-        .func<&nb::render_2d::cam_2d_setup>("cam_2d_setup"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"cam_2d_setup"})
-        .func<&nb::render_2d::cam_2d_scale>("cam_2d_scale"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"cam_2d_scale"})
         .func<&nb::render_2d::window_width>("window_width"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_width"})
         .func<&nb::render_2d::window_height>("window_height"_hs)

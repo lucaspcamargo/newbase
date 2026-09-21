@@ -26,6 +26,7 @@ namespace nb
         void draw_perf() override;
 
         void update_viewports() override;
+        glm::vec4 central_viewport(bool pixel_coords = false) override;
 
         bool toggle_tool_window(const char *name) override;
         unsigned int dockspace_id() const override;

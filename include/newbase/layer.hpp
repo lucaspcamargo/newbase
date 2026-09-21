@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <newbase/render/types.hpp>
+#include <newbase/render/batcher2d.hpp>
+#include <functional>
 
 namespace nb {
 
@@ -26,7 +28,9 @@ struct render_layer {
     float            clear_r     { 0.f };
     float            clear_g     { 0.f };
     float            clear_b     { 0.f };
-    bool             use_grid    { false }; // TODO: replace with proper grid layer/component
+
+    using custom_2d_draw_t = std::function<void(const render_layer &l, render::batcher2d &batcher)>;
+    custom_2d_draw_t custom_2d_draw {};
 };
 
 } // namespace nb

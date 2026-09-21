@@ -52,30 +52,24 @@ local update_handle = clock_update_add(function(delta)
     local thrust_dir = math.rad(sp.rot.z + THRUST_ANGLE_DELTA)
     local thrust_x   = math.cos(thrust_dir) * THRUST * dir.y
     local thrust_y   = math.sin(thrust_dir) * THRUST * dir.y
-
     physics2d_body_force_center(eid, vec2.new(thrust_x, thrust_y), false)
     physics2d_body_torque(eid, dir.x * ROT_TORQUE, true)
 
     -- screen wrapping
-    local renderer_svc = svc_renderer_service()
-    if renderer_svc then
-        local e  = renderer_svc:get_2d_extents()
-        local w  = e.xspan
-        local h  = e.yspan
-        local nx = sp.pos.x
-        local ny = sp.pos.y
-
-        if sp.pos.x < -w/2 then nx = sp.pos.x + w
-        elseif sp.pos.x > w/2 then nx = sp.pos.x - w end
-
-        if sp.pos.y < -h/2 then ny = sp.pos.y + h
-        elseif sp.pos.y > h/2 then ny = sp.pos.y - h end
-
-        if nx ~= sp.pos.x or ny ~= sp.pos.y then
-            physics2d_body_warp(eid, vec2.new(nx, ny))
-        end
-    else
-        print("[ship.lua] no renderer service? skip viewport wrapping")
+    local cam = get_camera(entity_find("camera"))
+    local e  = cam.cam2d:calc_world_bounds(0, 0, engine:render_layer_get(0).viewport) -- camera always at orgin here
+    local w = e.z
+    local h = e.w
+    local hw = e.z / 2
+    local hh = e.w / 2
+    local nx = sp.pos.x
+    local ny = sp.pos.y
+    if sp.pos.x < -hw then nx = sp.pos.x + w
+    elseif sp.pos.x > hw then nx = sp.pos.x - w end
+    if sp.pos.y < -hh then ny = sp.pos.y + h
+    elseif sp.pos.y > hh then ny = sp.pos.y - h end
+    if nx ~= sp.pos.x or ny ~= sp.pos.y then
+        physics2d_body_warp(eid, vec2.new(nx, ny))
     end
 
     -- shooting

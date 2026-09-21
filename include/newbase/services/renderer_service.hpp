@@ -16,34 +16,11 @@ public:
     // It is also a valid ImTextureID (cast is safe on all supported backends).
     using texture_handle = void*;
 
-    // HACK TODO get rid of this altogether!
-    struct extents_2d
-    {
-        int width;      // viewport size in pixels
-        int height;     // viewport size in pixels
-
-        float xspan;    // how wide the viewport is in world units
-        float yspan;    // how tall the viewport is in world units
-
-        float left;     // left border x, in world coordinates
-        float top;      // top border y, in world coordinates
-        float right;    // right border x, in world coordinates
-        float bottom;   // bottom border y, in world coordinates
-
-        float ui_scale; // how much UI drawing will be scaled by, when using ImGui to draw
-
-        int screen_x;   // viewport top-left in physical pixels (0 when no docked panels)
-        int screen_y;
-    };
-
     virtual ~renderer_service() = default;
-
-    virtual bool get_2d_extents(extents_2d&) = 0; // TODO remove
 
     virtual int   window_width()  const { return 0; }
     virtual int   window_height() const { return 0; }
     virtual float display_scale() const { return 1.f; }  // TODO rename to ui_scale, add event_scale
-    virtual void  cam_2d_setup(float cx, float cy, float wmax, float hmax) {}
 
     // --- texture management ---
 

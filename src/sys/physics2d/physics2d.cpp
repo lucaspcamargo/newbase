@@ -106,14 +106,16 @@ public:
         if(!data->debug_draw_enabled || B2_IS_NULL(data->world_id))
             return;
 
-        renderer_service* renderer = entt::locator<renderer_service*>::value();
-        if(!renderer)
+        ui_manager* uim = entt::locator<ui_manager*>::value_or(nullptr);
+        if(!uim)
             return;
 
-        renderer_service::extents_2d extents;
-        if(!renderer->get_2d_extents(extents))
-            return;
 
+        auto ui_vp = uim->central_viewport();
+
+        /* TODO - do it with ui viewport and camera data
+         * Which camera? Good question.
+         *
         const float cx = (extents.right + extents.left) / 2.0f;
         const float cy = (extents.top + extents.bottom) / 2.0f;
         const float sx = extents.width / extents.xspan;
@@ -123,6 +125,7 @@ public:
         physics2d_pre_debug_draw(data->debug_draw, cx, cy, sx, sy, data->world_scale,
             extents.ui_scale, screen_center_x, screen_center_y);
         b2World_Draw(data->world_id, &data->debug_draw);
+        */
     }
 
 private:

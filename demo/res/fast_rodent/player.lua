@@ -339,7 +339,7 @@ local update_handle = clock_update_add(function(dt)
     local cam_x = clamp(px, VIEW_W * 0.5, MAP_W - VIEW_W * 0.5)
     local cam_y = clamp(py, VIEW_H * 0.5, MAP_H - VIEW_H * 0.5)
     local _rs = svc_renderer_service()
-    if _rs then _rs:cam_2d_setup(cam_x, cam_y, VIEW_W, VIEW_H) end
+    -- if _rs then _rs:cam_2d_setup(cam_x, cam_y, VIEW_W, VIEW_H) end TODO use camera entity
 end)
 
 script_on_destroy(function()

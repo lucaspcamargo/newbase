@@ -10,7 +10,6 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
-#include <newbase/layer.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/services/ui_manager.hpp>
@@ -34,6 +33,9 @@
 #include <imgui_internal.h>
 #include <ImGuizmo.h>
 #include "IconsForkAwesome.h"
+#include "entt/locator/locator.hpp"
+#include "newbase/render/batcher2d.hpp"
+#include "newbase/render/types.hpp"
 #include <algorithm>
 #include <string>
 
@@ -103,20 +105,32 @@ void editor::_apply_override_layers()
     auto *uim = entt::locator<ui_manager*>::value();
     if (!uim || _d->editor_cam_eid == entt::null)
         return;
-    ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_DockingEmptyBg);
+    ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+
+    render_layer rl_grid;
+    rl_grid.scene_id   = entt::null;
+    rl_grid.layer_mask = clayers::MASK_ALL;
+    rl_grid.camera     = _d->editor_cam_eid;
+    rl_grid.viewport   = {};
+    rl_grid.order      = 0;
+    rl_grid.follow_ui  = true;
+    rl_grid.clear      = true;
+    rl_grid.clear_r    = bg.x * 0.5;
+    rl_grid.clear_g    = bg.y * 0.5;
+    rl_grid.clear_b    = bg.z * 0.5;
+    rl_grid.custom_2d_draw = [&](const render_layer &l, render::batcher2d &batcher){
+        this->_draw_grid(l, batcher);
+    };
+
     render_layer rl;
     rl.scene_id   = entt::null;
     rl.layer_mask = clayers::MASK_ALL;
     rl.camera     = _d->editor_cam_eid;
     rl.viewport   = {};
-    rl.order      = 0;
+    rl.order      = 1;
     rl.follow_ui  = true;
     rl.clear      = false;
-    rl.use_grid   = true;
-    rl.clear_r    = bg.x;
-    rl.clear_g    = bg.y;
-    rl.clear_b    = bg.z;
-    engine::instance().set_override_render_layers({rl});
+    engine::instance().set_override_render_layers({rl_grid, rl});
 }
 
 void editor::_ensure_editor_cam()
@@ -194,6 +208,13 @@ bool editor::step(step_phase phase)
             if (auto *cam = reg.try_get<ccamera>(_d->editor_cam_eid))
                 cam->cam2d.scale = _d->cam_zoom;
         }
+
+        // also update internal viewport state
+        auto vp = entt::locator<ui_manager*>::value()->central_viewport(true);
+        _d->vp_x = vp.x;
+        _d->vp_y = vp.y;
+        _d->vp_w = vp.z;
+        _d->vp_h = vp.w;
     }
 
     if (_d->enabled)
@@ -638,6 +659,111 @@ void editor::_draw_main_menu()
     }
 
     ImGui::EndMainMenuBar();
+}
+
+void editor::_draw_grid(const render_layer &l, render::batcher2d &batcher)
+{
+    // Helper lambda to push an axis-aligned line as a 1-pixel thick quad (4 vertices, 6 indices)
+    auto push_line = [&batcher](const glm::vec2& p0, const glm::vec2& p1, const glm::vec4& color) {
+
+        float x0 = std::round(p0.x);
+        float y0 = std::round(p0.y);
+        float x1 = std::round(p1.x);
+        float y1 = std::round(p1.y);
+
+        // expand by 1 pixel depending on orientation (helps with aliasing)
+        if (x0 == x1) {
+            x1 = x0 + 1.0f;
+        } else if (y0 == y1) {
+            y1 = y0 + 1.0f;
+        }
+
+        // Top-Left, Top-Right, Bottom-Right, Bottom-Left
+        const render::vertex2d vtxs[4] = {
+            { { x0, y0 }, color, { 0.0f, 0.0f } },
+            { { x1, y0 }, color, { 1.0f, 0.0f } },
+            { { x1, y1 }, color, { 1.0f, 1.0f } },
+            { { x0, y1 }, color, { 0.0f, 1.0f } }
+        };
+        const uint16_t inds[6] = { 0, 1, 2, 0, 2, 3 };
+
+        batcher.add_geom(vtxs, 4, inds, 6, nullptr, render::blendmode::BLEND, render::CLIP_NONE);
+    };
+
+    float cam_cx = _d->cam_x;
+    float cam_cy = _d->cam_y;
+    float zoom = _d->cam_zoom;
+
+    int vp_x = l.viewport.x;
+    int vp_y = l.viewport.y;
+    int vp_w = l.viewport.w;
+    int vp_h = l.viewport.h;
+
+    auto grid_rgb = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    auto axis_rgb = ImGui::GetStyleColorVec4(ImGuiCol_PlotLines);
+    constexpr float ALPHA_FAC = 0.6f;
+
+    constexpr float STEPS[]       = { 1.f, 16.f, 64.f, 256.f, 1024.f };
+    constexpr float MAX_ALPHA[]   = { 35.f/255.f, 45.f/255.f, 60.f/255.f, 75.f/255.f, 90.f/255.f };
+    constexpr int   NUM_LEVELS    = 5;
+    constexpr float FADE_IN_MIN   = 4.f;   // screen px below which lines disappear
+    constexpr float FADE_IN_FULL  = 24.f;  // screen px at which lines reach full alpha
+
+    const float vp_cx = vp_x + vp_w * 0.5f;
+    const float vp_cy = vp_y + vp_h * 0.5f;
+    const float wl = (vp_x        - vp_cx) / zoom + cam_cx;
+    const float wr = (vp_x + vp_w - vp_cx) / zoom + cam_cx;
+    const float wt = (vp_y        - vp_cy) / zoom + cam_cy;
+    const float wb = (vp_y + vp_h - vp_cy) / zoom + cam_cy;
+
+    const float min_x = static_cast<float>(vp_x);
+    const float max_x = static_cast<float>(vp_x + vp_w);
+    const float min_y = static_cast<float>(vp_y);
+    const float max_y = static_cast<float>(vp_y + vp_h);
+
+    for (int li = 0; li < NUM_LEVELS; ++li)
+    {
+        const float step      = STEPS[li];
+        const float screen_px = step * zoom;
+        if (screen_px < FADE_IN_MIN) continue;
+
+        const float t     = std::min(1.f, (screen_px - FADE_IN_MIN) / (FADE_IN_FULL - FADE_IN_MIN));
+        const float alpha = t * MAX_ALPHA[li];
+        if (alpha < (2.f / 255.f)) continue;
+
+        const glm::vec4 grid_color{ grid_rgb.x, grid_rgb.y, grid_rgb.y, alpha * ALPHA_FAC };
+
+        // Vertical Grid Lines
+        const float x0 = std::floor(wl / step) * step;
+        for (float wx = x0; wx <= wr; wx += step)
+        {
+            float sx = (wx - cam_cx) * zoom + vp_cx;
+            push_line({ sx, min_y }, { sx, max_y }, grid_color);
+        }
+
+        // Horizontal Grid Lines
+        const float y0 = std::floor(wt / step) * step;
+        for (float wy = y0; wy <= wb; wy += step)
+        {
+            float sy = (wy - cam_cy) * zoom + vp_cy;
+            push_line({ min_x, sy }, { max_x, sy }, grid_color);
+        }
+    }
+
+    // World-space axes (X = 0, Y = 0) — always visible
+    const glm::vec4 axis_color{ axis_rgb.x, axis_rgb.y, axis_rgb.z, 0.55f * ALPHA_FAC };
+    const float ox = (0.f - cam_cx) * zoom + vp_cx;
+    const float oy = (0.f - cam_cy) * zoom + vp_cy;
+
+    if (ox >= min_x && ox <= max_x)
+    {
+        push_line({ ox, min_y }, { ox, max_y }, axis_color);
+    }
+    if (oy >= min_y && oy <= max_y)
+    {
+        push_line({ min_x, oy }, { max_x, oy }, axis_color);
+    }
+
 }
 
 // RTTI metadata

@@ -1,3 +1,4 @@
+#include "newbase/services/ui_manager.hpp"
 #include <newbase/sys/input/overlay.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/log.hpp>
@@ -117,14 +118,11 @@ input_overlay::layout input_overlay::current_layout() const
 {
     ImVec2 pos = ImGui::GetMainViewport()->WorkPos;
     ImVec2 size = ImGui::GetMainViewport()->WorkSize;
-    if(auto *renderer = entt::locator<renderer_service*>::value_or(nullptr))
+    if(auto *uim = entt::locator<ui_manager*>::value_or(nullptr))
     {
-        renderer_service::extents_2d extents;
-        if(renderer->get_2d_extents(extents) && extents.ui_scale > 0.0f)
-        {
-            pos = {extents.screen_x / extents.ui_scale, extents.screen_y / extents.ui_scale};
-            size = {extents.width / extents.ui_scale, extents.height / extents.ui_scale};
-        }
+        auto vp = uim->central_viewport();
+        pos = {vp.x, vp.y};
+        size = {vp.z, vp.w};
     }
 
     const float unit = std::min(size.x, size.y);
@@ -318,12 +316,11 @@ void input_overlay::draw() const
     ImVec2 clip_max = {clip_min.x + viewport->WorkSize.x, clip_min.y + viewport->WorkSize.y};
     if(auto *renderer = entt::locator<renderer_service*>::value_or(nullptr))
     {
-        renderer_service::extents_2d extents;
-        if(renderer->get_2d_extents(extents) && extents.ui_scale > 0.0f)
+        if(auto *uim = entt::locator<ui_manager*>::value_or(nullptr))
         {
-            clip_min = {extents.screen_x / extents.ui_scale, extents.screen_y / extents.ui_scale};
-            clip_max = {clip_min.x + extents.width / extents.ui_scale,
-                        clip_min.y + extents.height / extents.ui_scale};
+            auto vp = uim->central_viewport();
+            clip_min = {vp.x, vp.y};
+            clip_max = {vp.x + vp.z, vp.y + vp.w};
         }
     }
     draw_list->PushClipRect(clip_min, clip_max, true);

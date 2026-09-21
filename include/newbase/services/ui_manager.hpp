@@ -1,4 +1,7 @@
 #pragma once
+
+#include <newbase/utility/glm.hpp>
+
 #include <functional>
 #include <entt/entt.hpp>
 #include <string_view>
@@ -40,6 +43,7 @@ namespace nb
 
         // Viewport management
         virtual void update_viewports() = 0;
+        virtual glm::vec4 central_viewport(bool pixel_coords = false) = 0;
 
         // Resource editor integration.
         // A system that can display a resource editor (e.g. the editor system) registers a

@@ -133,6 +133,7 @@ add_library(newbase STATIC
 
     # rendering (common)
     src/render/batcher2d.cpp
+    src/render/camera.cpp
     src/render/collector2d.cpp
     src/render/pick2d.cpp
     src/render/window.cpp
@@ -186,7 +187,7 @@ set_target_properties(newbase PROPERTIES
 add_subdirectory(src/sys/audio)
 add_subdirectory(src/sys/clock)
 add_subdirectory(src/sys/editor)
-add_subdirectory(src/sys/fluid_2d)
+# add_subdirectory(src/sys/fluid_2d) -- just a toy, needs update after vp refactor
 add_subdirectory(src/sys/input)
 add_subdirectory(src/sys/particle_system)
 add_subdirectory(src/sys/physics2d)
