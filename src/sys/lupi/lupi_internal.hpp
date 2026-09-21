@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace nb {
+namespace nb::lupi {
 
 // Fetches the owning lupi_p* stashed in the Lua registry at init() time.
 // Every lua_CFunction binding starts by calling this to reach engine-side state.

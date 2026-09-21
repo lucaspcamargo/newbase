@@ -6,12 +6,7 @@ namespace nb
 {
 
 /// Service provided by the active renderer. Used by engine tooling to query
-/// viewport geometry (for debug overlays, gizmos, picking) and to create/update
-/// backend-agnostic textures (e.g. for the resource editor).
-
-// Opaque handle to a renderer-managed viewport (window region or texture target).
-using viewport_handle = uint32_t;
-static constexpr viewport_handle VIEWPORT_INVALID = 0;
+/// window geometry and to create/update backend-agnostic textures (e.g. for the resource editor).
 
 class renderer_service
 {
@@ -21,6 +16,7 @@ public:
     // It is also a valid ImTextureID (cast is safe on all supported backends).
     using texture_handle = void*;
 
+    // HACK TODO get rid of this altogether!
     struct extents_2d
     {
         int width;      // viewport size in pixels
@@ -42,36 +38,12 @@ public:
 
     virtual ~renderer_service() = default;
 
-    virtual bool get_2d_extents(extents_2d&) = 0;
+    virtual bool get_2d_extents(extents_2d&) = 0; // TODO remove
 
     virtual int   window_width()  const { return 0; }
     virtual int   window_height() const { return 0; }
-    virtual float display_scale() const { return 1.f; }
+    virtual float display_scale() const { return 1.f; }  // TODO rename to ui_scale, add event_scale
     virtual void  cam_2d_setup(float cx, float cy, float wmax, float hmax) {}
-    virtual void  set_clear_color(float r, float g, float b) {}
-
-    // Returns the handle of the "default viewport" — a persistent viewport that
-    // covers the window area available for scene rendering.  Callers (e.g. the
-    // ui_manager / editor) may call update_viewport() on this handle to confine
-    // scene rendering to a sub-region (e.g. the DockSpace central node).
-    // reset_default_viewport() restores it to the full window.
-    // Returns VIEWPORT_INVALID if the renderer does not support this.
-    virtual viewport_handle default_viewport() const { return VIEWPORT_INVALID; }
-    virtual void reset_default_viewport() {}
-
-    // --- viewport management ---
-
-    // Create a viewport targeting a region of the window framebuffer.
-    // x, y, w, h are in logical pixels. clear_color is RGBA [0..1].
-    virtual viewport_handle create_viewport(int x, int y, int w, int h,
-                                            bool clear = true,
-                                            float r = 0.f, float g = 0.f,
-                                            float b = 0.f, float a = 1.f) = 0;
-
-    // Update the pixel region of an existing viewport.
-    virtual void update_viewport(viewport_handle vp, int x, int y, int w, int h) = 0;
-
-    virtual void destroy_viewport(viewport_handle vp) = 0;
 
     // --- texture management ---
 

@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <new>
 
-using namespace nb;
+using namespace ::nb;
+using namespace ::nb::lupi;
 
 namespace {
 // Real cart code routinely passes float results (math.sin/division/etc) as
@@ -26,14 +27,14 @@ static int l_sprite_ref_gc(lua_State* L)
     return 0;
 }
 
-void nb::lupi_push_sprite_ref(lua_State* L, std::shared_ptr<lupi_spritesheet> sheet)
+void nb::lupi::lupi_push_sprite_ref(lua_State* L, std::shared_ptr<lupi_spritesheet> sheet)
 {
     auto* ud = static_cast<lupi_sprite_ref_userdata*>(lua_newuserdatauv(L, sizeof(lupi_sprite_ref_userdata), 0));
     new (ud) lupi_sprite_ref_userdata{std::move(sheet)};
     luaL_setmetatable(L, "lupi.sprite_ref");
 }
 
-lupi_spritesheet* nb::lupi_check_sprite_ref(lua_State* L, int idx)
+lupi::lupi_spritesheet* nb::lupi::lupi_check_sprite_ref(lua_State* L, int idx)
 {
     auto* ud = static_cast<lupi_sprite_ref_userdata*>(luaL_testudata(L, idx, "lupi.sprite_ref"));
     return ud ? ud->sheet.get() : nullptr;
@@ -372,7 +373,7 @@ static const const_def k_consts[] = {
     {"BTN_F",12}, {"BTN_G",13}, {"BTN_Q",14}, {"BTN_E",15},
 };
 
-void nb::lupi_register_ui(lua_State* L)
+void nb::lupi::lupi_register_ui(lua_State* L)
 {
     luaL_newmetatable(L, "lupi.sprite_ref");
     lua_pushcfunction(L, l_sprite_ref_gc);

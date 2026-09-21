@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace nb {
+namespace nb::lupi {
 
 static constexpr int LUPI_SCREEN_W      = 480;
 static constexpr int LUPI_SCREEN_H      = 270;

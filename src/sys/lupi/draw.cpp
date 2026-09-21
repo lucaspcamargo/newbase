@@ -3,6 +3,7 @@
 #include <cstring>
 
 using namespace nb;
+using namespace nb::lupi;
 
 // ---------------------------------------------------------------------------
 // pixel-level helpers
@@ -28,7 +29,7 @@ static inline bool fillp_should_draw(const lupi_gfx_state& gfx, int x, int y)
     return (row >> (7 - (x & 7))) & 1;
 }
 
-void nb::lupi_put_pixel(lupi_p& p, int x, int y, uint8_t color, bool is_fill_op)
+void nb::lupi::lupi_put_pixel(lupi_p& p, int x, int y, uint8_t color, bool is_fill_op)
 {
     apply_camera(p.gfx, x, y);
 
@@ -47,7 +48,7 @@ void nb::lupi_put_pixel(lupi_p& p, int x, int y, uint8_t color, bool is_fill_op)
 // primitives
 // ---------------------------------------------------------------------------
 
-void nb::lupi_draw_cls(lupi_p& p, uint8_t color)
+void nb::lupi::lupi_draw_cls(lupi_p& p, uint8_t color)
 {
     std::memset(p.fb.pixels.data(), color, p.fb.pixels.size());
     p.gfx.reset_clip();
@@ -60,7 +61,7 @@ void nb::lupi_draw_cls(lupi_p& p, uint8_t color)
 // extra pixel on both axes by treating x1/y1 as inclusive). No coordinate
 // swapping/normalization either, matching the real API: a "backwards" rect
 // (x1<x0 or y1<y0) draws nothing rather than auto-correcting.
-void nb::lupi_draw_rect(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
+void nb::lupi::lupi_draw_rect(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
 {
     int w = x1 - x0, h = y1 - y0;
     for (int x = x0; x < x0 + w; ++x) {
@@ -73,7 +74,7 @@ void nb::lupi_draw_rect(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color
     }
 }
 
-void nb::lupi_draw_rectfill(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
+void nb::lupi::lupi_draw_rectfill(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
 {
     int w = x1 - x0, h = y1 - y0;
     for (int y = y0; y < y0 + h; ++y)
@@ -81,7 +82,7 @@ void nb::lupi_draw_rectfill(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t c
             lupi_put_pixel(p, x, y, color, true);
 }
 
-void nb::lupi_draw_circ(lupi_p& p, int cx, int cy, int r, uint8_t color)
+void nb::lupi::lupi_draw_circ(lupi_p& p, int cx, int cy, int r, uint8_t color)
 {
     if (r < 0) return;
     int x = r, y = 0, err = 1 - r;
@@ -104,7 +105,7 @@ void nb::lupi_draw_circ(lupi_p& p, int cx, int cy, int r, uint8_t color)
     }
 }
 
-void nb::lupi_draw_circfill(lupi_p& p, int cx, int cy, int r, uint8_t color)
+void nb::lupi::lupi_draw_circfill(lupi_p& p, int cx, int cy, int r, uint8_t color)
 {
     if (r < 0) return;
     int x = r, y = 0, err = 1 - r;
@@ -127,7 +128,7 @@ void nb::lupi_draw_circfill(lupi_p& p, int cx, int cy, int r, uint8_t color)
     }
 }
 
-void nb::lupi_draw_line(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
+void nb::lupi::lupi_draw_line(lupi_p& p, int x0, int y0, int x1, int y1, uint8_t color)
 {
     int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
@@ -166,7 +167,7 @@ void fill_flat(lupi_p& p, vtx a, vtx b, vtx c, uint8_t color)
 
 }
 
-void nb::lupi_draw_trisfill(lupi_p& p, int x1, int y1, int x2, int y2, int x3, int y3, uint8_t color)
+void nb::lupi::lupi_draw_trisfill(lupi_p& p, int x1, int y1, int x2, int y2, int x3, int y3, uint8_t color)
 {
     vtx v[3] = {{x1,y1},{x2,y2},{x3,y3}};
     std::sort(v, v+3, [](const vtx& a, const vtx& b){ return a.y < b.y; });
@@ -195,7 +196,7 @@ void nb::lupi_draw_trisfill(lupi_p& p, int x1, int y1, int x2, int y2, int x3, i
     fill_flat(p, v[2], v[1], split, color);
 }
 
-void nb::lupi_draw_tile(lupi_p& p, const lupi_spritesheet& sheet, int tile_id, int x, int y,
+void nb::lupi::lupi_draw_tile(lupi_p& p, const lupi_spritesheet& sheet, int tile_id, int x, int y,
                          bool flip_x, bool flip_y)
 {
     const uint8_t* origin = sheet.tile_origin(tile_id);
@@ -341,7 +342,7 @@ constexpr uint8_t font_data[95][5] = {
 
 }
 
-void nb::lupi_draw_print(lupi_p& p, const char* text, int x, int y, uint8_t color)
+void nb::lupi::lupi_draw_print(lupi_p& p, const char* text, int x, int y, uint8_t color)
 {
     int cursor_x = x;
     for (const char* c = text; *c; ++c) {

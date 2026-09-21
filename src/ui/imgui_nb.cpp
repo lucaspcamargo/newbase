@@ -227,6 +227,9 @@ void imgui_nb::render_flush()
             //log::info("VERT %f %f COL %f %f %f %f", vert.pos.x, vert.pos.y, fcol.x, fcol.y, fcol.z, fcol.w);
         }
 
+        ImVec2 clip_off = dd.DisplayPos; // should be (0,0) as we don't use multi-viewports, but still
+        ImVec2 clip_scale {scale, scale};
+
         // now convert commands using converted vertex data
         for(const auto &cmd: dl->CmdBuffer)
         {
@@ -244,8 +247,29 @@ void imgui_nb::render_flush()
             }
             uint32_t vtx_count = max_idx+1;
 
-            // TODO handle clipping
-            void *clip = nullptr;
+
+
+            // handle clipping
+            ImVec2 clip_min = {
+                (cmd.ClipRect.x + clip_off.x) * clip_scale.x,
+                (cmd.ClipRect.y + clip_off.y) * clip_scale.y,
+            };
+            ImVec2 clip_max = {
+                (cmd.ClipRect.z + clip_off.x) * clip_scale.x,
+                (cmd.ClipRect.w + clip_off.y) * clip_scale.y,
+            };
+            ImVec2 clip_dims = {
+                clip_max.x - clip_min.x,
+                clip_max.y - clip_min.y
+            };
+
+            if(clip_dims.x <= 0.0f || clip_dims.y <= 0.0f)
+                continue;  // skip empty or invalid clips
+
+            render::clip_t clip {
+                clip_min.x, clip_min.y,
+                clip_dims.x, clip_dims.y
+            };
 
             // TODO we need to figure out how to convert ImTextureRef <=> std::shared_ptr<rtexture>
             // this will also reduce or eliminate the need for the texture handling APIs in the renderer

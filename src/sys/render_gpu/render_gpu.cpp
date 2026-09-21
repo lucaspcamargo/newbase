@@ -1,3 +1,9 @@
+// THIS IS GOING TO BE REWRITTEN
+// 2D rendering, including GUI, went through a major rewrite and refactor
+// This is now quite bad and needs to go
+// End result will be much simplified, and should provide a nice base for 3D
+
+
 #include <newbase/sys/render_gpu/render_gpu.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>

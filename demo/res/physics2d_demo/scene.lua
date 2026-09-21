@@ -1,9 +1,20 @@
-local _rs = svc_renderer_service()
-if _rs then
-    _rs:cam_2d_setup(0, 0, 800, 800)
-    _rs:set_clear_color(0.373, 0.553, 0.827)
-end
+
 physics2d_set_gravity(vec2.new(0, 200))
+
+local cam_eid = entity_find("camera")
+if cam_eid then
+    local cam = get_camera(cam_eid)
+    engine:clear_render_layers()
+    local rl      = render_layer.new()
+    rl.order      = 0
+    rl.camera     = cam_eid
+    rl.follow_ui  = true
+    rl.clear      = true
+    rl.clear_r    = 0.373
+    rl.clear_g    = 0.553
+    rl.clear_b    = 0.827
+    engine:add_render_layer(rl)
+    end
 
 local BALL_ETREE = hs("res/physics2d_demo/ball.et.yaml")
 local BOX_ETREE  = hs("res/physics2d_demo/box.et.yaml")

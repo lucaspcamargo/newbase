@@ -132,9 +132,9 @@ local update_handle = clock_update_add(function()
     if _G.HUD_CAMERA_EID then
         local hsp = get_spatial(_G.HUD_CAMERA_EID)
         if hsp then
-            local _rs2 = svc_renderer_service()
-            hsp.pos = vec3.new(_rs2 and _rs2:window_width()  * 0.5 or 0,
-                               _rs2 and _rs2:window_height() * 0.5 or 0, 0)
+            local _rl = engine:render_layer_get(1)
+            local _vp = _rl.viewport
+            hsp.pos = vec3.new(_vp.w*0.5, _vp.h*0.5, 0)
             hsp:apply()
         end
     end

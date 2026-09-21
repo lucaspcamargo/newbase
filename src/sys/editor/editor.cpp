@@ -94,22 +94,24 @@ void editor::_sync_editor_cam_to_game()
     if (first.camera != entt::null)
     {
         if (auto *sp  = reg.try_get<cspatial>(first.camera)) { _d->cam_x = sp->pos.x; _d->cam_y = sp->pos.y; }
-        if (auto *cam = reg.try_get<ccamera> (first.camera)) { _d->cam_zoom = cam->zoom; }
+        if (auto *cam = reg.try_get<ccamera> (first.camera)) { _d->cam_zoom = cam->cam2d.scale; }
     }
 }
 
 void editor::_apply_override_layers()
 {
-    auto *rs = entt::locator<renderer_service*>::value();
-    if (!rs || _d->editor_cam_eid == entt::null) return;
+    auto *uim = entt::locator<ui_manager*>::value();
+    if (!uim || _d->editor_cam_eid == entt::null)
+        return;
     ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_DockingEmptyBg);
     render_layer rl;
     rl.scene_id   = entt::null;
     rl.layer_mask = clayers::MASK_ALL;
     rl.camera     = _d->editor_cam_eid;
-    rl.viewport   = rs->default_viewport();
+    rl.viewport   = {};
     rl.order      = 0;
-    rl.clear_bg   = false;
+    rl.follow_ui  = true;
+    rl.clear      = false;
     rl.use_grid   = true;
     rl.clear_r    = bg.x;
     rl.clear_g    = bg.y;
@@ -173,31 +175,15 @@ bool editor::init(ryml::ConstNodeRef cfg)
 
 bool editor::step(step_phase phase)
 {
-    if (phase == step_phase::POST_UPDATE && _d->console_enabled)
+    if (phase != step_phase::UI_RENDER)
+        return true;
+
+    if (_d->console_enabled)
         _d->con.Draw(ICON_FK_TERMINAL " Console", &_d->console_enabled);
 
-    if (phase == step_phase::POST_UPDATE && _d->enabled && _d->override_layers)
+    // update editor camera data
+    if (_d->enabled && _d->override_layers)
     {
-        // Update central viewport rect from the ImGui dock node (we own it while override is active)
-        auto *ui_mgr = entt::locator<ui_manager*>::value();
-        ImGuiID ds_id = ui_mgr ? static_cast<ImGuiID>(ui_mgr->dockspace_id()) : 0;
-        if (ImGuiDockNode *node = ds_id ? ImGui::DockBuilderGetCentralNode(ds_id) : nullptr)
-        {
-            const ImGuiIO &io = ImGui::GetIO();
-            float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-            float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-            _d->vp_x = static_cast<int>(node->Pos.x  * sx);
-            _d->vp_y = static_cast<int>(node->Pos.y  * sy);
-            _d->vp_w = static_cast<int>(node->Size.x * sx);
-            _d->vp_h = static_cast<int>(node->Size.y * sy);
-            if (auto *rs = entt::locator<renderer_service*>::value())
-            {
-                viewport_handle dvp = rs->default_viewport();
-                if (dvp != VIEWPORT_INVALID && _d->vp_w > 1 && _d->vp_h > 1)
-                    rs->update_viewport(dvp, _d->vp_x, _d->vp_y, _d->vp_w, _d->vp_h);
-            }
-        }
-
         // Maintain editor camera entity across scene changes
         _ensure_editor_cam();
         auto &reg = engine::instance().default_scene().registry();
@@ -206,11 +192,11 @@ bool editor::step(step_phase phase)
             if (auto *sp = reg.try_get<cspatial>(_d->editor_cam_eid))
                 { sp->pos.x = _d->cam_x; sp->pos.y = _d->cam_y; }
             if (auto *cam = reg.try_get<ccamera>(_d->editor_cam_eid))
-                cam->zoom = _d->cam_zoom;
+                cam->cam2d.scale = _d->cam_zoom;
         }
     }
 
-    if (phase == step_phase::POST_UPDATE && _d->enabled)
+    if (_d->enabled)
     {
         float fnt_size_unit = ImGui::GetFontSize();
         auto &scn = engine::instance().default_scene();
@@ -375,7 +361,7 @@ bool editor::event(SDL_Event* evt)
     {
         auto *picker = entt::locator<picker_service*>::value();
         auto *rs     = entt::locator<renderer_service*>::value();
-        if (picker && rs)
+        if (picker && rs && engine::instance().render_layers().size())
         {
             // evt->button.x/y are logical pixels; vp_x/y are physical — scale to match
             const ImGuiIO &io = ImGui::GetIO();
@@ -388,7 +374,7 @@ bool editor::event(SDL_Event* evt)
             rl.scene_id   = entt::null;
             rl.layer_mask = clayers::MASK_ALL;
             rl.camera     = _d->editor_cam_eid;
-            rl.viewport   = rs->default_viewport();
+            rl.viewport   = engine::instance().render_layers().front().viewport; // TODO review this, kinda hacky
 
             entt::entity hit = picker->pick(rl, vp_x, vp_y);
             if (hit != _d->editor_cam_eid)

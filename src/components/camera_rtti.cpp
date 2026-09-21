@@ -20,15 +20,9 @@ void ccamera::_ensure_rtti()
             }
         })
         .ctor<>()
-        .data<&ccamera::zoom>("zoom"_hs)
-            .custom<rtti::data_info>(rtti::data_info{ "zoom" })
-        .data<&ccamera::near_z>("near_z"_hs)
-            .custom<rtti::data_info>(rtti::data_info{ "near_z" })
-        .data<&ccamera::far_z>("far_z"_hs)
-            .custom<rtti::data_info>(rtti::data_info{ "far_z" })
-        .data<&ccamera::wmax>("wmax"_hs)
-            .custom<rtti::data_info>(rtti::data_info{ "wmax" })
-        .data<&ccamera::hmax>("hmax"_hs)
-            .custom<rtti::data_info>(rtti::data_info{ "hmax" });
+        .data<&ccamera::cam2d, entt::as_ref_t>("cam2d"_hs)
+            .custom<rtti::data_info>(rtti::data_info{ "cam2d" })
+        .data<&ccamera::cam3d, entt::as_ref_t>("cam3d"_hs)
+            .custom<rtti::data_info>(rtti::data_info{ "cam3d" });
     log::info("[ccamera] registered");
 }

@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace nb {
+namespace nb::lupi {
 
 struct lupi_asset_info {
     std::string kind;

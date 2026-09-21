@@ -189,11 +189,14 @@ bool nb::build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst)
 
 bool nb::build_camera(ryml::ConstNodeRef def, ccamera &dst)
 {
-    if (def.has_child("zoom"))    def["zoom"]    >> dst.zoom;
-    if (def.has_child("near_z"))  def["near_z"]  >> dst.near_z;
-    if (def.has_child("far_z"))   def["far_z"]   >> dst.far_z;
-    if (def.has_child("wmax"))    def["wmax"]    >> dst.wmax;
-    if (def.has_child("hmax"))    def["hmax"]    >> dst.hmax;
+    if (def.has_child("2d"))
+    {
+        const auto &def2d = def["2d"];
+        if (def2d.has_child("scale"))   def2d["scale"]   >> dst.cam2d.scale;
+        if (def2d.has_child("fit_mode"))  def2d["fit_mode"]  >> reinterpret_cast<int&>(dst.cam2d.fit_mode);
+        if (def2d.has_child("fit_dims"))    try_load_vec2(def2d["fit_dims"], dst.cam2d.fit_world_dims);
+        if (def2d.has_child("fit_anchor"))    try_load_vec2(def2d["fit_anchor"], dst.cam2d.fit_anchor);
+    }
     return true;
 }
 

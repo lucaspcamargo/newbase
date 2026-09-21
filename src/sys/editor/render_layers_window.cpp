@@ -4,6 +4,7 @@
 #include <newbase/services/renderer_service.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
+#include "newbase/render/types.hpp"
 #include <entt/entt.hpp>
 
 namespace nb {
@@ -59,10 +60,10 @@ void render_layers_window::draw(bool* p_open)
                 ImGui::Text("%x", entt::to_integral(layer.camera));
 
             ImGui::TableNextColumn();
-            if (layer.viewport == VIEWPORT_INVALID)
-                ImGui::TextDisabled("none");
+            if (layer.viewport == render::VIEWPORT_DEFAULT)
+                ImGui::TextDisabled("(full)");
             else
-                ImGui::Text("%u", layer.viewport);
+                ImGui::Text("%dx%d @ %d,%d", layer.viewport.w, layer.viewport.h, layer.viewport.x, layer.viewport.y);
 
             ImGui::TableNextColumn();
             // Draw 32 tiny toggle-style buttons, one per bit

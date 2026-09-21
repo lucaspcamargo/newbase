@@ -56,3 +56,6 @@
 [submodule "vendored/meshoptimizer"]
 	path = vendored/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer.git
+[submodule "vendored/miniz"]
+	path = vendored/miniz
+	url = https://github.com/richgel999/miniz.git

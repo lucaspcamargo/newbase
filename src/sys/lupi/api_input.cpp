@@ -1,6 +1,7 @@
 #include "lupi_internal.hpp"
 
 using namespace nb;
+using namespace nb::lupi;
 
 static bool valid_id(int id, int player)
 {
@@ -72,7 +73,7 @@ static const luaL_Reg k_input_funcs[] = {
     {nullptr, nullptr}
 };
 
-void nb::lupi_register_input(lua_State* L)
+void nb::lupi::lupi_register_input(lua_State* L)
 {
     lua_getglobal(L, "ui");
     luaL_setfuncs(L, k_input_funcs, 0);

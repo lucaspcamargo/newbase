@@ -1,3 +1,6 @@
+#include "entt/meta/policy.hpp"
+#include "newbase/render/types.hpp"
+#include <algorithm>
 #include <newbase/engine.hpp>
 #include <newbase/system.hpp>
 #include <newbase/res/manager.hpp>
@@ -371,7 +374,15 @@ void engine::clear_render_layers()
     _d->render_layers.clear();
 }
 
-const std::vector<render_layer>& engine::render_layers() const
+
+render_layer& engine::render_layer_get(int order)
+{
+    auto &v = _d->render_layers;
+    return *(std::find_if(v.begin(), v.end(),
+                           [order](const render_layer &l){ return l.order == order; }));
+}
+
+std::vector<render_layer>& engine::render_layers()
 {
     if (!_d->override_render_layers.empty())
         return _d->override_render_layers;
@@ -518,7 +529,21 @@ extern "C" void _rtti_init_engine()
 
     /* unsure non how to register singletons, asked on discord
        can possibly can be solved via some sort of proxy type that forwards to the singleton instance?
+       Right now the scripting layer takes care of it.
     */
+
+    entt::meta_factory<nb::render::viewport_t>{}
+    .type("render_viewport"_hs)
+    .custom<rtti::type_info>(rtti::type_info{.identifier="render_viewport", .type_class=rtti::TYPE_CLASS_NONE})
+    .ctor<>()
+    .data<&nb::render::viewport_t::x, entt::as_ref_t>("x"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"x"})
+    .data<&nb::render::viewport_t::y, entt::as_ref_t>("y"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"y"})
+    .data<&nb::render::viewport_t::w, entt::as_ref_t>("w"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"w"})
+    .data<&nb::render::viewport_t::h, entt::as_ref_t>("h"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"h"});
 
     entt::meta_factory<nb::render_layer>{}
     .type("render_layer"_hs)
@@ -530,12 +555,14 @@ extern "C" void _rtti_init_engine()
         .custom<rtti::data_info>(rtti::data_info{"layer_mask"})
     .data<&nb::render_layer::camera>("camera"_hs)
         .custom<rtti::data_info>(rtti::data_info{"camera"})
-    .data<&nb::render_layer::viewport>("viewport"_hs)
+    .data<&nb::render_layer::viewport, entt::as_ref_t>("viewport"_hs)
         .custom<rtti::data_info>(rtti::data_info{"viewport"})
     .data<&nb::render_layer::order>("order"_hs)
         .custom<rtti::data_info>(rtti::data_info{"order"})
-    .data<&nb::render_layer::clear_bg>("clear_bg"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear_bg"})
+    .data<&nb::render_layer::clear>("clear"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"clear"})
+    .data<&nb::render_layer::follow_ui>("follow_ui"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"follow_ui"})
     .data<&nb::render_layer::clear_r>("clear_r"_hs)
         .custom<rtti::data_info>(rtti::data_info{"clear_r"})
     .data<&nb::render_layer::clear_g>("clear_g"_hs)
@@ -544,6 +571,7 @@ extern "C" void _rtti_init_engine()
         .custom<rtti::data_info>(rtti::data_info{"clear_b"})
     .data<&nb::render_layer::use_grid>("use_grid"_hs)
         .custom<rtti::data_info>(rtti::data_info{"use_grid"});
+
 
     entt::meta_factory<nb::engine>{}
     .type("engine"_hs)
@@ -555,5 +583,7 @@ extern "C" void _rtti_init_engine()
     .func<&nb::engine::remove_render_layer>("remove_render_layer"_hs)
         .custom<rtti::func_info>(rtti::func_info{"remove_render_layer"})
     .func<&nb::engine::clear_render_layers>("clear_render_layers"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"clear_render_layers"});
+        .custom<rtti::func_info>(rtti::func_info{"clear_render_layers"})
+    .func<&nb::engine::render_layer_get, entt::as_ref_t>("render_layer_get"_hs)
+        .custom<rtti::func_info>(rtti::func_info{"render_layer_get"});
 }

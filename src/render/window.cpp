@@ -131,3 +131,13 @@ bool render::window::show()
 
     return false;
 }
+
+void render::window::center()
+{
+    assert(m_win && "You must create() the window first!");
+
+#ifndef NEWBASE_WII
+    SDL_SetWindowPosition(m_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+#endif
+
+}

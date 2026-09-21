@@ -83,14 +83,18 @@ class window final
          * Processes an SDL_Event that might be related to the window
          * @returns true if the event was related to the window, and internal state was updated, false otherwise
          */
-        bool
-        event(SDL_Event * evt);
+        bool event(SDL_Event * evt);
 
         /**
          * Shows the window and updates dimension and scale information.
          * @returns true if showing the window succeeded. On failure, you can check SDL_GetError() for details.
          */
         bool show();
+
+        /**
+         * Attempts to center window on screen. Can eb calledd before show()
+         */
+        void center();
 
 private:
     SDL_Window *m_win {nullptr};

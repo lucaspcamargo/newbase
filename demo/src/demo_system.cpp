@@ -72,8 +72,8 @@ bool demo_system::init(ryml::ConstNodeRef)
     if (!ui) return true;
 
     ui->register_tool_window("demo", [](bool* open) {
-        ImGui::Begin("Demo", open);
 
+        ImGui::Begin("Demo", open);
         ImGui::SetWindowFontScale(2.0f);
         ImGui::Text("newbase demo");
         ImGui::SetWindowFontScale(1.0f);

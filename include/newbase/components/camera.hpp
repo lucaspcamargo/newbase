@@ -1,15 +1,24 @@
 #pragma once
 
-namespace nb {
+#include <newbase/render/camera.hpp>
 
-struct ccamera {
-    float zoom  { 1.0f };
-    float near_z { -1000.0f };
-    float far_z  {  1000.0f };
-    // World-space extents hint used by cam_2d_setup and get_2d_extents.
-    // 0 means "use zoom directly".
-    float wmax  { 0.f };
-    float hmax  { 0.f };
+namespace nb
+{
+
+/**
+ * This is our camera component.
+ *
+ * Note that this is about the projection configuration.
+ * A corresponding spatial component on the same entity
+ * supplies the world transform matrix.
+ *
+ * The "type" of camera to be used is determined by the render
+ * layer, not the data component.
+ */
+struct ccamera
+{
+    render::camera_2d cam2d {};
+    render::camera_3d cam3d {};
 
     static void _ensure_rtti();
 };

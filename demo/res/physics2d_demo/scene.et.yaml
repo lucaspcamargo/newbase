@@ -2,7 +2,16 @@
   comps:
     script:
       lua: "res/physics2d_demo/scene.lua"
-
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      2d:
+        fit_mode: 2 # FIT_MAX
+        fit_dims: [800, 800]
 # Container background graphic
 - name: container_display
   comps:

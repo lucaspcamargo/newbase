@@ -17,6 +17,7 @@
 #include <cstdio>
 
 using namespace nb;
+using namespace nb::lupi;
 
 // ---------------------------------------------------------------------------
 // lupi_self — every lua_CFunction binding fetches the owning lupi_p* through
@@ -25,7 +26,7 @@ using namespace nb;
 
 static const char *k_registry_key = "lupi_p";
 
-lupi_p *nb::lupi_self(lua_State *L)
+lupi_p *nb::lupi::lupi_self(lua_State *L)
 {
     lua_getfield(L, LUA_REGISTRYINDEX, k_registry_key);
     auto *p = static_cast<lupi_p *>(lua_touserdata(L, -1));
@@ -83,12 +84,12 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
-// nb::lupi system
+// nb::lupi::lupi system
 // ---------------------------------------------------------------------------
 
-lupi::lupi() : _d(new lupi_p) {}
+nb::lupi::lupi::lupi() : _d(new lupi_p) {}
 
-lupi::~lupi()
+nb::lupi::lupi::~lupi()
 {
     if (auto *m = uim())
         m->unregister_tool_window("lupi framebuffer");
@@ -99,7 +100,7 @@ lupi::~lupi()
     delete _d;
 }
 
-bool lupi::init(ryml::ConstNodeRef cfg)
+bool nb::lupi::lupi::init(ryml::ConstNodeRef cfg)
 {
     _d->rgba_scratch.resize(static_cast<size_t>(LUPI_SCREEN_W) * LUPI_SCREEN_H);
 
@@ -224,7 +225,7 @@ bool lupi::init(ryml::ConstNodeRef cfg)
     return true;
 }
 
-bool lupi::start(const std::string &cart_path)
+bool nb::lupi::lupi::start(const std::string &cart_path)
 {
     stop();
 
@@ -316,7 +317,7 @@ bool lupi::start(const std::string &cart_path)
     return true;
 }
 
-void lupi::stop()
+void nb::lupi::lupi::stop()
 {
     if (_d->L)
     {
@@ -338,12 +339,12 @@ void lupi::stop()
     _d->simulation_accumulator = 0.0;
 }
 
-bool lupi::running() const
+bool nb::lupi::lupi::running() const
 {
     return _d->running;
 }
 
-void lupi::on_scene_change()
+void nb::lupi::lupi::on_scene_change()
 {
     // The scene-owned screen_entity is about to be cleared along with the
     // rest of the scene; stop the cart too so it doesn't keep calling
@@ -351,7 +352,7 @@ void lupi::on_scene_change()
     stop();
 }
 
-bool lupi::step(step_phase phase)
+bool nb::lupi::lupi::step(step_phase phase)
 {
     if (phase == GENERAL_UPDATE && _d->running)
     {
@@ -462,7 +463,7 @@ bool lupi::step(step_phase phase)
     return true;
 }
 
-bool lupi::event(SDL_Event *ev)
+bool nb::lupi::lupi::event(SDL_Event *ev)
 {
     if (!_d->text_input_started)
     {
@@ -505,23 +506,23 @@ extern "C" void _rtti_init_lupi()
 {
     using namespace entt::literals;
 
-    entt::meta_factory<nb::lupi>{}
+    entt::meta_factory<nb::lupi::lupi>{}
         .type("lupi"_hs)
         .custom<nb::rtti::type_info>(nb::rtti::type_info{"lupi", nb::rtti::TYPE_CLASS_SYSTEM})
         .base<nb::system>()
-        .func<&nb::lupi::start>("start"_hs)
+        .func<&nb::lupi::lupi::start>("start"_hs)
         .custom<nb::rtti::func_info>(nb::rtti::func_info{"start"})
-        .func<&nb::lupi::stop>("stop"_hs)
+        .func<&nb::lupi::lupi::stop>("stop"_hs)
         .custom<nb::rtti::func_info>(nb::rtti::func_info{"stop"})
-        .func<&nb::lupi::running>("running"_hs)
+        .func<&nb::lupi::lupi::running>("running"_hs)
         .custom<nb::rtti::func_info>(nb::rtti::func_info{"running"});
 
-    entt::meta_factory<std::shared_ptr<nb::lupi>>{nb::rtti::ctx_systems()}
+    entt::meta_factory<std::shared_ptr<nb::lupi::lupi>>{nb::rtti::ctx_systems()}
         .type("lupi_shared"_hs)
-        .ctor<&nb::rtti::shared_ptr_builder<nb::lupi>>()
+        .ctor<&nb::rtti::shared_ptr_builder<nb::lupi::lupi>>()
         .conv<std::shared_ptr<nb::system>>();
 
-    entt::meta_factory<nb::rlupi_cart>{}
+    entt::meta_factory<nb::lupi::rlupi_cart>{}
         .type("rlupi_cart"_hs)
         .custom<nb::rtti::type_info>(nb::rtti::type_info{
             .identifier = "lupi_cart",

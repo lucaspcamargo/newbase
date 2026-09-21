@@ -29,7 +29,7 @@ ENGBR_SECTION-->
 <!--ENGBR_TOGGLE-->
 ## Demo
 
-You can run the engine directly on your broser. Check out the [project page's demo section](https://camargo.eng.br/projects/newbase/README.html#demo).
+You can run the engine directly on your browser. Check out the [project page's demo section](https://camargo.eng.br/projects/newbase/README.html#demo).
 It is also availaable on [itch.io](https://camarguinho.itch.io/newbase-demo).
 <!--ENGBR_TOGGLE-->
 

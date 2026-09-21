@@ -11,12 +11,13 @@
 #include <unordered_set>
 
 using namespace nb;
+using namespace nb::lupi;
 
 // ---------------------------------------------------------------------------
 // 0b binary literal preprocessing (see lupi_internal.hpp for why)
 // ---------------------------------------------------------------------------
 
-std::string nb::lupi_preprocess_binary_literals(const std::string& src)
+std::string nb::lupi::lupi_preprocess_binary_literals(const std::string& src)
 {
     std::string out;
     out.reserve(src.size());
@@ -140,7 +141,7 @@ bool has_suffix(const std::string& s, const std::string& suffix)
 // metadata only) sitting next to `game.lua`. No asset list — see cart.hpp.
 // ---------------------------------------------------------------------------
 
-rloader_lupi_cart::result_type rloader_lupi_cart::operator()(entt::id_type id) const
+lupi::rloader_lupi_cart::result_type lupi::rloader_lupi_cart::operator()(entt::id_type id) const
 {
     log::info("[rloader_lupi_cart] loading: %x", id);
 
@@ -203,13 +204,13 @@ uint16_t rgb8_to_bgr555(uint8_t r, uint8_t g, uint8_t b)
 // entry by channel distance (a deliberate, pragmatic deviation from the real
 // codec, which has no fallback and simply can't exceed 256 colors in a
 // released cart — we're more lenient so an over-budget cart still renders).
-int find_or_allocate_color(lupi_palette& pal, uint16_t color)
+int find_or_allocate_color(lupi::lupi_palette& pal, uint16_t color)
 {
-    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i)
+    for (int i = 1; i < lupi::LUPI_PALETTE_SIZE; ++i)
         if (pal.allocated[i] && pal.bgr555[i] == color)
             return i;
 
-    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i) {
+    for (int i = 1; i < lupi::LUPI_PALETTE_SIZE; ++i) {
         if (!pal.allocated[i]) {
             pal.bgr555[i] = color;
             pal.allocated[i] = true;
@@ -220,7 +221,7 @@ int find_or_allocate_color(lupi_palette& pal, uint16_t color)
     auto chan = [](uint16_t c, int shift) { return (c >> shift) & 0x1F; };
     int b0 = chan(color, 10), g0 = chan(color, 5), r0 = chan(color, 0);
     int best = 1, best_dist = INT_MAX;
-    for (int i = 1; i < LUPI_PALETTE_SIZE; ++i) {
+    for (int i = 1; i < lupi::LUPI_PALETTE_SIZE; ++i) {
         int b1 = chan(pal.bgr555[i], 10), g1 = chan(pal.bgr555[i], 5), r1 = chan(pal.bgr555[i], 0);
         int d = (r0 - r1) * (r0 - r1) + (g0 - g1) * (g0 - g1) + (b0 - b1) * (b0 - b1);
         if (d < best_dist) { best_dist = d; best = i; }
@@ -236,7 +237,7 @@ int find_or_allocate_color(lupi_palette& pal, uint16_t color)
 // requested and wasn't already part of the cart's own sprite-derived palette;
 // once assigned, that mapping is permanent for the cart's lifetime. New slots
 // are mirrored into `pal` too, in lockstep, so rendering can actually use them.
-int find_in_master_or_allocate(lupi_p& p, uint16_t color)
+int find_in_master_or_allocate(lupi::lupi_p& p, uint16_t color)
 {
     for (int i = 1; i < LUPI_PALETTE_SIZE; ++i)
         if (p.master_pal.allocated[i] && p.master_pal.bgr555[i] == color)
@@ -263,7 +264,7 @@ int find_in_master_or_allocate(lupi_p& p, uint16_t color)
 
 }
 
-std::shared_ptr<lupi_spritesheet> nb::lupi_load_spritesheet_indexed(
+std::shared_ptr<lupi::lupi_spritesheet> nb::lupi::lupi_load_spritesheet_indexed(
     const std::vector<char>& png_bytes, lupi_palette& pal, const std::string& path)
 {
     int w, h, chs;
@@ -431,7 +432,7 @@ void set_nested_sprite(lua_State* L, int sprites_idx, const std::vector<std::str
 
 }
 
-void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
+void nb::lupi::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
 {
     // Reserve any overridden indices FIRST, before a single sprite color is
     // allocated — find_or_allocate_color's "first free slot" search then
@@ -596,7 +597,7 @@ void nb::lupi_scan_cart_assets(lua_State* L, lupi_p& p)
 // optional, absent for any cart we haven't manually annotated.
 // ---------------------------------------------------------------------------
 
-void nb::lupi_apply_palette_overrides(lupi_p& p)
+void nb::lupi::lupi_apply_palette_overrides(lupi_p& p)
 {
     std::string path = p.cart_dir + "palette_overrides.yaml";
     auto id = entt::hashed_string{path.c_str()}.value();

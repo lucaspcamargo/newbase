@@ -3,7 +3,7 @@
 #include <newbase/system.hpp>
 #include <string>
 
-namespace nb {
+namespace nb::lupi {
 
 struct lupi_p;
 

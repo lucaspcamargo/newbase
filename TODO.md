@@ -26,13 +26,18 @@ The things that are still meant to be done. Some have
     + [X] Shared window code
     + [X] Make render_simple use generalized 2D rendering
     + [X] Blend modes in sprites like in cgeom2d (support in 2d renderer done)
-    + [ ] Cleanup render layer and viewport semantics, and create spec
-        * [ ] Basic render-to-texture
     + [~] Implement ImGui backend specific to newbase, stop using the sample code.
+        * [X] Get basic support working
+        * [ ] Specify and implement clipping behavior
+        * [ ] Validate (and fix?) DPI handling on all platforms
+    + [X] Clipping on render_2d (and ImGui)
+    + [ ] Cleanup render layer and viewport semantics, and create spec - see below section
+    * [ ] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
     + [ ] Shader system
         * [ ] Optional shader support in render_2d depending on backend
+        * [ ] Shader support in render_gpu for 2d
     + [ ] Materials system + shader derivation
     + [ ] "Classic" fixed-function-like materials system
     + [ ] PBR material system
@@ -75,3 +80,19 @@ The things that are still meant to be done. Some have
     + [ ] Physics 2D: Fix picking on web and Android, audio and more stuff
     + [X] Move hello-world to the end
     
+    
+    
+## Scope: Viewports, Layers, and 2D Camera refactor
+
+- [X] Remove viewports from renderer_service, and vp handle concept
+    + [X] Update render_layer to contain viewport directly
+- [X] Remove clear color from renderer_service
+- [X] Implement UI viewport update logic
+- [X] New camera code
+    + [X] camera_2d structure in render namespace
+    + [X] helpers to get camera_2d world bounds according to cam data and viewport
+    + [X] update camera component and builder to contain new structure (2d and 3d data side by side is fine)
+- [X] Remove fallback camera and viewport path from render_2d
+- [ ] Remove get_2d_extents from renderer_service
+- [ ] Define overlay 
+- [ ] Update UI overlay callback signature and code

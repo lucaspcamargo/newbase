@@ -36,23 +36,13 @@ public:
     void cam_2d_setup(float cx, float cy, float wmax, float hmax) override;
     float cam_2d_scale();
 
-    void set_clear_color(float r, float g, float b) override;
-
     // picker_service interface
+    // TODO move to nb::render namespace, generalize, drop service
     entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
 
     // renderer_service interface
+    // TODO remove this
     bool get_2d_extents(renderer_service::extents_2d &extents) override;
-
-    viewport_handle create_viewport(int x, int y, int w, int h,
-                                    bool clear = true,
-                                    float r = 0.f, float g = 0.f,
-                                    float b = 0.f, float a = 1.f) override;
-    void update_viewport(viewport_handle vp, int x, int y, int w, int h) override;
-    void destroy_viewport(viewport_handle vp) override;
-
-    viewport_handle default_viewport() const override;
-    void reset_default_viewport() override;
 
     // opaque texture management interface from renderer_service
     // for UI usage and simpler rendering purposes
@@ -74,13 +64,12 @@ private:
 
     // draws the current contents of the geometry batcher
     // to the current render target
-    void _draw_batches(render::batcher2d& batcher);
+    // clip is intersected with the command's clip if not NONE
+    void _draw_batches(render::batcher2d& batcher, render::clip_t clip = render::CLIP_NONE);
 
-    // given a viewport handle, calculates target top-left and bottom-right points for geometry transformation
-    // we pass the layer because default/invalid viewport depends on target dimensions if any
+    // TODO remove this
+    // all viewports should be well-defined and know their target size
     std::pair<glm::vec2, glm::vec2> _get_viewport_bounds(const render_layer &l);
-
-    void on_scene_change() override;
 
     std::unique_ptr<render_2d_p> _d;
 };

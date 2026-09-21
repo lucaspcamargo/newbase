@@ -1,3 +1,4 @@
+#include "newbase/render/types.hpp"
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <newbase/ui/imgui_icons.hpp>
@@ -167,6 +168,40 @@ void ui_manager_simple::draw_tool_windows()
     }
 }
 
+void ui_manager_simple::update_viewports()
+{
+    // Updates the viewports that have follow_ui = true
+    // this is done for the currently active layer set
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_size = viewport->WorkSize;
+
+    ImGuiDockNode* central_node = ImGui::DockBuilderGetCentralNode(static_cast<ImGuiID>(_d->dockspace_id));
+    if (central_node)
+    {
+        // If there is a DockSpace, use its bounds instead of the entire viewport
+        work_pos = central_node->Pos;
+        work_size = central_node->Size;
+    }
+
+    const ImGuiIO &io = ImGui::GetIO();
+    float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+    float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+    const auto ui_vp = render::viewport_t {
+        static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
+        static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy)
+    };
+
+    for(auto &l: engine::instance().render_layers())
+    {
+        if(l.follow_ui)
+        {
+            l.viewport = ui_vp;
+        }
+    }
+}
+
 bool ui_manager_simple::toggle_tool_window(const char *name)
 {
     auto it = _d->tool_windows.find(name);
@@ -295,6 +330,7 @@ static void draw_frametimes_bar_graph(const engine::framecounter_data& fc, int f
 void ui_manager_simple::draw_perf()
 {
     const float PAD = ImGui::GetFontSize() * 0.75f;
+    const ImGuiIO &io = ImGui::GetIO();
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
     ImVec2 work_size = viewport->WorkSize;
@@ -307,33 +343,12 @@ void ui_manager_simple::draw_perf()
         work_size = central_node->Size;
     }
 
-    // Keep the renderer's default viewport in sync with the central node,
-    // but only when no override render layers are active — if they are, whoever
-    // set the override (e.g. the editor) owns the viewport layout.
-    if(!engine::instance().has_override_render_layers())
-    {
-        if(auto *rend = entt::locator<renderer_service*>::value())
-        {
-            viewport_handle dvp = rend->default_viewport();
-            if(dvp != VIEWPORT_INVALID && work_size.x > 1.f && work_size.y > 1.f)
-            {
-                const ImGuiIO &io = ImGui::GetIO();
-                float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-                float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-                rend->update_viewport(dvp,
-                    static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
-                    static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy));
-            }
-        }
-    }
-
     if (central_node && central_node->Windows.Size > 0)
         return;
 
     // maybe draw perf window
 
     static int location = 1;
-    ImGuiIO& io = ImGui::GetIO();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     if (location >= 0)
     {

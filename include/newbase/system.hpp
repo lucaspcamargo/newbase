@@ -11,6 +11,7 @@ namespace nb {
 
 enum step_phase {
     PREPARE,
+    UI_RENDER,
     PRE_UPDATE,
     PHYSICS_UPDATE,
     GENERAL_UPDATE,

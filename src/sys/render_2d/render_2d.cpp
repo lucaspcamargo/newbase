@@ -16,14 +16,21 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/ui/imgui_nb.hpp>
 #include <newbase/services/ui_manager.hpp>
+#include <newbase/sdl/utils.hpp>
 #include <newbase/log.hpp>
 
+#include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_surface.h"
+#include "SDL3/SDL_video.h"
 #include "glm/fwd.hpp"
 //#include "imgui_internal.h" // for ImGuiViewport
 #include "newbase/layer.hpp"
+#include "newbase/render/batcher2d.hpp"
+#include "newbase/render/camera.hpp"
+#include "newbase/render/types.hpp"
 #include "newbase/services/renderer_service.hpp"
+#include "newbase/system.hpp"
 #include <entt/entt.hpp>
 #include <newbase/utility/glm.hpp>
 #include <ryml.hpp>
@@ -38,58 +45,23 @@ using namespace nb;
 using entt::operator""_hs;
 
 
-
-struct viewport_entry {
-    int x, y, w, h;
-    bool clear;
-    float r, g, b, a;
-};
-
 struct nb::render_2d_p
 {
     render::window rwin;
-    SDL_Window    *_win {nullptr};
-    SDL_Renderer  *_render {nullptr};
-    int            _wx {0}, _wy {0};
-    float          _scale {1.0};
-    SDL_Rect       _safe {};
-    float          _clear_r{0.f}, _clear_g{0.f}, _clear_b{0.f};
+    SDL_Renderer  *render {nullptr};
+    int            wx {0}, wy {0};
+    float          ui_scale {1.0};
+    SDL_Rect       safe_area {};
 
-    // fallback camera used when no render layers are configured
-    ccamera  _fallback_camera  {};
-    cspatial _fallback_spatial {};
-
-    std::unordered_map<viewport_handle, viewport_entry> _viewports;
-    viewport_handle _next_vp_handle { 1 }; // 0 is VIEWPORT_INVALID
-
-    // The default viewport covers the window's scene area.
-    // It is auto-sized to the full window on init and resized unless
-    // a caller has explicitly overridden it via update_viewport().
-    viewport_handle _default_vp       { VIEWPORT_INVALID };
-    bool            _default_vp_owned { false }; // true once set by an external caller
-                                                 // if false, we will take care of it instead
-    std::vector<SDL_Vertex> _xform_buf {};
-    bool _has_ui {false};
+    bool has_ui {false};
+    imgui_nb imgui;
 
     render::batcher2d batcher;
     render::collector2d collector;
 
     SDL_ScaleMode default_tex_scalemode {SDL_SCALEMODE_NEAREST};
 
-    // try to get a pointer to a registered viewport
-    // or nullptr, if invalid or non-existant
-    viewport_entry*  try_find_viewport(viewport_handle vphnd)
-    {
-        if (vphnd == VIEWPORT_INVALID)
-            return nullptr;
-        auto it = _viewports.find(vphnd);
-        if(it != _viewports.end())
-            return &(it->second);
-        return nullptr;
-    }
-
-    imgui_nb imgui;
-
+    std::shared_ptr<rtexture> smpte;
 };
 
 
@@ -120,7 +92,7 @@ render_2d::render_2d()
 render_2d::~render_2d()
 {
     log::info("[render_2d] destroying");
-    if(_d->_has_ui)
+    if(_d->has_ui)
     {
         _d->imgui.teardown();
         ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
@@ -131,9 +103,9 @@ render_2d::~render_2d()
         else
             log::warn("[render_2d] could not locate ui service for destruction");
     }
-    if(_d->_render)
+    if(_d->render)
     {
-        SDL_DestroyRenderer(_d->_render);
+        SDL_DestroyRenderer(_d->render);
     }
 
     // release our private data
@@ -197,24 +169,21 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
         return false;
     }
 
-    _d->_win = _d->rwin.get();
-    log::info("[render_2d] window scale: %f", _d->_scale);
+    log::info("[render_2d] window scale: %f", _d->ui_scale);
 
-    _d->_render = SDL_CreateRenderer(_d->_win, nullptr);
-    log::info("[render_2d] renderer: %s", SDL_GetRendererName(_d->_render));
+    _d->render = SDL_CreateRenderer(_d->rwin.get(), nullptr);
+    log::info("[render_2d] renderer: %s", SDL_GetRendererName(_d->render));
 
-    SDL_SetRenderVSync(_d->_render, 1);
-    if (_d->_render == nullptr)
+    SDL_SetRenderVSync(_d->render, 1);
+    if (_d->render == nullptr)
     {
         log::error("[render_2d] SDL_CreateRenderer(): %s\n", SDL_GetError());
         return false;
     }
     else
-        log::info("[render_2d] created renderer: %s", SDL_GetRendererName(_d->_render));
+        log::info("[render_2d] created renderer: %s", SDL_GetRendererName(_d->render));
 
-#ifndef NEWBASE_WII
-    SDL_SetWindowPosition(_d->_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-#endif
+    _d->rwin.center();
 
     if(!_d->rwin.show())
     {
@@ -223,50 +192,48 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
     }
 
     // get main render window attributes
-    _d->_wx = _d->rwin.width();
-    _d->_wy = _d->rwin.height();
-    _d->_scale = _d->rwin.ui_scale();
-    _d->_safe = _d->rwin.safe_area();
+    _d->wx = _d->rwin.width();
+    _d->wy = _d->rwin.height();
+    _d->ui_scale = _d->rwin.ui_scale();
+    _d->safe_area = _d->rwin.safe_area();
 
     // attempt to load and set window icon
+    // TODO move to render::window
     auto icon_tex = rman().get<rtexture>("_nb_core/icon_192.png"_hs);
     if(icon_tex && icon_tex->surf)
     {
-        SDL_SetWindowIcon(_d->_win, icon_tex->surf);
+        SDL_SetWindowIcon(_d->rwin.get(), icon_tex->surf);
     }
 
     // init gui via ui manager
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
     if(ui_mgr)
     {
-        _d->_has_ui = ui_mgr->ui_init();
+        _d->has_ui = ui_mgr->ui_init();
     }
     else
         log::warn("[render_2d] could not init ui via ui_manager service");
     
-    if(_d->_has_ui)
+    if(_d->has_ui)
     {
         log::warn("[render_2d] ui init");
         _d->imgui.init(_d->rwin);
-        ui_mgr->ui_init_finish(_d->_scale);
+        ui_mgr->ui_init_finish(_d->ui_scale);
     }
     else
     {
         log::warn("[render_2d] no ui, not initializing ImGui renderer");
     }
 
-
-
-    // Create the persistent default viewport (full window, no clear).
-    _d->_default_vp = create_viewport(0, 0, _d->_wx, _d->_wy, false);
-    log::info("[render_2d] default viewport: %u", _d->_default_vp);
+    // load (no layers) background
+    _d->smpte = rman().get<rtexture>("_nb_core/tex/smpte.png"_hs);
 
     return true;
 }
 
 bool render_2d::step(nb::step_phase phase)
 {
-    if(phase == step_phase::PRE_UPDATE)
+    if(phase == step_phase::PREPARE)
     {
         ZoneScopedN("RenderPreUpdate");
         // Start UI frame
@@ -274,15 +241,28 @@ bool render_2d::step(nb::step_phase phase)
         if(ui_mgr)
         {
             _d->imgui.new_frame();
-            ui_mgr->ui_new_frame(_d->_safe.x, _d->_safe.y, _d->_safe.w, _d->_safe.h);
+            ui_mgr->ui_new_frame(_d->safe_area.x, _d->safe_area.y, _d->safe_area.w, _d->safe_area.h);
         }
     }
-    else if(phase == step_phase::POST_UPDATE)
+    else if(phase == step_phase::UI_RENDER)
     {
+        if(_d->has_ui)
+        {
+            ZoneScopedN("RenderDrawUI");
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->draw_tool_windows();
+            ui_mgr->draw_perf();
+        }
     }
     else if(phase == step_phase::PRE_RENDER)
     {
         ZoneScopedN("RenderPre");
+        if(_d->has_ui)
+        {
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->update_viewports();
+            _d->imgui.render_flush();
+        }
     }
     else if(phase == step_phase::RENDER)
     {
@@ -290,117 +270,83 @@ bool render_2d::step(nb::step_phase phase)
 
         const auto &layers = engine::instance().render_layers();
 
-        // Full-screen clear — use first layer's clear color if present
-        {
-            float cr = _d->_clear_r, cg = _d->_clear_g, cb = _d->_clear_b;
-            if (!layers.empty() && layers.front().clear_bg)
-            {
-                cr = layers.front().clear_r;
-                cg = layers.front().clear_g;
-                cb = layers.front().clear_b;
-            }
-            SDL_SetRenderDrawColor(_d->_render,
-                static_cast<Uint8>(cr * 255), static_cast<Uint8>(cg * 255),
-                static_cast<Uint8>(cb * 255), 255);
-            SDL_RenderClear(_d->_render);
-        }
-
+        // if there isn't be anything to render
+        // just draw a fun "debug" background
         if(layers.empty())
         {
-            log::verb("[render] no render layers, using fallback path");
-            // Fallback: draw default scene through the default viewport.
-            auto dvp_it = _d->_viewports.find(_d->_default_vp);
-            const viewport_entry &dvp = (dvp_it != _d->_viewports.end())
-                ? dvp_it->second
-                : viewport_entry{ 0, 0, _d->_wx, _d->_wy, false, 0, 0, 0, 1 };
-
-            float cam_cx = _d->_fallback_spatial.pos.x;
-            float cam_cy = _d->_fallback_spatial.pos.y;
-            float zoom   = _d->_fallback_camera.zoom > 0.f ? _d->_fallback_camera.zoom : 1.f;
-            float vp_cx  = dvp.x + dvp.w * 0.5f;
-            float vp_cy  = dvp.y + dvp.h * 0.5f;
-            glm::mat4x4 viewproj =
-                glm::translate(glm::mat4x4{1.0f}, glm::vec3{vp_cx, vp_cy, 0.f}) *
-                glm::scale(glm::mat4x4{1.0f}, glm::vec3{zoom, zoom, 1.f}) *
-                glm::translate(glm::mat4x4{1.0f}, glm::vec3{-cam_cx, -cam_cy, 0.f});
-            SDL_Rect clip_rect { dvp.x, dvp.y, dvp.w, dvp.h };
-            SDL_SetRenderClipRect(_d->_render, &clip_rect);
-            // auto &reg = engine::instance().default_scene().registry();
-            //_draw_scene(reg, viewproj, 0xFFFFFFFF);
-            render_layer tmp_l {};
-            _draw_scene(engine::instance().default_scene(), viewproj, tmp_l);
-            SDL_SetRenderClipRect(_d->_render, nullptr);
+            _prepare_texture(_d->smpte.get());
+            auto sdltex = static_cast<SDL_Texture*>(_d->smpte->rptr);
+            SDL_SetTextureScaleMode(sdltex, SDL_SCALEMODE_LINEAR);
+            SDL_RenderTexture(_d->render, static_cast<SDL_Texture*>(_d->smpte->rptr), NULL, NULL);
         }
-        else
+
+        //now render all layers
+        for(const auto &layer : layers)
         {
-            for(const auto &layer : layers)
+            auto *sc = engine::instance().find_scene(layer.scene_id);
+            if(!sc)
+                continue;   // layer has no scene, skip
+
+            const auto &vp = layer.viewport;
+
+            // Clear viewport region if requested
+            if(layer.clear)
             {
-                auto *sc = engine::instance().find_scene(layer.scene_id);
-                if(!sc)
-                    continue;   // layer has no scene, skip
 
-                auto vp_ptr = _d->try_find_viewport(layer.viewport);
-                if(!vp_ptr)
-                    continue;   // layer has no viewport, skip
-                const auto &vp = *vp_ptr;
-
-                // Clear viewport region if requested
-                if(vp.clear)
-                {
-                    SDL_SetRenderDrawColor(_d->_render,
-                        static_cast<Uint8>(vp.r * 255), static_cast<Uint8>(vp.g * 255),
-                        static_cast<Uint8>(vp.b * 255), static_cast<Uint8>(vp.a * 255));
-                    SDL_FRect clip { static_cast<float>(vp.x), static_cast<float>(vp.y),
-                                     static_cast<float>(vp.w), static_cast<float>(vp.h) };
-                    SDL_RenderFillRect(_d->_render, &clip);
-                }
-
-                // Build camera transform from camera entity
-                auto &reg = sc->registry();
-                float cam_cx = 0.f, cam_cy = 0.f, zoom = 1.f;
-                if(layer.camera != entt::null)
-                {
-                    auto *sp  = reg.try_get<cspatial>(layer.camera);
-                    auto *cam = reg.try_get<ccamera>(layer.camera);
-                    if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
-                    if(cam) { zoom = cam->zoom; }
-                    log::verb("[render] layer cam=%u sp=%p cam=%p zoom=%.2f cx=%.0f cy=%.0f",
-                        entt::to_integral(layer.camera), sp, cam, zoom, cam_cx, cam_cy);
-                }
-
-                float vp_cx = vp.x + vp.w * 0.5f;
-                float vp_cy = vp.y + vp.h * 0.5f;
-                glm::mat4x4 viewproj =
-                    glm::translate(glm::mat4x4{1.0f}, glm::vec3{vp_cx, vp_cy, 0.f}) *
-                    glm::scale(glm::mat4x4{1.0f}, glm::vec3{zoom, zoom, 1.f}) *
-                    glm::translate(glm::mat4x4{1.0f}, glm::vec3{-cam_cx, -cam_cy, 0.f});
-
-                SDL_Rect clip_rect { vp.x, vp.y, vp.w, vp.h };
-                SDL_SetRenderClipRect(_d->_render, &clip_rect);
-                if (layer.use_grid)
-                {
-                    SDL_SetRenderDrawColor(_d->_render,
-                        static_cast<Uint8>(layer.clear_r * 255),
-                        static_cast<Uint8>(layer.clear_g * 255),
-                        static_cast<Uint8>(layer.clear_b * 255), 255);
-                    SDL_FRect fill { (float)vp.x, (float)vp.y, (float)vp.w, (float)vp.h };
-                    SDL_RenderFillRect(_d->_render, &fill);
-                    _draw_editor_grid_hack(_d->_render, cam_cx, cam_cy, zoom, vp.x, vp.y, vp.w, vp.h);
-                }
-                _draw_scene(*sc, viewproj, layer);
-                SDL_SetRenderClipRect(_d->_render, nullptr);
+                //log::info("CLEAR %dx%d @ %d,%d", vp.w, vp.h, vp.x, vp.y);
+                SDL_SetRenderDrawColor(_d->render,
+                    static_cast<Uint8>(layer.clear_r * 255), static_cast<Uint8>(layer.clear_g * 255),
+                    static_cast<Uint8>(layer.clear_b * 255), 255);
+                SDL_FRect clip { static_cast<float>(vp.x), static_cast<float>(vp.y),
+                                    static_cast<float>(vp.w), static_cast<float>(vp.h) };
+                SDL_RenderFillRect(_d->render, &clip);
             }
+
+            // Find camera and determine world bounds
+            auto &reg = sc->registry();
+            glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
+            if(layer.camera != entt::null)
+            {
+                float cam_cx = 0.0f, cam_cy = 0.0f;
+                auto *sp  = reg.try_get<cspatial>(layer.camera);
+                auto *cam = reg.try_get<ccamera>(layer.camera);
+                if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
+                if(cam) { world_bounds = render::camera_2d_calc_world_bounds(cam_cx, cam_cy, cam->cam2d, vp); }
+                //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
+            }
+
+            // Build projection matrix from bounds (NDC)
+            glm::mat4 proj = glm::ortho(world_bounds.x, world_bounds.x + world_bounds.z,
+                                        world_bounds.y, world_bounds.y + world_bounds.w,
+                                        -1.0f, 1.0f);
+
+            // Viewport Matrix: Maps NDC [-1, 1] to Pixel Space [0, vp.w] x [0, vp.h]
+            glm::mat4 view = glm::mat4(1.0f);
+            view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
+            view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
+
+            // calculated view proection
+            glm::mat4 viewproj = view * proj;
+
+            SDL_Rect clip_rect { vp.x, vp.y, vp.w, vp.h };
+            SDL_SetRenderClipRect(_d->render, &clip_rect);
+            if (layer.use_grid)
+            {
+                SDL_SetRenderDrawColor(_d->render,
+                    static_cast<Uint8>(layer.clear_r * 255),
+                    static_cast<Uint8>(layer.clear_g * 255),
+                    static_cast<Uint8>(layer.clear_b * 255), 255);
+                SDL_FRect fill { (float)vp.x, (float)vp.y, (float)vp.w, (float)vp.h };
+                SDL_RenderFillRect(_d->render, &fill);
+                // TODO refactor this _draw_editor_grid_hack(_d->render, cam_cx, cam_cy, zoom, vp.x, vp.y, vp.w, vp.h);
+            }
+            _draw_scene(*sc, viewproj, layer);
+            SDL_SetRenderClipRect(_d->render, nullptr);
         }
         
         // GUI
-        if(_d->_has_ui)
+        if(_d->has_ui)
         {
-            SDL_SetRenderClipRect(_d->_render, nullptr);
-            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
-            ZoneScopedN("RenderDrawUI");
-            ui_mgr->draw_tool_windows();
-            ui_mgr->draw_perf();
-            _d->imgui.render_flush();
             _draw_batches(_d->imgui.render_data());
         }
 
@@ -410,7 +356,7 @@ bool render_2d::step(nb::step_phase phase)
         // Call SDL_RenderReadPixels() to fill buffer
         // Send buffer to tracy profiler
 #endif
-        SDL_RenderPresent(_d->_render);
+        SDL_RenderPresent(_d->render);
         FrameMark;
     }
     return true;
@@ -418,7 +364,7 @@ bool render_2d::step(nb::step_phase phase)
 
 bool render_2d::event( SDL_Event * evt)
 {
-    if(_d->_has_ui)
+    if(_d->has_ui)
     {
         _d->imgui.event(evt);
     }
@@ -426,20 +372,15 @@ bool render_2d::event( SDL_Event * evt)
     bool window_update = _d->rwin.event(evt);
     if(window_update)
     {
-        _d->_wx = _d->rwin.width();
-        _d->_wy = _d->rwin.height();
-        _d->_scale = _d->rwin.ui_scale();
-        _d->_safe = _d->rwin.safe_area();
-
-        if(!_d->_default_vp_owned && _d->_default_vp != VIEWPORT_INVALID)
-            update_viewport(_d->_default_vp, 0, 0, _d->_wx, _d->_wy);
-        if(_d->_fallback_camera.wmax > 0.f)
-            cam_2d_setup(_d->_fallback_spatial.pos.x, _d->_fallback_spatial.pos.y,
-                            _d->_fallback_camera.wmax, _d->_fallback_camera.hmax);
+        _d->wx = _d->rwin.width();
+        _d->wy = _d->rwin.height();
+        _d->ui_scale = _d->rwin.ui_scale();
+        _d->safe_area = _d->rwin.safe_area();
     }
 
+    // TODO move somewhere else?
     if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
-        SDL_SetWindowFullscreen(_d->_win, !(SDL_GetWindowFlags(_d->_win)&SDL_WINDOW_FULLSCREEN));
+        SDL_SetWindowFullscreen(_d->rwin.get(), !(SDL_GetWindowFlags(_d->rwin.get())&SDL_WINDOW_FULLSCREEN));
 
     return true;
 }
@@ -451,18 +392,18 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     _d->collector.clear();
 
     const auto bounds = _get_viewport_bounds(l);
-    (void) bounds;
+    auto clip = render::clip_t{bounds.first.x, bounds.first.y, bounds.second.x, bounds.second.y,};
 
     // use the standard 2d collector to go over scene and
     // batch geometry data
     _d->collector.collect(_d->batcher, scene, l, viewproj);
 
     // now go over batches and render them
-    _draw_batches(_d->batcher);
+    _draw_batches(_d->batcher, clip);
 }
 
 
-void render_2d::_draw_batches(render::batcher2d& batcher)
+void render_2d::_draw_batches(render::batcher2d& batcher, render::clip_t clip)
 {
     const auto &data = batcher.data();
 
@@ -472,12 +413,43 @@ void render_2d::_draw_batches(render::batcher2d& batcher)
         _prepare_texture(tex.get());
     }
 
+    // clipping init, handling
+    render::clip_t clip_cmd_curr = render::CLIP_NONE; // used to control cmd clip changes
+    if(clip != render::CLIP_NONE)
+    {
+        auto clip_int = render::clip_to_int(clip);
+        SDL_SetRenderClipRect(_d->render, &clip_int);
+    }
+    else
+        SDL_SetRenderClipRect(_d->render, nullptr);
+
     // now we draw
     for (const auto &cmd: batcher.commands())
     {
         assert(cmd.index_count);
         assert(cmd.index_start + cmd.index_count <= data.inds.size());
         assert(cmd.base_vertex < data.verts.size());
+
+        // first, handle clip
+        // command is dropped if there is clip but no intersection
+        if(clip_cmd_curr != cmd.clip)
+        {
+            clip_cmd_curr = cmd.clip;
+            render::clip_t intersect = render::clip_intersect(clip_cmd_curr, clip);
+            if(intersect == render::CLIP_EMPTY)
+                continue; // empty clip intersection, go to next draw command
+            else if(intersect == render::CLIP_NONE)
+            {
+                // no clipping now, just disable it
+                SDL_SetRenderClipRect(_d->render, nullptr);
+            }
+            else
+            {
+                // valid clip intersection, apply it
+                SDL_Rect clip_int = render::clip_to_int(intersect);
+                SDL_SetRenderClipRect(_d->render, &clip_int);
+            }
+        }
 
         const render::vertex2d *vtx0 = data.verts.data() + cmd.base_vertex;
         const uint16_t *ind0 = data.inds.data() + cmd.index_start;
@@ -502,12 +474,12 @@ void render_2d::_draw_batches(render::batcher2d& batcher)
         }
         else
         {
-            SDL_GetRenderDrawBlendMode(_d->_render, &blend_prev);
-            SDL_SetRenderDrawBlendMode(_d->_render, blend_now);
+            SDL_GetRenderDrawBlendMode(_d->render, &blend_prev);
+            SDL_SetRenderDrawBlendMode(_d->render, blend_now);
         }
 
         // OUR DRAW CALL
-        SDL_RenderGeometryRaw(_d->_render, sdltex,
+        SDL_RenderGeometryRaw(_d->render, sdltex,
                               static_cast<const float*>(&(vtx0->pos.x)), v_stride,
                               reinterpret_cast<const SDL_FColor*>(&(vtx0->color.x)), v_stride,
                               static_cast<const float*>(&(vtx0->uv.x)), v_stride,
@@ -521,11 +493,12 @@ void render_2d::_draw_batches(render::batcher2d& batcher)
         }
         else
         {
-            SDL_SetRenderDrawBlendMode(_d->_render, blend_prev);
+            SDL_SetRenderDrawBlendMode(_d->render, blend_prev);
         }
     }
 
-    SDL_SetRenderDrawBlendMode(_d->_render, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawBlendMode(_d->render, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderClipRect(_d->render, nullptr);
 }
 
 void render_2d::_prepare_texture(rtexture *rtex)
@@ -546,7 +519,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
         }
 
         // Always create a new texture
-        rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->_render, rtex->surf);
+        rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->render, rtex->surf);
         log::warn("[render_2d] texture created for 0x%08x: %dx%d", rtex->id(), rtex->width, rtex->height);
         // ...and register its cleanup on resource deletion
         rtex->on_delete = &_texture_cleanup;
@@ -569,31 +542,25 @@ void render_2d::_prepare_texture(rtexture *rtex)
 
 std::pair<glm::vec2, glm::vec2> render_2d::_get_viewport_bounds(const render_layer &l)
 {
-    // initialize with window dimensions
-    glm::vec2 tl {0.0, 0.0};
-    glm::vec2 br {static_cast<float>(_d->rwin.width()), static_cast<float>(_d->rwin.height())};
+    const auto &vp = l.viewport;
+    const glm::vec2 pos = {vp.x, vp.y};
+    const glm::vec2 dims = {vp.w, vp.h};
 
-    auto vp = _d->try_find_viewport(l.viewport);
-    if(vp)
-    {
-        // layer has a vaid viewport set, use that instead
-        tl = {vp->x, vp->y};
-        br = {vp->w, vp->h};
-    }
-
-    return std::make_pair(tl, br);
+   return std::make_pair(pos, dims);
 }
 
 
+// TODO move to nb::render namespace, generalize, drop service
+// TODO generalize camera behavior and math in a single place and use that,
+//      also for rendering
 entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
 {
-    // TODO move to render::picker2d, generalizedd
+    return entt::null;  // disabled for now
+    /*
     auto *sc = engine::instance().find_scene(layer.scene_id);
     if (!sc) { log::warn("[pick] no scene"); return entt::null; }
 
-    auto it = _d->_viewports.find(layer.viewport);
-    if (it == _d->_viewports.end()) { log::warn("[pick] viewport %u not found", layer.viewport); return entt::null; }
-    const auto &vp = it->second;
+    const auto &vp = layer.viewport;
 
     // Viewport-local → window → world
     const float win_x = vp_x + vp.x;
@@ -713,57 +680,48 @@ entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
     }
 
     log::info("[pick] result: %s (eid=%x)", best == entt::null ? "null" : "hit", entt::to_integral(best));
-    return best;
+    return best;*/
 }
 
 void render_2d::cam_2d_setup(float cx, float cy, float wmax, float hmax)
 {
-    _d->_fallback_spatial.pos = { cx, cy, 0.f };
-    _d->_fallback_camera.wmax = wmax;
-    _d->_fallback_camera.hmax = hmax;
-
-    float scale_x = _d->_wx / wmax;
-    float scale_y = _d->_wy / hmax;
-    _d->_fallback_camera.zoom = std::min(scale_x, scale_y);
-
-    log::verb("[render_2d] cam2d setup: cx=%f cy=%f wmax=%f hmax=%f => zoom=%f",
-        cx, cy, wmax, hmax, _d->_fallback_camera.zoom);
+    // TODO remove this dummy
 }
 
 float render_2d::cam_2d_scale()
 {
-    return _d->_fallback_camera.zoom;
+    return 1.0f; // TODO remove this dummy
 }
 
+// TODO we will get rid of this HACK mess in a bit
+//      again, taking a camera and a viewport should give out a world rect
 bool render_2d::get_2d_extents(renderer_service::extents_2d &extents)
 {
-    // Prefer the first configured render layer's camera
-    // TODO better control fo this mapping
     const auto &layers = engine::instance().render_layers();
     if(!layers.empty())
     {
         const auto &layer = layers.front();
         auto *sc = engine::instance().find_scene(layer.scene_id);
-        auto it  = _d->_viewports.find(layer.viewport);
-        if(sc && it != _d->_viewports.end())
+        if(sc)
         {
             auto &reg = sc->registry();
-            auto &vp  = it->second;
+            const auto &vp  = layer.viewport;
             float cx = 0.f, cy = 0.f, zoom = 1.f;
             if(layer.camera != entt::null)
             {
                 if(auto *sp  = reg.try_get<cspatial>(layer.camera)) { cx = sp->pos.x; cy = sp->pos.y; }
-                if(auto *cam = reg.try_get<ccamera>(layer.camera))  { zoom = cam->zoom; }
+                if(auto *cam = reg.try_get<ccamera>(layer.camera))  { zoom = cam->cam2d.scale; }
             }
             float span_x = vp.w / zoom;
             float span_y = vp.h / zoom;
 
             // on android, the ui style and font are scaled
             // but the internal imgui scale remains at 1.0
+            // this should never have happened
 #ifdef ANDROID
             static constexpr float ui_scale = 1.0f;
 #else
-            float ui_scale = _d->_scale;
+            float ui_scale = _d->ui_scale;
 #endif
             extents = { vp.w, vp.h, span_x, span_y,
                 cx - span_x * 0.5f, cy - span_y * 0.5f,
@@ -773,86 +731,13 @@ bool render_2d::get_2d_extents(renderer_service::extents_2d &extents)
         }
     }
 
-    // on android, the ui style and font are scaled
-    // but the internal imgui scale remains at 1.0
-#ifdef ANDROID
-    static constexpr float ui_scale = 1.0f;
-#else
-    float ui_scale = _d->_scale;
-#endif
-
-    // Fallback: use the default viewport's current rect.
-    auto dvp_it = _d->_viewports.find(_d->_default_vp);
-    int dvp_w = (dvp_it != _d->_viewports.end()) ? dvp_it->second.w : _d->_wx;
-    int dvp_h = (dvp_it != _d->_viewports.end()) ? dvp_it->second.h : _d->_wy;
-    float zoom   = _d->_fallback_camera.zoom > 0.f ? _d->_fallback_camera.zoom : 1.f;
-    float cx     = _d->_fallback_spatial.pos.x;
-    float cy     = _d->_fallback_spatial.pos.y;
-    float span_x = dvp_w / zoom;
-    float span_y = dvp_h / zoom;
-    int dvp_x = (dvp_it != _d->_viewports.end()) ? dvp_it->second.x : 0;
-    int dvp_y = (dvp_it != _d->_viewports.end()) ? dvp_it->second.y : 0;
-    extents = { dvp_w, dvp_h, span_x, span_y,
-        cx - span_x * 0.5f, cy - span_y * 0.5f,
-        cx + span_x * 0.5f, cy + span_y * 0.5f,
-        ui_scale, dvp_x, dvp_y };
-    return true;
+    return false;  // no layer, no extents
 }
 
-viewport_handle render_2d::create_viewport(int x, int y, int w, int h,
-                                               bool clear, float r, float g, float b, float a)
-{
-    viewport_handle handle = _d->_next_vp_handle++;
-    _d->_viewports[handle] = { x, y, w, h, clear, r, g, b, a };
-    log::info("[render_2d] viewport %u created: %dx%d@%d,%d", handle, w, h, x, y);
-    return handle;
-}
-
-void render_2d::update_viewport(viewport_handle vp, int x, int y, int w, int h)
-{
-    auto it = _d->_viewports.find(vp);
-    if(it == _d->_viewports.end()) return;
-    it->second.x = x; it->second.y = y;
-    it->second.w = w; it->second.h = h;
-
-    if(vp == _d->_default_vp)
-    {
-        _d->_default_vp_owned = true;
-        // Recompute zoom to fit the new viewport dimensions.
-        if(_d->_fallback_camera.wmax > 0.f && w > 0 && h > 0)
-        {
-            _d->_fallback_camera.zoom = std::min(
-                float(w) / _d->_fallback_camera.wmax,
-                float(h) / _d->_fallback_camera.hmax);
-        }
-    }
-}
-
-void render_2d::destroy_viewport(viewport_handle vp)
-{
-    _d->_viewports.erase(vp);
-}
-
-viewport_handle render_2d::default_viewport() const
-{
-    return _d->_default_vp;
-}
-
-void render_2d::reset_default_viewport()
-{
-    _d->_default_vp_owned = false;
-    if(_d->_default_vp != VIEWPORT_INVALID)
-        update_viewport(_d->_default_vp, 0, 0, _d->_wx, _d->_wy);
-
-    // Recompute camera for the full window.
-    if(_d->_fallback_camera.wmax > 0.f)
-        cam_2d_setup(_d->_fallback_spatial.pos.x, _d->_fallback_spatial.pos.y,
-                     _d->_fallback_camera.wmax, _d->_fallback_camera.hmax);
-}
 
 renderer_service::texture_handle render_2d::create_texture(int w, int h)
 {
-    auto ret = SDL_CreateTexture(_d->_render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
+    auto ret = SDL_CreateTexture(_d->render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
     SDL_SetTextureScaleMode(ret, _d->default_tex_scalemode);
     return ret;
 }
@@ -868,19 +753,10 @@ void render_2d::destroy_texture(texture_handle tex)
     SDL_DestroyTexture(static_cast<SDL_Texture*>(tex));
 }
 
-void render_2d::set_clear_color(float r, float g, float b)
-{
-    _d->_clear_r = r; _d->_clear_g = g; _d->_clear_b = b;
-}
 
-void render_2d::on_scene_change()
-{
-    _d->_clear_r = _d->_clear_g = _d->_clear_b = 0.f;
-}
-
-int   render_2d::window_width()  const { return _d->_wx; }
-int   render_2d::window_height() const { return _d->_wy; }
-float render_2d::display_scale() const { return _d->_scale; }
+int   render_2d::window_width()  const { return _d->wx; }
+int   render_2d::window_height() const { return _d->wy; }
+float render_2d::display_scale() const { return _d->ui_scale; }
 
 
 void _texture_cleanup(rtexture &tex, void*)
@@ -967,10 +843,6 @@ extern "C" void _rtti_init_render_2d()
         .custom<rtti::func_info>(rtti::func_info{"window_width"})
         .func<&nb::render_2d::window_height>("window_height"_hs)
         .custom<rtti::func_info>(rtti::func_info{"window_height"})
-        .func<&nb::render_2d::set_clear_color>("set_clear_color"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"set_clear_color"})
-        .func<&nb::render_2d::default_viewport>("default_viewport"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"default_viewport"})
         .func<&nb::render_2d::display_scale>("display_scale"_hs)
         .custom<rtti::func_info>(rtti::func_info{"display_scale"});
     entt::meta_factory<std::shared_ptr<nb::render_2d>>{rtti::ctx_systems()}

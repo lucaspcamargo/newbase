@@ -6,6 +6,9 @@
 
 namespace nb {
 
+/**
+ * Used with SDL's enumeration function pattern
+ */
 inline std::vector<std::string> get_all_strings(std::function<int(void)> countfn, std::function<const char*(int)> getfn)
 {
     const int count = countfn();
@@ -27,3 +30,4 @@ inline std::string join_strings(const std::vector<std::string> &in, char sep)
 }
 
 }
+

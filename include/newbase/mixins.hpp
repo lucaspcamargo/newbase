@@ -2,6 +2,10 @@
 
 namespace nb {
 
+/**
+ * Utility class "mixin" that disables copy and assignment
+ * Move operations are still allowed
+ */
 struct nocopy {
 protected:
     ~nocopy() = default;

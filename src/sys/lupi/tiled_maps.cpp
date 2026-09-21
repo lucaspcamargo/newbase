@@ -8,7 +8,8 @@
 #include <string>
 #include <vector>
 
-using namespace nb;
+using namespace ::nb;
+using namespace ::nb::lupi;
 
 // ---------------------------------------------------------------------------
 // Reimplements lupi-codec's tiled_codec.lua/tiled_processor.lua/tiled_generator.lua
@@ -262,9 +263,10 @@ void push_compiled_map(lua_State* L, const compiled_map& m)
     // M left on top of the stack for the caller.
 }
 
-}
+} // END of anon namespace
 
-void nb::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
+
+void nb::lupi::lupi_compile_cart_maps(lua_State* L, lupi_p& p)
 {
     lua_newtable(L); // the "lupi_maps" registry table: "<dotted.module.path>" -> compiled table
     int n = 0;

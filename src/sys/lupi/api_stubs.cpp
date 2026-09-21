@@ -24,7 +24,7 @@ static int l_print_override(lua_State* L)
     return 0;
 }
 
-void nb::lupi_register_print(lua_State* L)
+void nb::lupi::lupi_register_print(lua_State* L)
 {
     lua_pushcfunction(L, l_print_override);
     lua_setglobal(L, "print");
@@ -57,7 +57,7 @@ static int l_text_stub(lua_State* L)   { lua_newtable(L); return 1; }
 static int l_image_stub(lua_State* L)  { lua_newtable(L); return 1; }
 static int l_custom_stub(lua_State* L) { lua_newtable(L); return 1; }
 
-void nb::lupi_register_stubs(lua_State* L)
+void nb::lupi::lupi_register_stubs(lua_State* L)
 {
     lua_newtable(L);
     luaL_setfuncs(L, k_sfx_funcs, 0);

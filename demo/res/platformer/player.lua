@@ -233,10 +233,11 @@ local update_handle = clock_update_add(function(delta)
     physics2d_character_set_velocity(eid, vec2.new(vx, vy))
 
     -- Camera follow, clamped so the viewport never shows outside the map
-    local _rs = svc_renderer_service()
-    local _rw = _rs and _rs:window_width()  or VIEW_W
-    local _rh = _rs and _rs:window_height() or VIEW_H
-    local zoom = math.min(_rw / VIEW_W, _rh / VIEW_H)
+    local _rl = engine:render_layer_get(0)
+    local _vp = _rl.viewport
+    local _rw = _vp.w
+    local _rh = _vp.h
+    local zoom = _rh / VIEW_H  -- always go bby height in this demo
     local half_w = _rw * 0.5 / zoom
     local half_h = _rh * 0.5 / zoom
     local cam_x = math.max(half_w, math.min(MAP_W - half_w, sp.pos.x))

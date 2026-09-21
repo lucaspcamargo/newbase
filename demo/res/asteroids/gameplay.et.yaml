@@ -1,5 +1,14 @@
 - name: stage
   comps:
     script:
-      lua: "res/asteroids/stage.lua"
-
+      lua: "res/asteroids/gameplay.lua"
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      2d:
+        fit_mode: 1
+        fit_dims: [1920, 1920]

@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-namespace nb {
+namespace nb::lupi {
 
 // A decoded, auto-palettized spritesheet. Not an nb::resource: its pixel
 // indices are only meaningful against the specific cart's lupi_palette that

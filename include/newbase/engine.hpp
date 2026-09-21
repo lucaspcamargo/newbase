@@ -50,14 +50,15 @@ public:
     void add_render_layer(const render_layer &layer);
     void remove_render_layer(int order);
     void clear_render_layers();
+    render_layer& render_layer_get(int order);
 
     // render layer overrides (C++ only; when non-empty, replaces the game layers)
     void set_override_render_layers(std::vector<render_layer> layers);
     void clear_override_render_layers();
     bool has_override_render_layers() const;
 
-    // returns override layers if set, otherwise game layers
-    const std::vector<render_layer>& render_layers() const;
+    // returns reference to active layer set. override layers if set, otherwise game layers
+    std::vector<render_layer>& render_layers();
 
     void request_exit();
     void set_paused(bool paused);

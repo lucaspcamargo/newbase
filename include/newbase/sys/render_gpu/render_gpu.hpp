@@ -31,7 +31,6 @@ public:
     int   window_height() const override { return _wy; }
     float display_scale() const override { return _scale; }
     void  cam_2d_setup(float cx, float cy, float wmax, float hmax) override;
-    void  set_clear_color(float r, float g, float b) override;
 
     // picker_service
     entt::entity pick(const render_layer& layer, float vp_x, float vp_y) override;
@@ -39,14 +38,6 @@ public:
     // renderer_service
     bool get_2d_extents(renderer_service::extents_2d& extents) override;
 
-    viewport_handle default_viewport() const override { return _default_vp; }
-    void reset_default_viewport() override;
-    viewport_handle create_viewport(int x, int y, int w, int h,
-                                    bool clear = true,
-                                    float r = 0.f, float g = 0.f,
-                                    float b = 0.f, float a = 1.f) override;
-    void update_viewport(viewport_handle vp, int x, int y, int w, int h) override;
-    void destroy_viewport(viewport_handle vp) override;
 
     texture_handle create_texture(int w, int h) override;
     void update_texture(texture_handle tex, const void* pixels, int pitch) override;

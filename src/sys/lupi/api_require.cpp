@@ -16,7 +16,7 @@ using namespace nb;
 // through package.path/preload — see lupi_internal.hpp for the rationale.
 // ---------------------------------------------------------------------------
 
-namespace {
+namespace nb::lupi {
 
 // Loads and runs cart_dir/<name>.lua as a plain chunk (side-effect style —
 // every real sibling module here defines globals, none `return`s a value).
@@ -92,7 +92,7 @@ int l_require(lua_State* L)
 
 }
 
-void nb::lupi_register_require(lua_State* L, lupi_p& p)
+void nb::lupi::lupi_register_require(lua_State* L, lupi_p& p)
 {
     lua_pushlightuserdata(L, &p);
     lua_pushcclosure(L, l_require, 1);

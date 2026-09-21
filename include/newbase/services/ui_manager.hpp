@@ -33,10 +33,13 @@ namespace nb
         // Returns the ImGuiID of the root dockspace, or 0 if not available.
         virtual unsigned int dockspace_id() const { return 0; }
 
+        // Tool winddow management
         virtual void register_tool_window(const char* name, std::function<void(bool*)> draw_fn) = 0;
         virtual void unregister_tool_window(const char* name) = 0;
-
         virtual bool toggle_tool_window(const char *name) = 0;
+
+        // Viewport management
+        virtual void update_viewports() = 0;
 
         // Resource editor integration.
         // A system that can display a resource editor (e.g. the editor system) registers a

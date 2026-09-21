@@ -2,8 +2,22 @@
 
 physics2d_set_gravity(vec2.new(0.0, 0.0))
 
-local _rs = svc_renderer_service()
-if _rs then _rs:cam_2d_setup(0, 0, 1920, 1080) end
+-- setup render layer
+local cam_eid = entity_find("camera")
+if cam_eid then
+    engine:clear_render_layers()
+    local cam = get_camera(cam_eid)
+    _G.CAMERA_EID = cam_eid
+    local rl      = render_layer.new()
+    rl.order      = 0
+    rl.camera     = cam_eid
+    rl.follow_ui  = true
+    rl.clear      = true
+    rl.clear_r    = 0
+    rl.clear_g    = 0
+    rl.clear_b    = 0
+    engine:add_render_layer(rl)
+    end
 
 if sys_audio then
     audio_bgm_play(hs("res/asteroids/bgm/ObservingTheStar/ObservingTheStar.ogg"))
@@ -155,18 +169,17 @@ local ramp_target     = 1.0   -- where we're headed
 local BG_NORMAL = {0.0,  0.0,  0.0}
 local BG_SLOW   = {0.02, 0.06, 0.18}
 
-local function apply_scale(s)
+local function apply_time_scale(s)
     ramp_current = s
     clock_set_time_scale(s)
     if sys_audio then audio_set_global_pitch(s) end
     -- lerp background colour: t=0 at normal speed, t=1 at full slowdown
     local t = (1.0 - s) / (1.0 - SLOWTIME_SCALE)
     t = math.max(0.0, math.min(1.0, t))
-    local r = BG_NORMAL[1] + (BG_SLOW[1] - BG_NORMAL[1]) * t
-    local g = BG_NORMAL[2] + (BG_SLOW[2] - BG_NORMAL[2]) * t
-    local b = BG_NORMAL[3] + (BG_SLOW[3] - BG_NORMAL[3]) * t
-    local _rs = svc_renderer_service()
-    if _rs then _rs:set_clear_color(r, g, b) end
+    local rl = engine:render_layer_get(0)
+    rl.clear_r = BG_NORMAL[1] + (BG_SLOW[1] - BG_NORMAL[1]) * t
+    rl.clear_g = BG_NORMAL[2] + (BG_SLOW[2] - BG_NORMAL[2]) * t
+    rl.clear_b = BG_NORMAL[3] + (BG_SLOW[3] - BG_NORMAL[3]) * t
 end
 
 local h_slowtime = clock_update_add_monotonic(function(real_dt)
@@ -178,7 +191,7 @@ local h_slowtime = clock_update_add_monotonic(function(real_dt)
         if (dir > 0 and next >= ramp_target) or (dir < 0 and next <= ramp_target) then
             next = ramp_target
         end
-        apply_scale(next)
+        apply_time_scale(next)
     end
 
     -- countdown
@@ -342,5 +355,5 @@ script_on_destroy(function()
     clock_update_remove(h_contacts)
     clock_update_remove(h_dead_timer)
     clock_update_remove(h_slowtime)
-    apply_scale(1.0)
+    apply_time_scale(1.0)
 end)

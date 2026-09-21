@@ -3,7 +3,7 @@
 #include <newbase/res/resource.hpp>
 #include <string>
 
-namespace nb {
+namespace nb::lupi {
 
 // A Lupi "cart": a resource directory containing a real Lupi `lupi.yaml`
 // manifest (name/version/developer/public — cosmetic metadata only, parsed

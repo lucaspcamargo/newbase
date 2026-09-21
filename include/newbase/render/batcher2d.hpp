@@ -19,8 +19,7 @@
     The command stream describes the draw calls to be issued by the renderer.
     Each command provides spans of the index buffer to use, and the base vertex index.
 
-    In the future, we should have our own ImGui backend that uses this directly,
-    mostly for reducing duplicate code and to stop using the sample backend code.
+    Also used by our custom ImGui backend. So all our 2D rendering goes through here.
 */
 
 
@@ -95,7 +94,7 @@ namespace nb::render {
         uint32_t vtx_count {0};
         int32_t texture {-1};
         blendmode blend {blendmode::NONE};
-        void *clip;
+        clip_t clip {CLIP_NONE};
     };
 
     /**
@@ -123,7 +122,7 @@ namespace nb::render {
          * Other optimizations may be implemented in the future.
          */
         void add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
-                      std::shared_ptr<rtexture> tex = nullptr, blendmode blend = blendmode::NONE, void *clip = nullptr);
+                      std::shared_ptr<rtexture> tex = nullptr, blendmode blend = blendmode::NONE, clip_t clip = CLIP_NONE);
 
         /// const ref getter for draw data
         const data2d & data() const { return m_data; }

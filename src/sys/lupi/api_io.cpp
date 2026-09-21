@@ -6,8 +6,9 @@
 #include <vector>
 
 using namespace nb;
+using namespace lupi;
 
-namespace {
+namespace nb::lupi{
 
 struct lupi_file {
     std::string contents;
@@ -139,7 +140,7 @@ int io_open(lua_State* L)
 
 }
 
-void nb::lupi_register_io(lua_State* L, lupi_p& p)
+void nb::lupi::lupi_register_io(lua_State* L, lupi_p& p)
 {
     if (luaL_newmetatable(L, "lupi.file")) {
         lua_pushcfunction(L, file_gc);

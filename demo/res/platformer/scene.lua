@@ -9,35 +9,24 @@ physics2d_reset_gravity()
 -- Play bgm, looped
 audio_bgm_play(hs("res/platformer/bgm/Grasslands Theme.ogg"))
 
--- Spawn world camera and register world render layer
-local CAMERA_ETREE = hs("res/platformer/camera.et.yaml")
-local _res_camera  = res_get_etree(CAMERA_ETREE)
-local cam_eid      = entity_spawn(CAMERA_ETREE)
+-- Find world camera and register world render layer
+local cam_eid = entity_find("camera")
 if cam_eid then
     local cam = get_camera(cam_eid)
-    if cam then
-        local _rs = svc_renderer_service()
-        cam.zoom = _rs and math.min(_rs:window_width()  / 1920,
-                                    _rs:window_height() / 1080) or 1
-    end
-    local sp = get_spatial(cam_eid)
-    if sp then
-        sp.pos = vec3.new(MAP_W * 0.5, MAP_H * 0.5, 0)
-        sp:apply()
-    end
     _G.CAMERA_EID = cam_eid
     engine:clear_render_layers()
     local rl      = render_layer.new()
     rl.order      = 0
     rl.layer_mask = 0x1   -- world layer
     rl.camera     = cam_eid
-    rl.viewport   = svc_renderer_service():default_viewport()
-    rl.clear_bg   = true
+    rl.follow_ui  = true
+    rl.clear      = true
     rl.clear_r    = 0.82
     rl.clear_g    = 0.96
     rl.clear_b    = 0.97
     engine:add_render_layer(rl)
 end
+
 
 -- Spawn HUD (camera + script, defined in one etree)
 local HUD_ETREE = hs("res/platformer/hud.et.yaml")
@@ -45,19 +34,13 @@ local _res_hud  = res_get_etree(HUD_ETREE)
 entity_spawn(HUD_ETREE)
 local hud_cam_eid = entity_find("hud_camera")
 if hud_cam_eid then
-    local sp = get_spatial(hud_cam_eid)
-    if sp then
-        local _rs = svc_renderer_service()
-        sp.pos = vec3.new(_rs and _rs:window_width() * 0.5 or 0, _rs and _rs:window_height() * 0.5 or 0, 0)
-        sp:apply()
-    end
     _G.HUD_CAMERA_EID = hud_cam_eid
     local rl      = render_layer.new()
     rl.order      = 1
     rl.layer_mask = 0x2   -- HUD layer
     rl.camera     = hud_cam_eid
-    rl.viewport   = svc_renderer_service():default_viewport()
-    rl.clear_bg   = false
+    rl.follow_ui  = true
+    rl.clear      = false
     engine:add_render_layer(rl)
 end
 

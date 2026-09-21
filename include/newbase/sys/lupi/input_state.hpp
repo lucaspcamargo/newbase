@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-namespace nb {
+namespace nb::lupi {
 
 static constexpr int LUPI_BUTTON_COUNT = 16; // ids 0-15 (LEFT..BTN_E; 6-11 reserved/unbound)
 static constexpr int LUPI_MAX_PLAYERS  = 3;  // only player 0 is bound to real keys in this MVP

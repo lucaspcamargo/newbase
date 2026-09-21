@@ -25,6 +25,8 @@ namespace nb
         void draw_tool_windows() override;
         void draw_perf() override;
 
+        void update_viewports() override;
+
         bool toggle_tool_window(const char *name) override;
         unsigned int dockspace_id() const override;
 

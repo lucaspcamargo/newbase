@@ -13,3 +13,14 @@
       res: "res/hello_world/sprite.sprite"
     script:
       lua: "res/hello_world/sprite.lua"
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      2d:
+        fit_mode: 1
+        fit_dims: [1080, 1080]

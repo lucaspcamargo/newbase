@@ -1,5 +1,7 @@
 #include <cstdint>
 #include <newbase/render/batcher2d.hpp>
+#include <newbase/sdl/rect_ops.hpp>
+
 
 using namespace nb;
 
@@ -15,7 +17,7 @@ void render::batcher2d::clear()
 }
 
 void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
-              std::shared_ptr<rtexture> tex, blendmode blend, void *clip)
+              std::shared_ptr<rtexture> tex, blendmode blend, clip_t clip)
 {
     // nothing to render?
     if (!vcount or !icount)

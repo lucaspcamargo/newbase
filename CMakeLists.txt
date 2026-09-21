@@ -191,7 +191,7 @@ add_subdirectory(src/sys/input)
 add_subdirectory(src/sys/particle_system)
 add_subdirectory(src/sys/physics2d)
 add_subdirectory(src/sys/render_2d)
-add_subdirectory(src/sys/render_gpu)
+# add_subdirectory(src/sys/render_gpu)  -- disabled until layer/vp rework is done
 add_subdirectory(src/sys/script_lua)
 add_subdirectory(src/sys/sensors)
 add_subdirectory(src/sys/sgdk)
@@ -286,3 +286,7 @@ set_target_properties(newbase PROPERTIES ALL_SYSTEMS "${NEWBASE_ALL_SYSTEMS}")
 export(TARGETS newbase ${export_targets} NAMESPACE nb:: FILE newbase-export.cmake )
 endif() # NOT NEWBASE_WII
 
+#-------
+# DOCS
+# With the entire project conigured, we can add an optional "doc" tagret to run doxygen on it
+include(cmake/NewbaseDoxygen.cmake)
