@@ -1,6 +1,9 @@
 #pragma once
 
-#include <cstdint>
+#include <newbase/render/types.hpp>
+#include <newbase/res/texture.hpp>
+#include <newbase/utility/glm.hpp>
+
 
 namespace nb
 {
@@ -11,10 +14,6 @@ namespace nb
 class renderer_service
 {
 public:
-    // Opaque handle to a renderer-managed texture. The concrete type is
-    // backend-specific; callers must not assume anything about its value.
-    // It is also a valid ImTextureID (cast is safe on all supported backends).
-    using texture_handle = void*;
 
     virtual ~renderer_service() = default;
 
@@ -22,7 +21,12 @@ public:
     virtual int   window_height() const { return 0; }
     virtual float display_scale() const { return 1.f; }  // TODO rename to ui_scale, add event_scale
 
-    // --- texture management ---
+    // --- UI texture helpers ---
+
+    // Opaque handle to a renderer-managed texture. The concrete type is
+    // backend-specific; callers must not assume anything about its value.
+    // It is also a valid ImTextureID (cast is safe on all supported backends).
+    using texture_handle = void*;
 
     // Create an updatable (streaming) RGBA texture of the given pixel dimensions.
     // The caller owns the handle and must call destroy_texture when done.
@@ -34,6 +38,21 @@ public:
 
     // Free a texture previously created with create_texture.
     virtual void destroy_texture(texture_handle tex) = 0;
+
+
+    // --- Render Target Management ---
+    // This interface uses handles to create, destroy and represent render targets.
+    // They are internally managed by the renderer.
+    // NOTE: it may be better to use render::target_ref to create and manage
+    //       the target, usually within a shared_ptr
+
+    virtual render::target_id_t target_create(const render::target_desc& desc) = 0;
+    virtual void target_destroy(render::target_id_t id) = 0;
+    virtual std::shared_ptr<rtexture> target_get_color_texture(render::target_id_t id) const = 0;
+    virtual std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const = 0;
+    virtual glm::ivec2     target_get_size(render::target_id_t id) const = 0;
+    virtual bool           target_has_depth(render::target_id_t id) const = 0;
+
 };
 
 } // namespace nb

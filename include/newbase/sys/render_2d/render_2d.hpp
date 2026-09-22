@@ -42,15 +42,24 @@ public:
     void update_texture(texture_handle tex, const void* pixels, int pitch) override;
     void destroy_texture(texture_handle tex) override;
 
+    // RTT target management interface
+    // prefer to use these via render::target_ref
+    render::target_id_t target_create(const render::target_desc& desc) override;
+    void target_destroy(render::target_id_t id) override;
+    std::shared_ptr<rtexture> target_get_color_texture(render::target_id_t id) const override;
+    std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const override;
+    glm::ivec2     target_get_size(render::target_id_t id) const override;
+    bool           target_has_depth(render::target_id_t id) const override;
+
 private:
     // tries to ensure a texture is ready for rendering, uploading it
-    // if possible. for internal use, so raw pointer is ok
+    // if possible. for internal use, so raw pointer is fine
     void _prepare_texture(rtexture *tex);
 
-    // draws a scene using the given layer's masking, and the given viewprojection matrix
+    // draws a scene using the given layer's masking, and the given VP matrix
     // uses batcher2d and collect2d to do it
-    // SDL_Renderer does not use NDC, so viewproj must map to render target pixel coordinates
-    // caller is responsble for viewport clearing and clipping setup
+    // SDL_Renderer does not use NDC, so viewproj must map to target pixel coords
+    // will draw batches with viewport as the main clip
     void _draw_scene(scene &scn, const glm::mat4x4 &viewproj, const render_layer &l);
 
     // draws the current contents of the geometry batcher

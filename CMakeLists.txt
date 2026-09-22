@@ -107,7 +107,7 @@ add_library(newbase STATIC
     src/scene.cpp
     src/system_factory.cpp
 
-    # components
+    # ECS components
     src/components/body2d_rtti.cpp
     src/components/builders.cpp
     src/components/camera_rtti.cpp
@@ -122,6 +122,9 @@ add_library(newbase STATIC
     src/components/textext_rtti.cpp
     src/components/tilemap_rtti.cpp
 
+    # geometry handling
+    src/geom/picker2d.cpp
+
     # graphplan
     src/graphplan/domain.cpp
     src/graphplan/editor.cpp
@@ -135,7 +138,6 @@ add_library(newbase STATIC
     src/render/batcher2d.cpp
     src/render/camera.cpp
     src/render/collector2d.cpp
-    src/render/pick2d.cpp
     src/render/window.cpp
 
     # resource system

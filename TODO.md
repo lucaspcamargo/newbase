@@ -1,12 +1,15 @@
 # TODO
 
-The things that are still meant to be done. Some have 
+The tasks that are still meant to be done. Some have dependencies or subtasks.
+
+This is a living document.
 
 - Core
     + [ ] MULTISCENE. This will be a big refactor.
     + [ ] RTTI, scene: generalized serialization and deserialization system (yaml/meta_any gets close)
     + [ ] RTTI: enums support
-    + [ ] Use entt's new support for names associated with members and functions, reducing usage of custom data.
+    + [ ] Port to entt v4. Quite a bit of work, especially in script_lua. REQUIRES C++20.
+        + [ ] Use entt's new support for names associated with members and functions, reducing usage of custom data.
     + [ ] Move system-specific resources and components out of engine core
     + [X] Decouple rtexture from SDL_Texture. Texture specialization is a renderer task.
     + [ ] Ship standard "engine intro" scene in core resources
@@ -31,13 +34,16 @@ The things that are still meant to be done. Some have
         * [X] Specify and implement clipping behavior
         * [ ] Validate (and fix?) DPI handling on all platforms
     + [X] Clipping on render_2d (and ImGui)
-    + [~] Cleanup render layer and viewport semantics, and create spec - see below section
-    * [ ] Basic render-to-texture with render layers
+    + [X] Cleanup render layer and viewport semantics, and create spec - see below section
+    * [~] Basic render-to-texture with render layers - WIP, see below
     + [X] Don't leak SDL_Texture on resource cleanup.
+    + [ ] Impove UI overlay interface and semantics - see below
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
+    + [ ] Elementary 3D rendering with render_gpu
+        * [ ] Do some research and come up with MVP requirements
     + [ ] Shader system
         * [ ] Optional shader support in render_2d depending on backend
-        * [ ] Shader support in render_gpu for 2d
+        * [ ] Shader support in render_gpu for 2d too
     + [ ] Materials system + shader derivation
     + [ ] "Classic" fixed-function-like materials system
     + [ ] PBR material system
@@ -93,6 +99,25 @@ The things that are still meant to be done. Some have
     + [X] helpers to get camera_2d world bounds according to cam data and viewport
     + [X] update camera component and builder to contain new structure (2d and 3d data side by side is fine)
 - [X] Remove fallback camera and viewport path from render_2d
-- [~] Remove get_2d_extents and cam_2d_setup from renderer_service too
+- [X] Remove get_2d_extents and cam_2d_setup from renderer_service too
+  
+
+## Scope: Render-To-Texture (RTT)
+
+- [X] Define main interfaces
+- [ ] Implement render_2d internal structures
+- [ ] Implement target and viewport sizing mechanism
+- [ ] Implement rendering proper
+- [ ] Figure out exposure to RTTI (and script) system
+- [ ] create simple demo
+  
+## Scope: UI Overlays
+    
 - [ ] Refine overlay API
+        Right now, overlay callback takes no arguments and provides no context.
+        That's fine but in case of, for example, physics overlay, it may have no
+        idea of what camera to use. Perhaps tie overllay renndering to render layers.
+        We could have a bool flag has_overlays and make ui_manager traverse it, 
+        perhaps? Providing a render_layer should give the overlay enough context.
+        If/when RTT is being used is another story in this scenario.
 - [ ] Update UI overlay callback signature and code

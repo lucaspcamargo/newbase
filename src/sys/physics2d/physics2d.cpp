@@ -115,7 +115,7 @@ public:
 
         /* TODO - do it with ui viewport and camera data
          * Which camera? Good question.
-         *
+         * Need to tie overlays with render layers.
         const float cx = (extents.right + extents.left) / 2.0f;
         const float cy = (extents.top + extents.bottom) / 2.0f;
         const float sx = extents.width / extents.xspan;
