@@ -1,4 +1,0 @@
-- name: root
-  comps:
-    script:
-      lua: "res/hello_world/scene.lua"
