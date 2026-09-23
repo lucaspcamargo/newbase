@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 #include <SDL3/SDL.h>
 #include <ryml.hpp>
 #include <entt/entt.hpp>

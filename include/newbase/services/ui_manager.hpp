@@ -42,8 +42,8 @@ namespace nb
         virtual bool toggle_tool_window(const char *name) = 0;
 
         // Viewport management
-        virtual void update_viewports() = 0;
-        virtual glm::vec4 central_viewport(bool pixel_coords = false) = 0;
+        virtual glm::ivec4 update_viewports() = 0;  // returns central ui viewport in pixel coords
+        virtual glm::vec4 central_viewport(bool pixel_coords = false) = 0; // return in ui coords by default
 
         // Resource editor integration.
         // A system that can display a resource editor (e.g. the editor system) registers a

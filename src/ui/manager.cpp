@@ -39,7 +39,7 @@ struct nb::ui_manager_p
     std::vector<std::pair<std::string, ui_manager::overlay_fn>> overlays;
 
     glm::vec4 viewport_gui {0.0f};
-    glm::vec4 viewport_px {0.0f};
+    glm::ivec4 viewport_px {0};
 };
 
 
@@ -171,10 +171,11 @@ void ui_manager_simple::draw_tool_windows()
     }
 }
 
-void ui_manager_simple::update_viewports()
+glm::ivec4 ui_manager_simple::update_viewports()
 {
     // Updates the viewports that have follow_ui = true
     // this is done for the currently active layer set
+    // returns central viewport in integer pixel coordinates
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
@@ -205,12 +206,14 @@ void ui_manager_simple::update_viewports()
             l.viewport = ui_vp;
         }
     }
+
+    return _d->viewport_px;
 }
 
 
 glm::vec4 ui_manager_simple::central_viewport(bool pixel_coords)
 {
-    return pixel_coords? _d->viewport_px : _d->viewport_gui;
+    return pixel_coords? glm::vec4{_d->viewport_px} : _d->viewport_gui;
 }
 
 bool ui_manager_simple::toggle_tool_window(const char *name)

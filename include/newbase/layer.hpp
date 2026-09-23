@@ -8,10 +8,12 @@
 
 namespace nb {
 
-/// A render_layer describes one rendering "pass", that draws a scene
+/// A render_layer describes one rendering "operation", that draws a scene
 /// (or optionally, custom 2d geometry) into a render target. Common
 /// rendering properties such as clearing, the camera to use, and
 /// render order are also described here.
+///
+/// TODO: move to render namespace?
 
 struct render_layer
 {

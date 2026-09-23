@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/layer.hpp>
 #include <entt/core/ident.hpp>

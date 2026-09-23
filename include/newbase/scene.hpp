@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 #include <entt/fwd.hpp>
 #include <entt/entity/entity.hpp>
 

@@ -7,6 +7,9 @@
 #include <newbase/components/structure.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
+#include "SDL3/SDL_error.h"
+#include "SDL3/SDL_properties.h"
+#include "entt/core/fwd.hpp"
 #include "newbase/geom/picker2d.hpp"
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
@@ -20,18 +23,21 @@
 #include <newbase/res/manager.hpp>
 #include <newbase/ui/imgui_nb.hpp>
 #include <newbase/utility/glm.hpp>
+#include <newbase/utility/topological_sort.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/sdl/utils.hpp>
 #include <newbase/log.hpp>
 
 #include "./rtt_private.hpp"
 
+#include "SDL3/SDL_pixels.h"
 #include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_surface.h"
 #include "SDL3/SDL_video.h"
 #include "glm/fwd.hpp"
 #include <entt/entt.hpp>
+#include <entt/graph/flow.hpp>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 #include <tracy/Tracy.hpp>
@@ -39,6 +45,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 
 
 using namespace nb;
@@ -47,11 +54,17 @@ using entt::operator""_hs;
 
 struct nb::render_2d_p
 {
+    // window and some data we want to keep handy
     render::window rwin;
-    SDL_Renderer  *render {nullptr};
     int            wx {0}, wy {0};
     float          ui_scale {1.0};
+    glm::ivec4     ui_vp {0};
     SDL_Rect       safe_area {};
+
+    // renderer and some properties we want to keep at hand
+    SDL_Renderer  *render {nullptr};
+    SDL_PropertiesID r_props;
+    int r_prop_tex_max_sz {0};
 
     bool has_ui {false};
     imgui_nb imgui;
@@ -60,6 +73,10 @@ struct nb::render_2d_p
     render::collector2d collector;
 
     std::unordered_map<render::target_id_t, render_2d_target> targets;
+    util::topological_sorter rt_resize_sorter;
+    bool rt_resize_order_dirty {false};  // new rts were added or removed, reorder
+    bool rt_sizes_dirty {true}; // sizes have changed, even if order remains
+    render::target_id_t rt_next_id {render::TARGET_DEFAULT + 1};
 
     geom::picker_2d picker;
 
@@ -146,7 +163,7 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
     log::info("[render_2d] current driver: %s", SDL_GetCurrentVideoDriver());
     
 
-    if (cfg.has_child("dump_backkends"))
+    if (cfg.has_child("dump_backends"))
     {
         bool dump;
         cfg["dump_backends"] >> dump;
@@ -185,7 +202,12 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
         return false;
     }
     else
+    {
         log::info("[render_2d] created renderer: %s", SDL_GetRendererName(_d->render));
+        _d->r_props = SDL_GetRendererProperties(_d->render);
+        _d->r_prop_tex_max_sz = (int)SDL_GetNumberProperty(_d->r_props,
+                                SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+    }
 
     _d->rwin.center();
 
@@ -264,7 +286,7 @@ bool render_2d::step(nb::step_phase phase)
         if(_d->has_ui)
         {
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
-            ui_mgr->update_viewports();
+            _d->ui_vp = ui_mgr->update_viewports();
             _d->imgui.render_flush();
         }
     }
@@ -283,6 +305,10 @@ bool render_2d::step(nb::step_phase phase)
             SDL_SetTextureScaleMode(sdltex, SDL_SCALEMODE_LINEAR);
             SDL_RenderTexture(_d->render, static_cast<SDL_Texture*>(_d->smpte->rptr), NULL, NULL);
         }
+
+        // update render target sizing calculations if needed
+        if(_d->rt_sizes_dirty)
+            _targets_resize();
 
         //now render all layers
         for(const auto &layer : layers)
@@ -378,6 +404,12 @@ bool render_2d::event( SDL_Event * evt)
         _d->wy = _d->rwin.height();
         _d->ui_scale = _d->rwin.ui_scale();
         _d->safe_area = _d->rwin.safe_area();
+        if(!_d->has_ui)
+        {
+            // if we have no UI, do this here
+            _d->ui_vp = {0, 0, _d->wx, _d->wy};
+            // otherwise, this will get done in PRE_RENDER phase from ui info
+        }
     }
 
     // TODO move somewhere else?
@@ -513,7 +545,62 @@ void render_2d::_prepare_texture(rtexture *rtex)
 
     auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
 
-    // if we need to do an upload
+    if(rtex->rtarget)
+    {
+        // this texture is a render target
+
+        bool destroy {false};
+        bool create {false};
+
+        // validate basic requested size
+        if(rtex->width == 0 || rtex->height == 0)
+        {
+            log::warn("[render_2d] preparing rt texture for 0x%08x: zero size!", rtex->id());
+                // a render target of size zero should not exist
+                // still, if it had a valid texture before, we will destroy it
+            destroy = true;
+        }
+        else if(sdltex && sdltex->w == rtex->width && sdltex->h == rtex->height)
+        {
+            // target texture exists and size matches, nothing to do
+            return;
+        }
+        else if(!sdltex)
+        {
+            // there is no texture, create one
+            create = true;
+        }
+        else
+        {
+            // texture exists but size does not match, recreate
+            destroy = true;
+            create = true;
+        }
+
+        if(destroy && sdltex)
+        {
+            SDL_DestroyTexture(sdltex);
+            rtex->rptr = sdltex = nullptr;
+        }
+
+        if(create && !sdltex)
+        {
+            // since we only support color formats, let the renderer pick an optimal RGBA format
+            // for that, we don't need to pass any format
+            auto props = SDL_CreateProperties();
+            SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, rtex->width);
+            SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, rtex->height);
+            SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, SDL_TEXTUREACCESS_TARGET);
+            rtex->rptr = sdltex = SDL_CreateTextureWithProperties(_d->render, props);
+            if(!sdltex)
+                log::warn("[render_2d] rt texture creation failure for 0x%08x: '%s'", rtex->id(), SDL_GetError());
+        }
+
+        return;
+    }
+
+    // common texture
+    // check if we need to do an upload, potentially recreating the texture
     if (!rtex->uploaded && rtex->surf)
     {
         if(sdltex)
@@ -524,12 +611,13 @@ void render_2d::_prepare_texture(rtexture *rtex)
             rtex->rptr = nullptr;
         }
 
-        // Always create a new texture
+        // always create a new texture
+        // we could check for max texture size but SDL already does it
         rtex->rptr = sdltex = SDL_CreateTextureFromSurface(_d->render, rtex->surf);
-        log::warn("[render_2d] texture created for 0x%08x: %dx%d", rtex->id(), rtex->width, rtex->height);
-        // ...and register its cleanup on resource deletion
+        log::info("[render_2d] texture created for 0x%08x: %dx%d", rtex->id(), rtex->width, rtex->height);
+        // register its cleanup on resource deletion
         rtex->on_delete = &_texture_cleanup;
-        rtex->on_delete_uptr = _d.get();
+        rtex->on_delete_uptr = this;
 
         if(sdltex)
         {
@@ -537,7 +625,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
             rtex->uploaded = true;
         }
         else
-            log::warn("[render_2d] texture upload failure for 0x%08x", rtex->id());
+            log::warn("[render_2d] texture upload failure for 0x%08x: '%s'", rtex->id(), SDL_GetError());
 
         // even on upload failure, we destroy the surface, to prevent continuous failure every frame
         SDL_DestroySurface(rtex->surf);
@@ -580,7 +668,7 @@ void _texture_cleanup(rtexture &tex, void*)
     if(tex.rptr)
     {
         SDL_DestroyTexture(static_cast<SDL_Texture*>(tex.rptr));
-        tex.rptr = nullptr; // for correctness
+        tex.rptr = nullptr; // for correctness, even if irrelevant by now
     }
 }
 
@@ -589,17 +677,90 @@ void _texture_cleanup(rtexture &tex, void*)
 
 render::target_id_t render_2d::target_create(const render::target_desc& desc)
 {
-    return render::TARGET_INVALID;
+    // first, let's do some sanity checks on the descriptor
+
+    if (desc.has_depth)
+        return render::TARGET_INVALID;  // sorry, I'm shallow
+
+    if (desc.size_mode == render::target_size_mode::ABSOLUTE)
+    {
+        if(!(desc.width && desc.height))
+            return render::TARGET_INVALID; // absolute sizing gone wild
+        if(desc.width > _d->r_prop_tex_max_sz)
+            return render::TARGET_INVALID; // greedy
+        if(desc.height > _d->r_prop_tex_max_sz)
+            return render::TARGET_INVALID; // greedy too
+    }
+    else
+    {
+        if (desc.size_scale <= 0.0f)
+            return render::TARGET_INVALID; // relative sizing gone wild
+
+        if(!_d->targets.contains(desc.size_source))
+            return render::TARGET_INVALID; // don't know her
+    }
+
+    // ok, descriptor checks out
+    // let's build it'
+    auto target_id = _d->rt_next_id++;
+    render_2d_target target {
+        target_id,
+        desc
+    };
+
+    std::string rname {"r_2d_t_%u"};
+    rname += std::to_string(target.id);
+    auto rid = entt::hashed_string(rname.c_str()).value();
+    target.color_tex = std::make_shared<rtexture>( rid );
+    target.color_tex->rtarget = true;
+    target.color_tex->on_delete = &_texture_cleanup;
+    target.color_tex->on_delete_uptr = _d.get();
+
+    _d->targets.emplace(target.id, std::move(target));
+
+    if(desc.size_mode != render::target_size_mode::ABSOLUTE)
+    {
+        _d->rt_resize_order_dirty = true;
+    }
+
+    return target_id;
 }
 
-void render_2d::target_destroy(render::target_id_t id)
+bool render_2d::target_destroy(render::target_id_t id)
 {
+    if (id == render::TARGET_DEFAULT || id == render::TARGET_INVALID)
+        return false;
 
+    auto it = _d->targets.find(id);
+    if (it == _d->targets.end())
+        return false;
+
+    // ok, target exists, let's get rid of it
+
+    // removing a target that has size dependants may cause issues
+    // but that is a separate issue
+    // just mark the graph dirty
+    if(it->second.desc.size_mode != render::target_size_mode::ABSOLUTE)
+    {
+        _d->rt_resize_order_dirty = true;
+    }
+
+    // NOTE that the texture resource is destroyed via shared ptr semantics
+    _d->targets.erase(it);
+
+    return true;
 }
 
 std::shared_ptr<rtexture> render_2d::target_get_color_texture(render::target_id_t id) const
 {
-    return {};
+    if (id == render::TARGET_DEFAULT || id == render::TARGET_INVALID)
+        return {nullptr};
+
+    auto it = _d->targets.find(id);
+    if (it == _d->targets.end())
+        return {nullptr};
+
+    return it->second.color_tex;
 }
 
 std::shared_ptr<rtexture> render_2d::target_get_depth_texture(render::target_id_t id) const
@@ -610,15 +771,125 @@ std::shared_ptr<rtexture> render_2d::target_get_depth_texture(render::target_id_
 
 glm::ivec2 render_2d::target_get_size(render::target_id_t id) const
 {
-    return {};
+    static constexpr glm::vec2 INVALID = {-1.f, -1.f};
+
+    if (id == render::TARGET_DEFAULT || id == render::TARGET_INVALID)
+        return INVALID;
+
+    auto it = _d->targets.find(id);
+    if (it == _d->targets.end())
+        return INVALID;
+
+    return {it->second.curr_w, it->second.curr_h};
 }
 
 bool render_2d::target_has_depth(render::target_id_t id) const
 {
     // No 2D targets have a depth buffer.
-    // SDL_Renderer does not use the Z axis in any way, so we cannot make use
+    // SDL_Renderer does not use the Z axis, so we cannot make use
     // of the depth buffer in any meaningful way.
     return false;
+}
+
+
+void render_2d::_targets_sizing_reorder()
+{
+    entt::flow builder {};
+
+    builder.bind(render::TARGET_DEFAULT)
+            .rw(render::TARGET_DEFAULT);
+
+    for(const auto &[tid, target]: _d->targets)
+    {
+        switch (target.desc.size_mode) {
+            case render::target_size_mode::ABSOLUTE:
+                break; // no dependencies
+
+            case render::target_size_mode::UI_RELATIVE:
+                builder.bind(tid).rw(tid).ro(render::TARGET_DEFAULT);
+                break;
+
+            case render::target_size_mode::TARGET_RELATIVE:
+                builder.bind(tid).rw(tid).ro(target.desc.size_source);
+                break;
+        }
+    }
+
+    // now rebuild graph, and order via topo sort
+    auto ok = _d->rt_resize_sorter.build(builder.graph());
+    if(!ok)
+        log::error("[render_2d] _targets_sizing_reorder: cyclic dependencies in render target sizes");
+    _d->rt_resize_order_dirty = false;
+}
+
+
+void render_2d::_targets_resize()
+{
+    if(_d->rt_resize_order_dirty)
+        _targets_sizing_reorder();
+
+    // calculate render target sizes
+    // GPU texture sizes will be applied before rendering
+    for(auto gid: _d->rt_resize_sorter.execution_order())
+    {
+        render::target_id_t tid = static_cast<render::target_id_t>(gid);
+
+        if(tid == render::TARGET_DEFAULT)
+        {
+            // main swapchain, our graph "anchor"
+            // ui_vp should already be up to date, so do noting
+            continue;
+        }
+
+        auto it = _d->targets.find(tid);
+        if(it == _d->targets.end())
+        {
+            log::error("[render_2d] _targets_resize: unknwon target id: %u", tid);
+            continue;
+        }
+
+        auto &target = it->second;
+        switch(target.desc.size_mode)
+        {
+            case render::target_size_mode::ABSOLUTE:
+                target.curr_w = std::max(1u, target.desc.width);
+                target.curr_h = std::max(1u, target.desc.height);
+                break;
+
+            case render::target_size_mode::UI_RELATIVE:
+                target.curr_w = std::max(1u, static_cast<unsigned>(
+                    std::ceil(_d->ui_vp.z * target.desc.size_scale)));
+                target.curr_h = std::max(1u, static_cast<unsigned>(
+                    std::ceil(_d->ui_vp.w * target.desc.size_scale)));
+                break;
+
+            case render::target_size_mode::TARGET_RELATIVE:
+            {
+                const auto oid = target.desc.size_source;
+                auto it_other = _d->targets.find(oid);
+                if(it == _d->targets.end())
+                {
+                    log::error("[render_2d] _targets_resize: %u: unknown source target id: %u", tid, oid);
+                    continue;
+                }
+
+                auto &other = it->second;
+                target.curr_w = std::max(1u, static_cast<unsigned>(
+                    std::ceil(other.curr_w * target.desc.size_scale)));
+                target.curr_h = std::max(1u, static_cast<unsigned>(
+                    std::ceil(other.curr_h * target.desc.size_scale)));
+                break;
+            }
+        }
+
+        // apply newly calculated sizes to the texture resources
+        // we defer GPU texture manageent for the rendering phase
+        target.color_tex->width = target.curr_w;
+        target.color_tex->height = target.curr_h;
+    }
+
+    // finally, clear the dirty flag
+    _d->rt_sizes_dirty = false;
 }
 
 

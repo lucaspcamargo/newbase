@@ -47,7 +47,7 @@ public:
     //       the target, usually within a shared_ptr
 
     virtual render::target_id_t target_create(const render::target_desc& desc) = 0;
-    virtual void target_destroy(render::target_id_t id) = 0;
+    virtual bool target_destroy(render::target_id_t id) = 0;
     virtual std::shared_ptr<rtexture> target_get_color_texture(render::target_id_t id) const = 0;
     virtual std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const = 0;
     virtual glm::ivec2     target_get_size(render::target_id_t id) const = 0;

@@ -45,7 +45,7 @@ public:
     // RTT target management interface
     // prefer to use these via render::target_ref
     render::target_id_t target_create(const render::target_desc& desc) override;
-    void target_destroy(render::target_id_t id) override;
+    bool target_destroy(render::target_id_t id) override;
     std::shared_ptr<rtexture> target_get_color_texture(render::target_id_t id) const override;
     std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const override;
     glm::ivec2     target_get_size(render::target_id_t id) const override;
@@ -66,6 +66,12 @@ private:
     // to the current render target
     // clip is intersected with the command's clip if not NONE
     void _draw_batches(render::batcher2d& batcher, render::clip_t clip = render::CLIP_NONE);
+
+    // Updates the render target resize order
+    void _targets_sizing_reorder();
+
+    // Resizes the render targets, following resize graph ordering
+    void _targets_resize();
 
     std::unique_ptr<render_2d_p> _d;
 };

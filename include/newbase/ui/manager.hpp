@@ -25,7 +25,7 @@ namespace nb
         void draw_tool_windows() override;
         void draw_perf() override;
 
-        void update_viewports() override;
+        glm::ivec4 update_viewports() override;
         glm::vec4 central_viewport(bool pixel_coords = false) override;
 
         bool toggle_tool_window(const char *name) override;

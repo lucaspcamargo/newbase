@@ -1,7 +1,7 @@
 #pragma once
 
 #include <newbase/res/storage/handle.hpp>
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 #include <vector>
 
 namespace nb::res_storage {

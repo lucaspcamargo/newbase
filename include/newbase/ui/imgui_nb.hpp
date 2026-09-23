@@ -2,7 +2,7 @@
 
 #include <newbase/render/batcher2d.hpp>
 #include <newbase/render/window.hpp>
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 #include "SDL3/SDL_events.h"
 #include <memory>
 

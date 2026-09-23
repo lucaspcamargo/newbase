@@ -2,7 +2,7 @@
 
 #include <newbase/sys/audio/types.hpp>
 #include <newbase/sys/audio/buffer.hpp>
-#include <newbase/mixins.hpp>
+#include <newbase/utility/mixins.hpp>
 
 namespace nb {
 

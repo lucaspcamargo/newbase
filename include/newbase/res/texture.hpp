@@ -23,8 +23,15 @@ public:
     int width {0};
     int height {0};
 
-    // opaque pointer for renderer usage
+    // opaque pointer for renderer usage, do not touch
+    // unless you are the renderer, of course
     void *rptr {nullptr};
+
+    // render target flag
+    // DO NOT try to create render targets with this
+    // use the renderer_service interface instead
+    // if you are not the renderer, consider this RO
+    bool rtarget {false};
 
     // optional callback: reload the CPU surface from the resource manager (set by the loader).
     // Returns a freshly allocated SDL_Surface* that the caller owns, or nullptr on failure.
