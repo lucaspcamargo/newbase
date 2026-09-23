@@ -11,6 +11,7 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/reflection/coercions.hpp>
 #include <newbase/reflection/lib_glm.hpp>
+#include <newbase/components/rtti.hpp>
 #include <newbase/res/rtti.hpp>
 #include <newbase/i18n/i18n.hpp>
 #include <newbase/log.hpp>
@@ -524,9 +525,10 @@ engine& engine::instance()
 extern "C" void _rtti_init_engine()
 {
     ::nb::rtti::register_coercions();
-    ::nb::rtti::_rtti_init_resources();
     ::nb::rtti::register_lib_glm();
+    ::nb::rtti::_rtti_init_resources();
     ::nb::rtti::_rtti_init_services();
+    ::nb::rtti::_rtti_init_components();
 
     /* unsure non how to register singletons, asked on discord
        can possibly can be solved via some sort of proxy type that forwards to the singleton instance?

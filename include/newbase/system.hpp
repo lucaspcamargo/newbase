@@ -10,13 +10,13 @@
 namespace nb {
 
 enum step_phase {
-    PREPARE,
-    UI_RENDER,
-    PRE_UPDATE,
+    PREPARE,        // UI reset, independent frame state reset
+    UI_RENDER,      // Renders UI
+    PRE_UPDATE,     // Prepare for new update cycle
     PHYSICS_UPDATE,
     GENERAL_UPDATE,
     POST_UPDATE,
-    PRE_RENDER,
+    PRE_RENDER,     // Prepare data needed for rendering
     RENDER,
     POST_RENDER,
     _STEP_PHASE_COUNT

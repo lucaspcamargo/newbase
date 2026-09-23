@@ -105,10 +105,12 @@ This is a living document.
 ## Scope: Render-To-Texture (RTT)
 
 - [X] Define main interfaces
-- [ ] Implement render_2d internal structures
-- [ ] Implement target and viewport sizing mechanism
-- [ ] Implement rendering proper
-- [ ] Figure out exposure to RTTI (and script) system
+- [X] Implement render_2d internal structures
+- [~] Implement target and viewport sizing mechanism
+    + [X] RT sizing dependency graph ordering and evaluation.
+    + [ ] Allow sizing viewports by RT, after RT resize pass (_targets_resize). Use a flag in layer.
+- [ ] Implement render targeting proper
+- [ ] Expose API to RTTI and script systems. Use target_ref in shared_ptr and a service locator.
 - [ ] create simple demo
   
 ## Scope: UI Overlays

@@ -1,42 +1,36 @@
 #include <newbase/sys/render_2d/render_2d.hpp>
 #include <newbase/engine.hpp>
-#include <newbase/components/sprite.hpp>
-#include <newbase/components/mesh2d.hpp>
-#include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/spatial.hpp>
-#include <newbase/components/structure.hpp>
 #include <newbase/components/camera.hpp>
-#include <newbase/components/layers.hpp>
-#include "SDL3/SDL_error.h"
-#include "SDL3/SDL_properties.h"
-#include "entt/core/fwd.hpp"
-#include "newbase/geom/picker2d.hpp"
+
+#include <newbase/log.hpp>
+#include <newbase/geom/picker2d.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/render/window.hpp>
 #include <newbase/render/collector2d.hpp>
-#include "newbase/render/batcher2d.hpp"
-#include "newbase/render/camera.hpp"
-#include "newbase/render/types.hpp"
+#include <newbase/render/batcher2d.hpp>
+#include <newbase/render/camera.hpp>
+#include <newbase/render/types.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
 #include <newbase/res/manager.hpp>
+#include <newbase/services/ui_manager.hpp>
+#include <newbase/sdl/utils.hpp>
 #include <newbase/ui/imgui_nb.hpp>
 #include <newbase/utility/glm.hpp>
 #include <newbase/utility/topological_sort.hpp>
-#include <newbase/services/ui_manager.hpp>
-#include <newbase/sdl/utils.hpp>
-#include <newbase/log.hpp>
 
 #include "./rtt_private.hpp"
 
-#include "SDL3/SDL_pixels.h"
-#include "SDL3/SDL_rect.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_surface.h"
-#include "SDL3/SDL_video.h"
-#include "glm/fwd.hpp"
+#include <SDL3/SDL_pixels.h>
+#include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_video.h>
+#include <glm/fwd.hpp>
 #include <entt/entt.hpp>
+#include <entt/core/fwd.hpp>
 #include <entt/graph/flow.hpp>
 #include <ryml.hpp>
 #include <ryml_std.hpp>
@@ -280,13 +274,28 @@ bool render_2d::step(nb::step_phase phase)
             ui_mgr->draw_perf();
         }
     }
-    else if(phase == step_phase::PRE_RENDER)
+    else if(phase == step_phase::PRE_UPDATE)
     {
-        ZoneScopedN("RenderPre");
+        ZoneScopedN("PreUpdate");
         if(_d->has_ui)
         {
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            const auto prev_ui_vp = _d->ui_vp;
             _d->ui_vp = ui_mgr->update_viewports();
+
+            // if ui viewport changed, we may need to update render target sizes
+            if(prev_ui_vp != _d->ui_vp)
+                _d->rt_sizes_dirty = true;
+        }
+
+        // update render target sizes if needed, before general updates
+        if(_d->rt_sizes_dirty)
+            _targets_resize();
+    }
+    else if(phase == step_phase::PRE_RENDER)
+    {
+        if(_d->has_ui)
+        {
             _d->imgui.render_flush();
         }
     }
@@ -306,7 +315,8 @@ bool render_2d::step(nb::step_phase phase)
             SDL_RenderTexture(_d->render, static_cast<SDL_Texture*>(_d->smpte->rptr), NULL, NULL);
         }
 
-        // update render target sizing calculations if needed
+        // update render target sizing calculations if needed, again
+        // some may have been added during the update phases
         if(_d->rt_sizes_dirty)
             _targets_resize();
 
@@ -408,6 +418,7 @@ bool render_2d::event( SDL_Event * evt)
         {
             // if we have no UI, do this here
             _d->ui_vp = {0, 0, _d->wx, _d->wy};
+            _d->rt_sizes_dirty = true;
             // otherwise, this will get done in PRE_RENDER phase from ui info
         }
     }
@@ -718,9 +729,18 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
 
     _d->targets.emplace(target.id, std::move(target));
 
-    if(desc.size_mode != render::target_size_mode::ABSOLUTE)
+    if(desc.size_mode == render::target_size_mode::ABSOLUTE)
     {
+        // preload desired static size
+        // _prepare_texture does the rest
+        target.color_tex->width = desc.width;
+        target.color_tex->height = desc.height;
+    }
+    else
+    {
+        // we need to recalculate resize order and sizes themselves
         _d->rt_resize_order_dirty = true;
+        _d->rt_sizes_dirty = true;
     }
 
     return target_id;
@@ -888,6 +908,9 @@ void render_2d::_targets_resize()
         target.color_tex->height = target.curr_h;
     }
 
+    // TODO with render targets having correct sizes, we can update
+    //      any viewports that depend on those
+
     // finally, clear the dirty flag
     _d->rt_sizes_dirty = false;
 }
@@ -911,12 +934,4 @@ extern "C" void _rtti_init_render_2d()
         .type("render_2d_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::render_2d>>()
         .conv<std::shared_ptr<nb::system>>();
-
-    cspatial::_ensure_rtti();
-    cstructure::_ensure_rtti();
-    csprite::_ensure_rtti();
-    cmesh2d::_ensure_rtti();
-    cparticle_emitter::_ensure_rtti();
-    ccamera::_ensure_rtti();
-    clayers::_ensure_rtti();
 }

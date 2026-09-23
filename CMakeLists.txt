@@ -121,6 +121,7 @@ add_library(newbase STATIC
     src/components/structure_rtti.cpp
     src/components/textext_rtti.cpp
     src/components/tilemap_rtti.cpp
+    src/components/rtti.cpp # registration entry point
 
     # geometry handling
     src/geom/picker2d.cpp
