@@ -1,0 +1,22 @@
+max_particles: 600
+pre_simulate_frames: 60
+blend_mode: alpha
+texture: res/asteroids/spr/shot.png
+
+emitter:
+  rate: 180.0
+  lifetime: 3.0
+  lifetime_variance: 0.0
+  pos_variance: [0, 0]
+  vel: [200.0, 0.0]
+  vel_variance: [30.0, 0.0]
+  vel_angle_variance: 360
+  color: [0.8, 0.8, 0.8, 1.0]
+  color_variance: [0.2, 0.2, 0.2, 0.0]
+  scale: 15.0
+  scale_variance: 3.0
+
+affectors:
+  - type: color_fade
+    rgba_per_sec: [0.0, 0.0, 0.0, -0.025]
+    kill_on_zero: true

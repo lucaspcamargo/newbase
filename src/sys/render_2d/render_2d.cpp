@@ -22,6 +22,8 @@
 #include <newbase/utility/topological_sort.hpp>
 
 #include "./rtt_private.hpp"
+#include "entt/graph/adjacency_matrix.hpp"
+#include "entt/graph/fwd.hpp"
 
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
@@ -68,13 +70,14 @@ struct nb::render_2d_p
 
     std::unordered_map<render::target_id_t, render_2d_target> targets;
     util::topological_sorter rt_resize_sorter;
+    std::vector<render::target_id_t> rt_resize_order;
     bool rt_resize_order_dirty {false};  // new rts were added or removed, reorder
     bool rt_sizes_dirty {true}; // sizes have changed, even if order remains
-    render::target_id_t rt_next_id {render::TARGET_DEFAULT + 1};
+    render::target_id_t rt_next_id {1};
 
     geom::picker_2d picker;
 
-    SDL_ScaleMode default_tex_scalemode {SDL_SCALEMODE_NEAREST};
+    SDL_ScaleMode default_tex_scalemode {SDL_SCALEMODE_LINEAR};
 
     std::shared_ptr<rtexture> smpte;
 };
@@ -200,7 +203,8 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
         log::info("[render_2d] created renderer: %s", SDL_GetRendererName(_d->render));
         _d->r_props = SDL_GetRendererProperties(_d->render);
         _d->r_prop_tex_max_sz = (int)SDL_GetNumberProperty(_d->r_props,
-                                SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+                                                           SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+        log::info("[render_2d] max texture size: %dx%d", _d->r_prop_tex_max_sz, _d->r_prop_tex_max_sz);
     }
 
     _d->rwin.center();
@@ -303,7 +307,7 @@ bool render_2d::step(nb::step_phase phase)
     {
         ZoneScopedN("Render");
 
-        const auto &layers = engine::instance().render_layers();
+        auto &layers = engine::instance().render_layers();
 
         // if there isn't be anything to render
         // just draw a fun "debug" background
@@ -320,14 +324,60 @@ bool render_2d::step(nb::step_phase phase)
         if(_d->rt_sizes_dirty)
             _targets_resize();
 
+        // adjust layer viewports that follow targets
+        for(auto &layer : layers)
+        {
+            if(layer.follow_target)
+            {
+                auto it = _d->targets.find(layer.target_id);
+                if(it!=_d->targets.end())
+                {
+                    auto &tgt = it->second;
+                    layer.viewport = {0, 0, tgt.curr_w, tgt.curr_h};
+                }
+            }
+        }
+
         //now render all layers
         for(const auto &layer : layers)
         {
-            auto *sc = engine::instance().find_scene(layer.scene_id);
-            if(!sc)
-                continue;   // layer has no scene, skip
-
             const auto &vp = layer.viewport;
+
+            // setup render target
+            if(layer.target_id == render::TARGET_INVALID)
+                continue;
+            else if(layer.target_id == render::TARGET_DEFAULT)
+            {
+                SDL_SetRenderTarget(_d->render, nullptr);
+            }
+            else
+            {
+                // we have a target for this layer
+                auto it = _d->targets.find(layer.target_id);
+                if(it!=_d->targets.end())
+                {
+                    auto &tgt = it->second;
+
+                    auto col = tgt.color_tex;
+                    if(col)
+                    {
+                        _prepare_texture(col.get()); // create texture or apply size
+                        SDL_SetRenderTarget(_d->render, static_cast<SDL_Texture*>(col->rptr));
+                    }
+                    else
+                    {
+                        log::warn("[render_2d] target has no color texture, skipping: %u",
+                                  layer.target_id);
+                        continue;
+                    }
+                }
+                else
+                {
+                    log::warn("[render_2d] layer has invalid target id, skipping: order=%i target_id=%u",
+                              layer.order, layer.target_id);
+                    continue;
+                }
+            }
 
             // Clear viewport region if requested
             if(layer.clear)
@@ -350,38 +400,47 @@ bool render_2d::step(nb::step_phase phase)
                 render::clip_t clip_rect { (float) vp.x, (float) vp.y, (float) vp.w, (float) vp.h };
                 layer.custom_2d_draw(layer, _d->batcher);
                 _draw_batches(_d->batcher, clip_rect);
-                continue; // now go to next layer
             }
-
-            // Find camera and determine world bounds
-            auto &reg = sc->registry();
-            glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
-            if(layer.camera != entt::null)
+            else
             {
-                float cam_cx = 0.0f, cam_cy = 0.0f;
-                auto *sp  = reg.try_get<cspatial>(layer.camera);
-                auto *cam = reg.try_get<ccamera>(layer.camera);
-                if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
-                if(cam) { world_bounds = cam->cam2d.calc_world_bounds(cam_cx, cam_cy, vp); }
-                //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
+                // regular scene draw
+                auto *sc = engine::instance().find_scene(layer.scene_id);
+                if(!sc)
+                    continue;   // layer has no scene, skip
+
+                // Find camera and determine world bounds
+                auto &reg = sc->registry();
+                glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
+                if(layer.camera != entt::null)
+                {
+                    float cam_cx = 0.0f, cam_cy = 0.0f;
+                    auto *sp  = reg.try_get<cspatial>(layer.camera);
+                    auto *cam = reg.try_get<ccamera>(layer.camera);
+                    if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
+                    if(cam) { world_bounds = cam->cam2d.calc_world_bounds(cam_cx, cam_cy, vp); }
+                    //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
+                }
+
+                // Build projection matrix from bounds (NDC)
+                glm::mat4 proj = glm::ortho(world_bounds.x, world_bounds.x + world_bounds.z,
+                                            world_bounds.y, world_bounds.y + world_bounds.w,
+                                            -1.0f, 1.0f);
+
+                // Viewport Matrix: Maps NDC [-1, 1] to Pixel Space [0, vp.w] x [0, vp.h]
+                glm::mat4 view = glm::mat4(1.0f);
+                view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
+                view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
+
+                // calculated view projection
+                glm::mat4 viewproj = view * proj;
+
+                _draw_scene(*sc, viewproj, layer); // takes care of clipping
             }
-
-            // Build projection matrix from bounds (NDC)
-            glm::mat4 proj = glm::ortho(world_bounds.x, world_bounds.x + world_bounds.z,
-                                        world_bounds.y, world_bounds.y + world_bounds.w,
-                                        -1.0f, 1.0f);
-
-            // Viewport Matrix: Maps NDC [-1, 1] to Pixel Space [0, vp.w] x [0, vp.h]
-            glm::mat4 view = glm::mat4(1.0f);
-            view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
-            view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
-
-            // calculated view projection
-            glm::mat4 viewproj = view * proj;
-
-            _draw_scene(*sc, viewproj, layer); // takes care of clipping
         }
-        
+
+        // reset any render target association
+        SDL_SetRenderTarget(_d->render, nullptr);
+
         // GUI
         if(_d->has_ui)
         {
@@ -568,7 +627,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
         {
             log::warn("[render_2d] preparing rt texture for 0x%08x: zero size!", rtex->id());
                 // a render target of size zero should not exist
-                // still, if it had a valid texture before, we will destroy it
+                // still, if it had a valid texture before, we will still destroy it
             destroy = true;
         }
         else if(sdltex && sdltex->w == rtex->width && sdltex->h == rtex->height)
@@ -603,8 +662,18 @@ void render_2d::_prepare_texture(rtexture *rtex)
             SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, rtex->height);
             SDL_SetNumberProperty(props, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, SDL_TEXTUREACCESS_TARGET);
             rtex->rptr = sdltex = SDL_CreateTextureWithProperties(_d->render, props);
-            if(!sdltex)
+            if(sdltex)
+            {
+                log::info("[render_2d] rt texture created for 0x%08x: %dx%d", rtex->id(), rtex->width, rtex->height);
+                SDL_ScaleMode sm = rtex->nearest?
+                SDL_SCALEMODE_NEAREST : _d->default_tex_scalemode;
+                SDL_SetTextureScaleMode(sdltex, sm);
+            }
+            else
+            {
+
                 log::warn("[render_2d] rt texture creation failure for 0x%08x: '%s'", rtex->id(), SDL_GetError());
+            }
         }
 
         return;
@@ -632,7 +701,9 @@ void render_2d::_prepare_texture(rtexture *rtex)
 
         if(sdltex)
         {
-            SDL_SetTextureScaleMode(sdltex, _d->default_tex_scalemode);
+            SDL_ScaleMode sm = rtex->nearest?
+                            SDL_SCALEMODE_NEAREST : _d->default_tex_scalemode;
+            SDL_SetTextureScaleMode(sdltex, sm);
             rtex->uploaded = true;
         }
         else
@@ -695,11 +766,11 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
 
     if (desc.size_mode == render::target_size_mode::ABSOLUTE)
     {
-        if(!(desc.width && desc.height))
+        if(!(desc.abs_width && desc.abs_height))
             return render::TARGET_INVALID; // absolute sizing gone wild
-        if(desc.width > _d->r_prop_tex_max_sz)
+        if(desc.abs_width > _d->r_prop_tex_max_sz)
             return render::TARGET_INVALID; // greedy
-        if(desc.height > _d->r_prop_tex_max_sz)
+        if(desc.abs_height > _d->r_prop_tex_max_sz)
             return render::TARGET_INVALID; // greedy too
     }
     else
@@ -707,19 +778,19 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
         if (desc.size_scale <= 0.0f)
             return render::TARGET_INVALID; // relative sizing gone wild
 
-        if(!_d->targets.contains(desc.size_source))
-            return render::TARGET_INVALID; // don't know her
+        if(desc.size_mode == render::target_size_mode::TARGET_RELATIVE)
+            if(!_d->targets.contains(desc.size_source))
+                return render::TARGET_INVALID; // don't know her
     }
 
     // ok, descriptor checks out
     // let's build it'
     auto target_id = _d->rt_next_id++;
-    render_2d_target target {
-        target_id,
-        desc
-    };
+    render_2d_target target {};
+    target.id = target_id;
+    target.desc = desc;
 
-    std::string rname {"r_2d_t_%u"};
+    std::string rname {"r_2d_t_"};
     rname += std::to_string(target.id);
     auto rid = entt::hashed_string(rname.c_str()).value();
     target.color_tex = std::make_shared<rtexture>( rid );
@@ -727,14 +798,12 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
     target.color_tex->on_delete = &_texture_cleanup;
     target.color_tex->on_delete_uptr = _d.get();
 
-    _d->targets.emplace(target.id, std::move(target));
-
     if(desc.size_mode == render::target_size_mode::ABSOLUTE)
     {
         // preload desired static size
         // _prepare_texture does the rest
-        target.color_tex->width = desc.width;
-        target.color_tex->height = desc.height;
+        target.color_tex->width = desc.abs_width;
+        target.color_tex->height = desc.abs_height;
     }
     else
     {
@@ -742,6 +811,8 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
         _d->rt_resize_order_dirty = true;
         _d->rt_sizes_dirty = true;
     }
+
+    _d->targets.emplace(target.id, std::move(target));
 
     return target_id;
 }
@@ -814,11 +885,21 @@ bool render_2d::target_has_depth(render::target_id_t id) const
 
 void render_2d::_targets_sizing_reorder()
 {
-    entt::flow builder {};
+    // map all targets to a sequential vertex index
+    std::unordered_map<render::target_id_t, int> mapping;
+    int next_mapping = 0;
+    mapping[render::TARGET_DEFAULT] = next_mapping++;
+    for(const auto &[tid, target]: _d->targets)
+    {
+        if(!mapping.contains(tid))
+            mapping[tid] = next_mapping++;
+        if(target.desc.size_mode == render::target_size_mode::TARGET_RELATIVE)
+            if(!mapping.contains(target.desc.size_source))
+                mapping[target.desc.size_source] = next_mapping++;
+    }
 
-    builder.bind(render::TARGET_DEFAULT)
-            .rw(render::TARGET_DEFAULT);
-
+    // build a graph using our mapping
+    entt::adjacency_matrix<entt::directed_tag> graph {mapping.size()};
     for(const auto &[tid, target]: _d->targets)
     {
         switch (target.desc.size_mode) {
@@ -826,19 +907,32 @@ void render_2d::_targets_sizing_reorder()
                 break; // no dependencies
 
             case render::target_size_mode::UI_RELATIVE:
-                builder.bind(tid).rw(tid).ro(render::TARGET_DEFAULT);
+                graph.insert(mapping[render::TARGET_DEFAULT], mapping[tid]);
                 break;
 
             case render::target_size_mode::TARGET_RELATIVE:
-                builder.bind(tid).rw(tid).ro(target.desc.size_source);
+                graph.insert(mapping[target.desc.size_source], mapping[tid]);
                 break;
         }
     }
 
-    // now rebuild graph, and order via topo sort
-    auto ok = _d->rt_resize_sorter.build(builder.graph());
+    // now order graph via topo sort
+    auto ok = _d->rt_resize_sorter.build(graph);
     if(!ok)
         log::error("[render_2d] _targets_sizing_reorder: cyclic dependencies in render target sizes");
+
+    // finally, remap vertex indices from graph back into target ids
+    std::unordered_map<unsigned long long, render::target_id_t> invmap;
+    for(auto &&[tid, vtx]:mapping)
+        invmap[vtx] = tid;
+    _d->rt_resize_order.clear();
+    for(auto vtx: _d->rt_resize_sorter.execution_order())
+    {
+        auto tid = invmap[vtx];
+        log::warn("VTX %d TID %d", (int) vtx, (int) tid);
+        _d->rt_resize_order.push_back(tid);
+    }
+
     _d->rt_resize_order_dirty = false;
 }
 
@@ -850,10 +944,8 @@ void render_2d::_targets_resize()
 
     // calculate render target sizes
     // GPU texture sizes will be applied before rendering
-    for(auto gid: _d->rt_resize_sorter.execution_order())
+    for(auto tid: _d->rt_resize_order)
     {
-        render::target_id_t tid = static_cast<render::target_id_t>(gid);
-
         if(tid == render::TARGET_DEFAULT)
         {
             // main swapchain, our graph "anchor"
@@ -864,7 +956,7 @@ void render_2d::_targets_resize()
         auto it = _d->targets.find(tid);
         if(it == _d->targets.end())
         {
-            log::error("[render_2d] _targets_resize: unknwon target id: %u", tid);
+            log::error("[render_2d] _targets_resize: unknown target id: %u", tid);
             continue;
         }
 
@@ -872,8 +964,8 @@ void render_2d::_targets_resize()
         switch(target.desc.size_mode)
         {
             case render::target_size_mode::ABSOLUTE:
-                target.curr_w = std::max(1u, target.desc.width);
-                target.curr_h = std::max(1u, target.desc.height);
+                target.curr_w = std::max(1u, target.desc.abs_width);
+                target.curr_h = std::max(1u, target.desc.abs_height);
                 break;
 
             case render::target_size_mode::UI_RELATIVE:
@@ -889,17 +981,19 @@ void render_2d::_targets_resize()
                 auto it_other = _d->targets.find(oid);
                 if(it == _d->targets.end())
                 {
-                    log::error("[render_2d] _targets_resize: %u: unknown source target id: %u", tid, oid);
-                    continue;
+                    log::error("[render_2d] _targets_resize: %u: unknown source target id: %u. setting to 1x1", tid, oid);
+                    target.curr_w = target.curr_h = 1;
                 }
-
-                auto &other = it->second;
-                target.curr_w = std::max(1u, static_cast<unsigned>(
-                    std::ceil(other.curr_w * target.desc.size_scale)));
-                target.curr_h = std::max(1u, static_cast<unsigned>(
-                    std::ceil(other.curr_h * target.desc.size_scale)));
-                break;
+                else
+                {
+                    auto &other = it_other->second;
+                    target.curr_w = std::max(1u, static_cast<unsigned>(
+                        std::ceil(other.curr_w * target.desc.size_scale)));
+                    target.curr_h = std::max(1u, static_cast<unsigned>(
+                        std::ceil(other.curr_h * target.desc.size_scale)));
+                }
             }
+            break;
         }
 
         // apply newly calculated sizes to the texture resources

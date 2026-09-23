@@ -17,7 +17,7 @@ void render_layers_window::draw(bool* p_open)
         return;
     }
 
-    const auto &layers = engine::instance().render_layers();
+    const auto &layers = engine::instance().render_layers_real();
 
     if (layers.empty())
     {

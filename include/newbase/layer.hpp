@@ -42,6 +42,10 @@ struct render_layer
     /// renderer via the renderer_service interface.
     render::target_id_t target_id   {render::TARGET_DEFAULT};
 
+
+    /// Whether to resize viewport to render target size (except for TARGET_DEFAULT)
+    bool                follow_target {false};
+
     /// Whether to cear the target viewport before rendering.
     bool                clear       { true };
 

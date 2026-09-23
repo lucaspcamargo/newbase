@@ -16,7 +16,6 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "ImGuizmo.h"
-#include "tracy/Tracy.hpp"
 #include <unordered_map>
 #include <string>
 

@@ -12,8 +12,8 @@ class target_ref
 public:
     target_ref() = default;
 
-    // Constructs and immediately allocates the GPU render target via the service interface
-    target_ref(renderer_service& service, const target_desc& desc)
+    // Constructs the render target via the service interface
+    target_ref(renderer_service &service, const target_desc& desc)
     : m_service(&service)
     {
         m_id = m_service->target_create(desc);
@@ -56,14 +56,15 @@ public:
     // Raw Handle
     target_id_t id() const { return m_id; }
     explicit operator bool() const { return m_id != TARGET_INVALID; }
+    bool is_valid() const { return operator bool(); }
 
     // Convenience property getters that forward to m_service
     std::shared_ptr<rtexture> color_texture() const {
-        return (m_id != TARGET_INVALID && m_service) ? m_service->target_get_color_texture(m_id) : 0;
+        return (m_id != TARGET_INVALID && m_service) ? m_service->target_get_color_texture(m_id) : nullptr;
     }
 
     std::shared_ptr<rtexture> depth_texture() const {
-        return (m_id != TARGET_INVALID && m_service) ? m_service->target_get_depth_texture(m_id) : 0;
+        return (m_id != TARGET_INVALID && m_service) ? m_service->target_get_depth_texture(m_id) : nullptr;
     }
 
     glm::ivec2 size() const {

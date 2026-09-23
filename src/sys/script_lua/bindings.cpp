@@ -156,9 +156,13 @@ void nb::lua::register_box_metatable(lua_State *L)
     lua_pop(L, 1);
 }
 
-void nb::lua::push_meta_any(lua_State *L, entt::meta_any value, std::shared_ptr<void> owner)
+void nb::lua::push_meta_any(lua_State *L, entt::meta_any &&value, std::shared_ptr<void> &&owner)
 {
-    if (!value) { lua_pushnil(L); return; }
+    if (!value) {
+        log::warn("[lua] push_meta_any: empty meta_any! pushing nil");
+        lua_pushnil(L);
+        return;
+    }
 
     // unbox primitive types directly onto the Lua stack — use exact type id to
     // avoid matching complex types that happen to be coercible to bool/int/etc.
@@ -172,10 +176,18 @@ void nb::lua::push_meta_any(lua_State *L, entt::meta_any value, std::shared_ptr<
     else if (ti == entt::type_id<entt::entity>())  { lua_pushinteger(L, entt::to_integral(*value.try_cast<entt::entity>())); return; }
     else if (ti == entt::type_id<std::string>())   { lua_pushstring(L,  value.try_cast<std::string>()->c_str()); return; }
 
+    //log::warn("[lua] push_meta_any: new lua box: type id: %d", value.type().id());
     auto *box = static_cast<lua_nb_box*>(lua_newuserdata(L, sizeof(lua_nb_box)));
-    new (box) lua_nb_box { std::move(value), std::move(owner) };
+    new (box) lua_nb_box ();
+    box->value = std::move(value);
+    box->owner = std::move(owner);
     luaL_getmetatable(L, BOX_METATABLE);
     lua_setmetatable(L, -2);
+
+    if(!box->value)
+    {
+        log::warn("[lua] push_meta_any: move failed! box is empty");
+    }
 }
 
 entt::meta_any nb::lua::lua_to_meta_any(lua_State *L, int idx)
@@ -217,22 +229,32 @@ static int box_index(lua_State *L)
 {
     auto *box = static_cast<lua_nb_box*>(luaL_checkudata(L, 1, BOX_METATABLE));
 
-    if(!box->value || lua_type(L, 2) != LUA_TSTRING)
-    {
-        lua_pushnil(L);
-        return 1;
-    }
+    if(lua_type(L, 2) != LUA_TSTRING)
+        return luaL_error(L, "[lua] box_index: invalid key type '%d'", lua_type(L, 2));
 
     const char *key = lua_tostring(L, 2);
+
+    if(!box->value)
+        return luaL_error(L, "[lua] box_index: box has invalid value, cannot get '%s'", key);
+
     auto hash = entt::hashed_string{key}.value();
-    auto type = box->value.type();
+
+    auto target_instance = box->value.type().is_pointer_like()
+                                        ? (*box->value).as_ref()
+                                        : box->value.as_ref();
+
+    if (!target_instance) {
+        auto orig_type = box->value.type();
+        return luaL_error(L, "[lua] box_index: attempted to index nullptr or empty object. key '%s' for type '%s'", key, std::string(orig_type.info().name()).c_str());
+    }
+
+    auto type = target_instance.type();
 
     // data member access
-    if(auto d = type.data(hash); d)
-    {
-        auto result = d.get(box->value);
-        if(result)
-        {
+    if (auto d = type.data(hash); d) {
+        // Fetch field off the underlying target_instance
+        auto result = d.get(target_instance);
+        if (result) {
             push_meta_any(L, std::move(result));
             return 1;
         }
@@ -248,31 +270,56 @@ static int box_index(lua_State *L)
         return 1;
     }
 
-    lua_pushnil(L);
-    return 1;
+    return luaL_error(L, "[lua] box_index: invalid key '%s' for type '%s'",
+                      key, std::string(type.info().name()).c_str());
 }
 
 static int box_newindex(lua_State *L)
 {
     auto *box = static_cast<lua_nb_box*>(luaL_checkudata(L, 1, BOX_METATABLE));
 
-    if(!box->value || lua_type(L, 2) != LUA_TSTRING)
-        return 0;
+    if(lua_type(L, 2) != LUA_TSTRING)
+        return luaL_error(L, "[lua] box_newindex: invalid key type '%d'", lua_type(L, 2));
 
     const char *key = lua_tostring(L, 2);
+
+    if(!box || !box->value)
+        return luaL_error(L, "[lua] box_newindex: box has invalid value, cannot set '%s'", key);
+
+    auto orig_type = box->value.type();
     auto hash = entt::hashed_string{key}.value();
-    auto type = box->value.type();
+    auto target_instance = box->value.type().is_pointer_like()
+                            ? (*box->value).as_ref()
+                            : box->value.as_ref();
+
+    if (!target_instance) {
+        return luaL_error(L, "[lua] box_newindex: attempted to newindex nullptr or empty object. key '%s' for type '%s' (%d)", key, std::string(orig_type.info().name()).c_str(), orig_type.id());
+    }
+
+    auto type = target_instance.type();
 
     if(auto d = type.data(hash); d)
     {
         auto val = lua_to_meta_any(L, 3);
-        if(val)
-            d.set(box->value, std::move(val));
-        else
-            log::warn("[bindings] __newindex: unsupported value type for key '%s'", key);
+
+        if (!val) {
+            return luaL_error(L, "[lua] box_newindex: could not convert Lua argument to a valid meta_any for property '%s'", key);
+        }
+
+        // try direct set of value
+        if(d.set(target_instance, val))
+            return 0;
+
+        // fallback if value to set is a pointer_like but the target member isn't
+        if (val.type().is_pointer_like()) {
+            if(d.set(target_instance, (*val).as_ref()))
+                return 0;
+        }
+
+        return luaL_error(L, "[lua] box_newindex: failed to set property '%s' on type '%s', from '%s'", key, std::string(type.info().name()).c_str(), std::string(orig_type.info().name()).c_str());
     }
 
-    return 0;
+    return luaL_error(L, "[lua] box_newindex: cannot find field '%s' on type '%s', from '%s'", key, std::string(type.info().name()).c_str(),  std::string(orig_type.info().name()).c_str());
 }
 
 static int box_tostring(lua_State *L)

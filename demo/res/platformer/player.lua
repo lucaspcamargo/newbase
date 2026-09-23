@@ -245,7 +245,6 @@ local update_handle = clock_update_add(function(delta)
     local cam_sp = _G.CAMERA_EID and get_spatial(_G.CAMERA_EID)
     if cam_sp then cam_sp.pos = vec3.new(cam_x, cam_y, 0) end
     local cam_c = _G.CAMERA_EID and get_camera(_G.CAMERA_EID)
-    if cam_c then cam_c.zoom = zoom end
 end)
 
 script_on_destroy(function()

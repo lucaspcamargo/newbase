@@ -1,0 +1,69 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/rtt/scene.lua"
+
+- name: logo
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/hello_world/sprite.sprite"
+    layers:
+      mask: 1
+
+- name: stars
+  comps:
+    spatial:
+      pos: [0, 0, 10]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    particle_emitter:
+      res: "res/rtt/stars.particle"
+    layers:
+      mask: 1
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      2d:
+        fit_mode: 1
+        fit_dims: [1080, 1080]
+
+- name: camera_tex
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera: {}
+
+
+- name: accum
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: "res/rtt/accum.sprite"
+      color: [1.0, 1.0, 1.0, 0.2]
+    layers:
+      mask: 2
+
+- name: present
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [8, 8, 1]
+    sprite:
+      res: "res/rtt/present.sprite"
+    layers:
+      mask: 4

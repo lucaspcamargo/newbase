@@ -26,6 +26,7 @@ namespace nb::rtti {
     {
         entt::meta_factory<rscript>{}
             .type("rscript"_hs)
+            .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "script",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -36,7 +37,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<rtexture>{}
-            .type("rtexture"_hs)
+        .type("rtexture"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "texture",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -45,10 +47,13 @@ namespace nb::rtti {
                     return rloader_texture{}(id);
                 },
                 .saver_fn = rwriter_texture,
-            });
+            })
+        .data<&rtexture::nearest, entt::as_ref_t>("nearest"_hs)
+        .custom<rtti::data_info>(rtti::data_info{"nearest"});
 
         entt::meta_factory<rsprite>{}
-            .type("rsprite"_hs)
+        .type("rsprite"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "sprite",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -62,11 +67,12 @@ namespace nb::rtti {
                 .custom<rtti::data_info>(rtti::data_info{"anchor"})
             .data<&rsprite::dims, entt::as_ref_t>("dims"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"dims"})
-            .data<&rsprite::tex>("tex"_hs)
+            .data<&rsprite::tex, entt::as_ref_t>("tex"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"tex"});
 
         entt::meta_factory<rparticle_emitter>{}
-            .type("rparticle_emitter"_hs)
+        .type("rparticle_emitter"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "particle_emitter",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -86,7 +92,8 @@ namespace nb::rtti {
                 });
 
         entt::meta_factory<rvorbis>{}
-            .type("rvorbis"_hs)
+        .type("rvorbis"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "vorbis",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -97,7 +104,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<rwav>{}
-            .type("rwav"_hs)
+        .type("rwav"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "wav",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -108,7 +116,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<ryaml>{}
-            .type("ryaml"_hs)
+        .type("ryaml"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "yaml",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -119,7 +128,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<retree>{}
-            .type("retree"_hs)
+        .type("retree"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "etree",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -130,7 +140,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<rtexfont>{}
-            .type("rtexfont"_hs)
+        .type("rtexfont"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "texfont",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -141,7 +152,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<rtilemap>{}
-            .type("rtilemap"_hs)
+        .type("rtilemap"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "tilemap",
                 .type_class = TYPE_CLASS_RESOURCE,
@@ -152,7 +164,8 @@ namespace nb::rtti {
             });
 
         entt::meta_factory<rgraphplan>{}
-            .type("rgraphplan"_hs)
+        .type("rgraphplan"_hs)
+        .base<resource>()
             .custom<type_info>(type_info{
                 .identifier = "graphplan",
                 .type_class = TYPE_CLASS_RESOURCE,

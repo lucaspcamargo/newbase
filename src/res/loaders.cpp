@@ -66,23 +66,25 @@ namespace nb {
         auto tree = ryml::parse_in_place(c4::to_substr(data.data()));
         auto root = tree.rootref();
 
-        std::string tex_path;
-        if (!root.has_child("texture"))
-        {
-            log::error("[rloader_sprite] missing 'texture' field: %x", id);
-            return nullptr;
-        }
-        c4::from_chars(root["texture"].val(), &tex_path);
-
         auto ret = std::make_shared<rsprite>(id);
 
-        // resolve and cache the texture
-        auto tex_id = entt::hashed_string{tex_path.c_str()}.value();
-        ret->tex = rman().get<rtexture>(tex_id);
-        if (!ret->tex)
+        std::string tex_path;
+        if (root.has_child("texture"))
         {
-            log::error("[rloader_sprite] cannot load texture '%s': %x", tex_path.c_str(), id);
-            return nullptr;
+            c4::from_chars(root["texture"].val(), &tex_path);
+
+            // resolve and cache the texture
+            auto tex_id = entt::hashed_string{tex_path.c_str()}.value();
+            ret->tex = rman().get<rtexture>(tex_id);
+            if (!ret->tex)
+            {
+                log::error("[rloader_sprite] cannot load texture '%s': %x", tex_path.c_str(), id);
+                return nullptr;
+            }
+        }
+        else
+        {
+            log::warn("[rloader_sprite] missing 'texture' field: %x", id);
         }
 
         if (root.has_child("anchor"))

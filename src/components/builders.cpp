@@ -52,6 +52,8 @@ bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
         def["pixel_snap"] >> dst.pixel_snap;
     if(def.has_child("animating"))
         def["animating"] >> dst.animating;
+    if(def.has_child("blend"))
+        def["blend"] >> ((int&)dst.blend);
     if(def.has_child("sequence"))
     {
         std::string seq;

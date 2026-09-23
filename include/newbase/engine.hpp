@@ -60,6 +60,9 @@ public:
     // returns reference to active layer set. override layers if set, otherwise game layers
     std::vector<render_layer>& render_layers();
 
+    /// return the real set of render layers, ignoring any overrides
+    std::vector<render_layer>& render_layers_real();
+
     void request_exit();
     void set_paused(bool paused);
     bool is_paused() const;

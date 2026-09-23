@@ -140,6 +140,7 @@ add_library(newbase STATIC
     src/render/camera.cpp
     src/render/collector2d.cpp
     src/render/window.cpp
+    src/render/rtti.cpp
 
     # resource system
     src/res/manager.cpp

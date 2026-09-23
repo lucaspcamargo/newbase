@@ -20,15 +20,15 @@ void csprite::_ensure_rtti()
             }
         })
         .ctor<>()
-        .data<&csprite::spr>("spr"_hs)
+        .data<&csprite::spr, entt::as_ref_t>("spr"_hs)
             .custom<rtti::data_info>(rtti::data_info{
                 .identifier       = "spr",
                 .subtype          = rtti::DATA_SUBTYPE_RESOURCE,
                 .resource_type_id = "rsprite"_hs.value()
             })
-        .data<&csprite::visible>("visible"_hs)
+        .data<&csprite::visible, entt::as_ref_t>("visible"_hs)
             .custom<rtti::data_info>(rtti::data_info{"visible"})
-        .data<&csprite::pixel_snap>("pixel_snap"_hs)
+        .data<&csprite::pixel_snap, entt::as_ref_t>("pixel_snap"_hs)
             .custom<rtti::data_info>(rtti::data_info{"pixel_snap"})
         .data<&csprite::color, entt::as_ref_t>("color"_hs)
         .custom<rtti::data_info>(rtti::data_info{.identifier="color", .subtype=rtti::DATA_SUBTYPE_COLOR})

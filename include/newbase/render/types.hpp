@@ -147,11 +147,11 @@ namespace nb::render
     /// Used in render target creation (via the renderer service).
     struct target_desc
     {
-        uint width {0};
-        uint height {0};
         target_size_mode size_mode{target_size_mode::ABSOLUTE};
-        float size_scale {1.0f};
-        target_id_t size_source {TARGET_INVALID};
+        unsigned int abs_width {0};                 // for absolute
+        unsigned int abs_height {0};                // for absolute
+        float size_scale {1.0f};                    // for relative
+        target_id_t size_source {TARGET_INVALID};   // for target relative
         bool has_depth {false};
     };
 

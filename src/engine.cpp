@@ -1,7 +1,3 @@
-#include "entt/meta/policy.hpp"
-#include "newbase/render/camera.hpp"
-#include "newbase/render/types.hpp"
-#include <algorithm>
 #include <newbase/engine.hpp>
 #include <newbase/system.hpp>
 #include <newbase/res/manager.hpp>
@@ -12,6 +8,7 @@
 #include <newbase/reflection/coercions.hpp>
 #include <newbase/reflection/lib_glm.hpp>
 #include <newbase/components/rtti.hpp>
+#include <newbase/render/rtti.hpp>
 #include <newbase/res/rtti.hpp>
 #include <newbase/i18n/i18n.hpp>
 #include <newbase/log.hpp>
@@ -37,14 +34,14 @@
 #include <entt/entt.hpp>
 #include <entt/meta/utility.hpp>
 #include <entt/meta/pointer.hpp>
+#include <entt/meta/policy.hpp>
 #include <tracy/Tracy.hpp>
 
+#include <algorithm>
 #include <functional>
+#include <iostream>
 #include <optional>
 #include <string>
-#include <fstream>
-#include <sstream>
-#include <iostream>
 
 
 using namespace nb;
@@ -356,9 +353,9 @@ bool engine::event(SDL_Event *evt)
 
 void engine::add_render_layer(const render_layer &layer)
 {
-    log::info("[engine] add_render_layer: order=%d camera=%u vp=%u mask=0x%x total=%zu",
-        layer.order, entt::to_integral(layer.camera), layer.viewport, layer.layer_mask,
-        _d->render_layers.size() + 1);
+    log::info("[engine] add_render_layer: order=%d camera=%u mask=0x%x total=%zu",
+        layer.order, entt::to_integral(layer.camera), layer.layer_mask,
+        _d->render_layers.size());
     _d->render_layers.push_back(layer);
     std::stable_sort(_d->render_layers.begin(), _d->render_layers.end(),
         [](const render_layer &a, const render_layer &b){ return a.order < b.order; });
@@ -388,6 +385,11 @@ std::vector<render_layer>& engine::render_layers()
 {
     if (!_d->override_render_layers.empty())
         return _d->override_render_layers;
+    return _d->render_layers;
+}
+
+std::vector<render_layer>& engine::render_layers_real()
+{
     return _d->render_layers;
 }
 
@@ -529,67 +531,14 @@ extern "C" void _rtti_init_engine()
     ::nb::rtti::_rtti_init_resources();
     ::nb::rtti::_rtti_init_services();
     ::nb::rtti::_rtti_init_components();
+    ::nb::render::_rtti_init_render();
 
-    /* unsure non how to register singletons, asked on discord
+
+    /* unsure now how to register singletons, asked on discord
        can possibly can be solved via some sort of proxy type that forwards to the singleton instance?
        Right now the scripting layer takes care of it.
     */
 
-    entt::meta_factory<nb::render::viewport_t>{}
-    .type("render_viewport"_hs)
-    .custom<rtti::type_info>(rtti::type_info{.identifier="render_viewport", .type_class=rtti::TYPE_CLASS_NONE})
-    .ctor<>()
-    .data<&nb::render::viewport_t::x, entt::as_ref_t>("x"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"x"})
-    .data<&nb::render::viewport_t::y, entt::as_ref_t>("y"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"y"})
-    .data<&nb::render::viewport_t::w, entt::as_ref_t>("w"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"w"})
-    .data<&nb::render::viewport_t::h, entt::as_ref_t>("h"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"h"});
-
-    entt::meta_factory<nb::render_layer>{}
-    .type("render_layer"_hs)
-    .custom<rtti::type_info>(rtti::type_info{.identifier="render_layer", .type_class=rtti::TYPE_CLASS_NONE})
-    .ctor<>()
-    .data<&nb::render_layer::scene_id>("scene_id"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"scene_id"})
-    .data<&nb::render_layer::layer_mask>("layer_mask"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"layer_mask"})
-    .data<&nb::render_layer::camera>("camera"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"camera"})
-    .data<&nb::render_layer::viewport, entt::as_ref_t>("viewport"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"viewport"})
-    .data<&nb::render_layer::order>("order"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"order"})
-    .data<&nb::render_layer::clear>("clear"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear"})
-    .data<&nb::render_layer::follow_ui>("follow_ui"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"follow_ui"})
-    .data<&nb::render_layer::clear_r>("clear_r"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear_r"})
-    .data<&nb::render_layer::clear_g>("clear_g"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear_g"})
-    .data<&nb::render_layer::clear_b>("clear_b"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"clear_b"});
-
-
-    // TODO fit mode enum
-
-    entt::meta_factory<nb::render::camera_2d>{}
-    .type("render_camera_2d"_hs)
-        .custom<rtti::type_info>(rtti::type_info{.identifier="render_camera_2d", .type_class=rtti::TYPE_CLASS_NONE})
-    .ctor<>()
-    .data<&nb::render::camera_2d::scale, entt::as_ref_t>("scale"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"scale"})
-    .data<&nb::render::camera_2d::fit_mode, entt::as_ref_t>("fit_mode"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"fit_mode"})
-    .data<&nb::render::camera_2d::fit_world_dims, entt::as_ref_t>("fit_world_dims"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"fit_world_dims"})
-    .data<&nb::render::camera_2d::fit_anchor, entt::as_ref_t>("fit_anchor"_hs)
-        .custom<rtti::data_info>(rtti::data_info{"fit_anchor"})
-    .func<&nb::render::camera_2d::calc_world_bounds>("calc_world_bounds"_hs)
-        .custom<rtti::func_info>(rtti::func_info{"calc_world_bounds"});
 
     entt::meta_factory<nb::engine>{}
     .type("engine"_hs)

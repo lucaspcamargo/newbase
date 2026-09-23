@@ -33,6 +33,10 @@ public:
     // if you are not the renderer, consider this RO
     bool rtarget {false};
 
+    // use neares neighbor scaling when rendering
+    // TODO replace by real enum when we get 3D?
+    bool nearest {false};
+
     // optional callback: reload the CPU surface from the resource manager (set by the loader).
     // Returns a freshly allocated SDL_Surface* that the caller owns, or nullptr on failure.
     SDL_Surface* (*reload_surface)(entt::id_type asset_id) {nullptr};

@@ -35,7 +35,7 @@ This is a living document.
         * [ ] Validate (and fix?) DPI handling on all platforms
     + [X] Clipping on render_2d (and ImGui)
     + [X] Cleanup render layer and viewport semantics, and create spec - see below section
-    * [~] Basic render-to-texture with render layers - WIP, see below
+    * [~] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
     + [ ] Impove UI overlay interface and semantics - see below
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
@@ -67,8 +67,10 @@ This is a living document.
     + [ ] Integrate LVGL
     + [ ] Integrate RmlUi
 - Lua Scripting
+    + [ ] Refactor some the API glue out of script_lua.cpp (too big, and decoupled)
     + [ ] Mechanism for automatic callback cleanup
     + [ ] Wire up enum RTTI when they are in place
+    + [ ] Reduce usage of lua_box::owner. ~~And improve support for pointer-like types in the bindings.~~(done?). This way we can use meta_any<shared_ptr<T>> directly. And cleanup the resource shared_ptr mess.
 - Lupi
     + [ ] Music and sfx, when Lupinho has it too and it is better documented
 - Sensors
@@ -78,6 +80,8 @@ This is a living document.
 - QOL
     + [X] Organize newbase systems in subdirectories (newbase system)
     + [ ] Group system-specific components and resources with their systems
+- Physics2D
+    + [ ] Some sort of collision callback system. Update Asteroids demo with that.
 - Demo
     + [ ] Proper in-game UI
     + [ ] Asteroids: add proper game loop and dynamic object spawning in waves
@@ -106,12 +110,16 @@ This is a living document.
 
 - [X] Define main interfaces
 - [X] Implement render_2d internal structures
-- [~] Implement target and viewport sizing mechanism
+- [X] Implement target and viewport sizing mechanism
     + [X] RT sizing dependency graph ordering and evaluation.
-    + [ ] Allow sizing viewports by RT, after RT resize pass (_targets_resize). Use a flag in layer.
-- [ ] Implement render targeting proper
-- [ ] Expose API to RTTI and script systems. Use target_ref in shared_ptr and a service locator.
-- [ ] create simple demo
+    + [X] Allow sizing viewports by RT, after RT resize pass (_targets_resize).
+- [X] Implement render targeting proper.
+- [X] Expose API to RTTI and script systems.
+        Bonus: we got important script_lua fixes for boxing non-movable types!
+- [X] Create simple demo: accumulation blur
+        Bonus++: Even more script_lua issues were surfaced and fixed!
+                 We now handle pointer-like types and use refs appropriately.
+- [ ] Polish: allow definition of clear data for initialization when needed.
   
 ## Scope: UI Overlays
     

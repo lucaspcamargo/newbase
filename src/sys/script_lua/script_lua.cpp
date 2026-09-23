@@ -162,7 +162,7 @@ void script_lua::bind_meta_types()
             entt::id_type type_id = type.id();
             lua_newtable(_d->L);
             lua_pushinteger(_d->L, (lua_Integer)type_id);
-            lua_pushcclosure(_d->L, [](lua_State *L) -> int {
+            lua_pushcclosure(_d->L, +[](lua_State *L) -> int {
                 auto tid = (entt::id_type)lua_tointeger(L, lua_upvalueindex(1));
                 auto mtype = entt::resolve(tid);
                 int argc = lua_gettop(L);
@@ -171,7 +171,33 @@ void script_lua::bind_meta_types()
                 for (int i = 1; i <= argc; ++i)
                     args.push_back(lua::lua_to_meta_any(L, i));
                 auto result = mtype.construct(args.empty() ? nullptr : args.data(), args.size());
-                if (!result) { lua_pushnil(L); return 1; }
+                if (!result) {
+                    rtti::type_info *ti = mtype.custom();
+                    std::string t_name {"?"};
+                    if(ti)
+                        t_name = ti->identifier;
+                    log::warn("[script_lua] constructor for '%s' (0x%08x) failed (%zu args)",
+                              t_name.c_str(), tid, args.size());
+                    for(int ai = 0; ai < argc; ai++)
+                    {
+                        log::warn("[script_lua]     arg #%d is of type (0x%08x)", ai, args[ai].type().id());
+                        rtti::type_info *ati = args[ai].type().custom();
+                        if(ati)
+                        {
+                            log::warn("[script_lua]     arg #%d is '%s'", ai, ati->identifier);
+                        }
+                    }
+                    lua_pushnil(L);
+                    return 1;
+                }
+                // TEST BEGIN
+                rtti::type_info *ti = mtype.custom();
+                std::string t_name {"?"};
+                if(ti)
+                    t_name = ti->identifier;
+                //log::warn("[script_lua] constructed '%s' (0x%08x), (%zu args)",
+                //          t_name.c_str(), tid, args.size());
+                // TEST END
                 lua::push_meta_any(L, std::move(result));
                 return 1;
             }, 1);
@@ -426,6 +452,9 @@ void script_lua::bind_resource_getters()
         std::string gname = std::string{"res_get_"} + static_cast<const char*>(info->identifier);
         lua_setglobal(_d->L, gname.c_str());
         log::info("[script_lua] registered resource getter: %s", gname.c_str());
+
+
+        // register new resource creator
     }
 }
 
@@ -700,6 +729,7 @@ bool script_lua::step(step_phase phase)
                     // register a getter function per component present on this entity
                     for (auto&& curr : reg.storage())
                     {
+                        // TODO remove these, use get_component(eid)
                         auto& storage = curr.second;
                         if (!storage.contains(id))
                             continue;
@@ -815,7 +845,7 @@ std::string script_lua::eval(const std::string &code)
     {
         const char *err = lua_tostring(_d->L, -1);
         std::string msg = err ? err : "(no message)";
-        log::warn("[script_lua] eval load error: %s", msg.c_str());
+        log::error("[script_lua] eval load error: %s", msg.c_str());
         lua_pop(_d->L, 1);
         return "load error: " + msg;
     }
@@ -826,7 +856,7 @@ std::string script_lua::eval(const std::string &code)
     {
         const char *err = lua_tostring(_d->L, -1);
         std::string msg = err ? err : "(no message)";
-        log::warn("[script_lua] eval runtime error: %s", msg.c_str());
+        log::error("[script_lua] eval runtime error: %s", msg.c_str());
         lua_pop(_d->L, 1);
         return "runtime error: " + msg;
     }
