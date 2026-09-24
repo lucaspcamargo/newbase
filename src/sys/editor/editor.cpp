@@ -384,8 +384,8 @@ bool editor::event(SDL_Event* evt)
             const ImGuiIO &io = ImGui::GetIO();
             const float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
             const float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-            const float vp_x = evt->button.x * sx - ui_vp.x;
-            const float vp_y = evt->button.y * sy - ui_vp.y;
+            const float vp_x = (evt->button.x - ui_vp.x) * sx;
+            const float vp_y = (evt->button.y - ui_vp.y) * sy;
 
             render_layer rl;
             rl.scene_id   = entt::null;
@@ -407,8 +407,12 @@ bool editor::event(SDL_Event* evt)
 
     if (evt->type == SDL_EVENT_MOUSE_MOTION && _d->panning && !ImGuizmo::IsUsing())
     {
-        _d->cam_x -= evt->motion.xrel / _d->cam_zoom;
-        _d->cam_y -= evt->motion.yrel / _d->cam_zoom;
+        auto *uim    = entt::locator<ui_manager*>::value();
+        const ImGuiIO &io = ImGui::GetIO();
+        const float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+        const float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+        _d->cam_x -= evt->motion.xrel / _d->cam_zoom * sx;
+        _d->cam_y -= evt->motion.yrel / _d->cam_zoom * sy;
     }
 
     if (evt->type == SDL_EVENT_MOUSE_WHEEL)
@@ -432,20 +436,20 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
     const float scy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
 
     // Physical→logical pixel helper: convert a world point to an ImGui screen position
-    const float vp_cx_phys = ui_vp.x + ui_vp.z * 0.5f;
-    const float vp_cy_phys = ui_vp.y + ui_vp.w * 0.5f;
+    const float ui_vp_cx = ui_vp.x + ui_vp.z * 0.5f;
+    const float ui_vp_cy = ui_vp.y + ui_vp.w * 0.5f;
     auto w2s = [&](float wx, float wy) -> ImVec2 {
         return {
-            ((wx - _d->cam_x) * _d->cam_zoom + vp_cx_phys) / scx,
-            ((wy - _d->cam_y) * _d->cam_zoom + vp_cy_phys) / scy
+            ((wx - _d->cam_x) * _d->cam_zoom) / scx + ui_vp_cx,
+            ((wy - _d->cam_y) * _d->cam_zoom) / scy + ui_vp_cy
         };
     };
     // Transform a world-space glm vec4 to screen
     auto v2s = [&](const glm::vec4 &v) -> ImVec2 { return w2s(v.x, v.y); };
 
     // Viewport clip rect in logical pixels so we don't draw outside it
-    const ImVec2 vp_min{ ui_vp.x / scx, ui_vp.y / scy };
-    const ImVec2 vp_max{ (ui_vp.x + ui_vp.z) / scx, (ui_vp.y + ui_vp.w) / scy };
+    const ImVec2 vp_min{ ui_vp.x, ui_vp.y };
+    const ImVec2 vp_max{ ui_vp.x + ui_vp.z, ui_vp.y + ui_vp.w };
 
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     dl->PushClipRect(vp_min, vp_max, true);
@@ -532,16 +536,16 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
     // --- Gizmo (selected entity, foreground draw list) ---
     if (_d->selected_entity != entt::null)
     {
-        const float lvp_x = ui_vp.x / scx, lvp_y = ui_vp.y / scy;
-        const float lvp_w = ui_vp.z / scx, lvp_h = ui_vp.w / scy;
+        const float lvp_x = ui_vp.x, lvp_y = ui_vp.y;
+        const float lvp_w = ui_vp.z, lvp_h = ui_vp.w;
 
         ImGuizmo::SetDrawlist(dl);
         ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
         ImGuizmo::SetOrthographic(true);
 
         glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
-        const float half_w = (ui_vp.z * 0.5f) / _d->cam_zoom;
-        const float half_h = (ui_vp.w * 0.5f) / _d->cam_zoom;
+        const float half_w = (ui_vp.z * 0.5f * scx) / _d->cam_zoom; // real pixels
+        const float half_h = (ui_vp.w * 0.5f * scy) / _d->cam_zoom; // real pixels
         glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
 
         auto *sp = reg.try_get<cspatial>(_d->selected_entity);
