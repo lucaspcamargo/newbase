@@ -1,5 +1,6 @@
 #pragma once
 
+#include <newbase/layer.hpp>
 #include <newbase/utility/glm.hpp>
 
 #include <functional>
@@ -26,12 +27,21 @@ namespace nb
 
         virtual void draw_tool_windows() = 0;
         virtual void draw_perf() = 0;
+        virtual void draw_overlays() = 0;
 
         // Overlay callbacks — drawn after all tool windows, on the foreground draw list.
-        // Suitable for debug wireframes, physics shapes, editor gizmos, etc.
-        using overlay_fn = std::function<void()>;
-        virtual void register_overlay(const char* name, overlay_fn fn) = 0;
-        virtual void unregister_overlay(const char* name) = 0;
+        // "layer" overlays are suitable for debug wireframes, physics shapes, editor gizmos, etc.
+        // Receives the render layer to draw with, and a viewport in gui space
+        // Always use the ui viewport instead of the layer's viewport
+        using layer_overlay_fn = std::function<void(const render_layer &rl, glm::vec4 ui_vp)>;
+        virtual void register_layer_overlay(const char* name, layer_overlay_fn fn) = 0;
+        virtual void unregister_layer_overlay(const char* name) = 0;
+        // "ui" overlays are suitable for interactive elements on the main UI viewport,
+        // that have no relation to specific render layers. The callback is invoked
+        // unconditionally, after the "layer" overlays
+        using ui_overlay_fn = std::function<void(glm::vec4 ui_vp)>;
+        virtual void register_ui_overlay(const char* name, ui_overlay_fn fn) = 0;
+        virtual void unregister_ui_overlay(const char* name) = 0;
 
         // Returns the ImGuiID of the root dockspace, or 0 if not available.
         virtual unsigned int dockspace_id() const { return 0; }

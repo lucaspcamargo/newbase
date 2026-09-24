@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/ui/overlay.hpp>
+#include <newbase/layer.hpp>
 #include <SDL3/SDL_joystick.h>
 #include <SDL3/SDL_events.h>
 #include <newbase/utility/glm.hpp>
@@ -9,7 +9,7 @@
 
 namespace nb {
 
-struct input_overlay : ui_overlay
+struct input_overlay
 {
     input_overlay();
     ~input_overlay();
@@ -17,7 +17,7 @@ struct input_overlay : ui_overlay
     bool init();
     void shutdown();
     void event(const SDL_Event &event);
-    void draw() const;
+    void draw(glm::vec4 ui_vp) const;
 
     bool enabled() const { return _enabled; }
     void set_enabled(bool enabled);

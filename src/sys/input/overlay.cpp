@@ -305,24 +305,17 @@ void input_overlay::reset_controls()
     }
 }
 
-void input_overlay::draw() const
+void input_overlay::draw(glm::vec4 ui_vp) const
 {
     if(!_visible || engine::instance().is_paused())
         return;
+
     const auto layout = current_layout();
     ImDrawList *draw_list = ImGui::GetForegroundDrawList();
-    const ImGuiViewport *viewport = ImGui::GetMainViewport();
-    ImVec2 clip_min = viewport->WorkPos;
-    ImVec2 clip_max = {clip_min.x + viewport->WorkSize.x, clip_min.y + viewport->WorkSize.y};
-    if(auto *renderer = entt::locator<renderer_service*>::value_or(nullptr))
-    {
-        if(auto *uim = entt::locator<ui_manager*>::value_or(nullptr))
-        {
-            auto vp = uim->central_viewport();
-            clip_min = {vp.x, vp.y};
-            clip_max = {vp.x + vp.z, vp.y + vp.w};
-        }
-    }
+
+    ImVec2 clip_min = {ui_vp.x, ui_vp.y};
+    ImVec2 clip_max = {ui_vp.x + ui_vp.z, ui_vp.y + ui_vp.w};
+
     draw_list->PushClipRect(clip_min, clip_max, true);
     const ImU32 idle = OVERLAY_COLOR_IDLE;
     const ImU32 active = OVERLAY_COLOR_ACTIVE;

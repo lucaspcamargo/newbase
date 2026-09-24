@@ -35,10 +35,13 @@ struct nb::ui_manager_p
     ImGuiID dockspace_id;
     std::string ini_path;
     ui_manager::open_resource_editor_fn open_resource_editor_cb;
-    std::vector<std::pair<std::string, ui_manager::overlay_fn>> overlays;
+
+    std::vector<std::pair<std::string, ui_manager::layer_overlay_fn>> layer_overlays;
+    std::vector<std::pair<std::string, ui_manager::ui_overlay_fn>> ui_overlays;
 
     glm::vec4 viewport_gui {0.0f};
     glm::ivec4 viewport_px {0};
+    glm::vec2 ui_scale {1.0f};
 };
 
 
@@ -191,18 +194,19 @@ glm::ivec4 ui_manager_simple::update_viewports()
     const ImGuiIO &io = ImGui::GetIO();
     float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
     float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-    const auto ui_vp = render::viewport_t {
+    _d->ui_scale = {sx, sy};
+    const auto vp_px = render::viewport_t {
         static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
         static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy)
     };
-    _d->viewport_px = {ui_vp.x, ui_vp.y, ui_vp.w, ui_vp.h};
+    _d->viewport_px = {vp_px.x, vp_px.y, vp_px.w, vp_px.h};
     _d->viewport_gui = {work_pos.x, work_pos.y, work_size.x, work_size.y};
 
     for(auto &l: engine::instance().render_layers())
     {
         if(l.follow_ui)
         {
-            l.viewport = ui_vp;
+            l.viewport = vp_px;
         }
     }
 
@@ -472,22 +476,67 @@ void ui_manager_simple::draw_perf()
     col_text.w *= 0.5f; // make text more transparent
     dl->AddText(bottom_text_pos, ImGui::ColorConvertFloat4ToU32(col_text),
         bottom_text.c_str());
-
-    // Registered overlays (debug wireframes, gizmos, etc.)
-    for (auto &[name, fn] : _d->overlays)
-        fn();
 }
 
-void ui_manager_simple::register_overlay(const char* name, overlay_fn fn)
+void ui_manager_simple::draw_overlays()
 {
-    for (auto &[n, f] : _d->overlays)
+    // first draw the layer overlays for layers that have that enabled
+    // then draws the ui overlays on top
+
+    const auto vp_ui = glm::vec4 {
+        _d->viewport_gui.x,
+        _d->viewport_gui.y,
+        _d->viewport_gui.z,
+        _d->viewport_gui.w
+    };
+
+    for(const auto &rl: engine::instance().render_layers())
+    {
+        if(rl.ui_overlays)
+        {
+            auto vp_layer = rl.target_id == render::TARGET_DEFAULT
+                ? glm::vec4 {
+                    rl.viewport.x / _d->ui_scale.x,
+                    rl.viewport.y / _d->ui_scale.y,
+                    rl.viewport.w / _d->ui_scale.x,
+                    rl.viewport.h / _d->ui_scale.y,
+                }
+                : vp_ui;
+
+            for (auto &[name, fn] : _d->layer_overlays)
+                fn(rl, vp_layer);
+        }
+    }
+
+    for (auto &[name, fn] : _d->ui_overlays)
+        fn(vp_ui);
+}
+
+void ui_manager_simple::register_layer_overlay(const char* name, layer_overlay_fn fn)
+{
+    for (auto &[n, f] : _d->layer_overlays)
         if (n == name) { f = std::move(fn); return; }
-    _d->overlays.emplace_back(name, std::move(fn));
+    _d->layer_overlays.emplace_back(name, std::move(fn));
 }
 
-void ui_manager_simple::unregister_overlay(const char* name)
+void ui_manager_simple::unregister_layer_overlay(const char* name)
 {
-    auto &v = _d->overlays;
+    auto &v = _d->layer_overlays;
     v.erase(std::remove_if(v.begin(), v.end(),
         [name](const auto &p){ return p.first == name; }), v.end());
+}
+
+
+void ui_manager_simple::register_ui_overlay(const char* name, ui_overlay_fn fn)
+{
+    for (auto &[n, f] : _d->ui_overlays)
+        if (n == name) { f = std::move(fn); return; }
+        _d->ui_overlays.emplace_back(name, std::move(fn));
+}
+
+void ui_manager_simple::unregister_ui_overlay(const char* name)
+{
+    auto &v = _d->ui_overlays;
+    v.erase(std::remove_if(v.begin(), v.end(),
+                           [name](const auto &p){ return p.first == name; }), v.end());
 }

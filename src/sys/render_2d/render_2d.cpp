@@ -301,6 +301,8 @@ bool render_2d::step(nb::step_phase phase)
     {
         if(_d->has_ui)
         {
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->draw_overlays();
             _d->imgui.render_flush();
         }
     }

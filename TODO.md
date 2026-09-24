@@ -55,14 +55,20 @@ This is a living document.
 - Audio
     + [ ] Spatial sound support, 2D and 3D
     + [ ] Basic HRTF support in spatial functionality
+    + [ ] Sequenced music and sfx usin synths. Look into tsf/tml, and pl_synth.
+          Also integrate ymfm.
     + [ ] "Maestro" system for handling dynamic music and transitions
+    + [ ] Reusable effect pipelines as subgraphs + graphplan resource IO
+    + [ ] Better audio tools layout
 - Tooling UI (ImGui)
     + [ ] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
+        * [ ] Restore image editor
         * To avoid constant texture reloads, we may cache loaded textures until the next frame.
           Mostly a contingency, as UI that renders with textures should itself hold references to the textures it uses.
     + [ ] Unify tool window toggle, remove dedicated debug actions
     + [ ] Default dock layout mechanism for tool and editor windows
     + [ ] Integrate imgui-text-editor for scripts and text files
+    + [ ] Make resource editor work with plain shared_ptr, resource system registration should be optional
 - In-Game UI
     + [ ] Integrate LVGL
     + [ ] Integrate RmlUi
@@ -84,6 +90,7 @@ This is a living document.
     + [ ] Some sort of collision callback system. Update Asteroids demo with that.
 - Demo
     + [ ] Proper in-game UI
+    + [ ] API for UI paramters
     + [ ] Asteroids: add proper game loop and dynamic object spawning in waves
     + [ ] Platformer: A bit more polish, no need to go overboard though
     + [ ] Fast-rodent: Get it working with some cool resources from the web

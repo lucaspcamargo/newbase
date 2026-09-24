@@ -24,6 +24,7 @@ namespace nb
         void unregister_tool_window(const char* name) override;
         void draw_tool_windows() override;
         void draw_perf() override;
+        void draw_overlays() override;
 
         glm::ivec4 update_viewports() override;
         glm::vec4 central_viewport(bool pixel_coords = false) override;
@@ -34,8 +35,11 @@ namespace nb
         void register_open_resource_editor_callback(open_resource_editor_fn fn) override;
         void request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name) override;
 
-        void register_overlay(const char* name, overlay_fn fn) override;
-        void unregister_overlay(const char* name) override;
+        void register_layer_overlay(const char* name, layer_overlay_fn fn) override;
+        void unregister_layer_overlay(const char* name) override;
+        void register_ui_overlay(const char* name, ui_overlay_fn fn) override;
+        void unregister_ui_overlay(const char* name) override;
+
     private:
         ui_manager_p *_d;
     };

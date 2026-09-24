@@ -98,7 +98,7 @@ input::~input()
 {
     if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
     {
-        ui_mgr->unregister_overlay("input_overlay");
+        ui_mgr->unregister_ui_overlay("input_overlay");
         ui_mgr->unregister_tool_window("input_debug");
     }
     delete _d;
@@ -160,10 +160,10 @@ bool input::init(ryml::ConstNodeRef cfg)
     }
     _d->overlay.set_enabled(_d->overlay_force || _d->overlay_enabled);
     _d->overlay.set_dpad_mode(_d->overlay_dpad);
-    entt::locator<ui_manager*>::value()->register_overlay("input_overlay", [this]() {
+    entt::locator<ui_manager*>::value()->register_ui_overlay("input_overlay", [this](glm::vec4 ui_vp) {
         _d->overlay.set_visible(_d->overlay_force ||
                                 (_d->overlay_enabled && _d->wants_overlay));
-        _d->overlay.draw();
+        _d->overlay.draw(ui_vp);
     });
 
     if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))

@@ -24,6 +24,11 @@ newbase_declare_resources(TARGET newbase_demo ${BUILD_SYMLINKS} INDEX
         "${CMAKE_CURRENT_BINARY_DIR}/config.yaml"
 )
 
+if(NEWBASE_LTO)
+    # enable verbose mode if with LTO, for better visibility
+    target_link_options(newbase_demo BEFORE PRIVATE LINKER:-V)
+endif()
+
 if(NEWBASE_SGDK)
     # we have sgdk support, let's add the game target for use in the demo
     newbase_sgdk_add_game( TARGET newbase_demo_sgdk_hello

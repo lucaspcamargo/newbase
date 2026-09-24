@@ -8,7 +8,6 @@
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/log.hpp>
-#include <newbase/ui/overlay.hpp>
 #include <newbase/services/renderer_service.hpp>
 #include <newbase/services/ui_manager.hpp>
 #include <newbase/reflection/contexts.hpp>
@@ -95,23 +94,16 @@ struct nb::physics2d_p
     }
 };
 
-class nb::physics2d_debug_overlay : public ui_overlay
+class nb::physics2d_debug_overlay
 {
 public:
     explicit physics2d_debug_overlay(physics2d &owner) : _owner(owner) {}
 
-    void draw() const override
+    void draw(const render_layer &rl, glm::vec4 ui_vp) const
     {
         auto *data = _owner._d;
         if(!data->debug_draw_enabled || B2_IS_NULL(data->world_id))
             return;
-
-        ui_manager* uim = entt::locator<ui_manager*>::value_or(nullptr);
-        if(!uim)
-            return;
-
-
-        auto ui_vp = uim->central_viewport();
 
         /* TODO - do it with ui viewport and camera data
          * Which camera? Good question.
@@ -144,7 +136,7 @@ physics2d::~physics2d()
     log::info("[physics2d] destroying");
 
     if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
-        ui_mgr->unregister_overlay("physics2d_debug_draw");
+        ui_mgr->unregister_layer_overlay("physics2d_debug_draw");
 
     if(B2_IS_NON_NULL(_d->world_id))
     {
@@ -193,13 +185,13 @@ bool physics2d::init(ryml::ConstNodeRef cfg)
         ui_mgr->register_tool_window("physics2d", [this](bool *open){
             _draw_tool_window(open);
         });
-        ui_mgr->register_overlay("physics2d_debug_draw", [this]() {
-            _d->debug_overlay->draw();
+        ui_mgr->register_layer_overlay("physics2d_debug_draw", [this](const render_layer &rl, glm::vec4 ui_vp) {
+            _d->debug_overlay->draw(rl, ui_vp);
         });
     }
 
     engine::instance().debug_action_register("Physics2D Tools", [](){
-        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value_or(nullptr);
         if(ui_mgr)
             ui_mgr->toggle_tool_window("physics2d");
     }, 8);

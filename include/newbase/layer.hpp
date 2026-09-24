@@ -38,10 +38,13 @@ struct render_layer
     /// central view node.
     bool                follow_ui   {false};
 
+    /// Whether UI overlays render over this layer
+    /// Note that layers with render targets will always use the main UI viewport
+    bool                ui_overlays {false};
+
     /// Render target to draw this layer onto. The targets are managed by the
     /// renderer via the renderer_service interface.
     render::target_id_t target_id   {render::TARGET_DEFAULT};
-
 
     /// Whether to resize viewport to render target size (except for TARGET_DEFAULT)
     bool                follow_target {false};

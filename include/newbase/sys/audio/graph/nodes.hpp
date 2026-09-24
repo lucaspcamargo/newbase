@@ -7,7 +7,6 @@
 #include <newbase/sys/audio/converter.hpp>
 #include <newbase/sys/audio/visualizer_feedback.hpp>
 #include <newbase/sys/audio/producer/lpc.hpp>
-#include <newbase/sys/audio/lpc_vocab.hpp>
 #include <newbase/sys/audio/res/rlpcvocab.hpp>
 #include <newbase/log.hpp>
 #include <memory>

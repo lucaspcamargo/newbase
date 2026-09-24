@@ -71,17 +71,13 @@ struct nb::editor_p
     float        cam_y            = 0.f;
     float        cam_zoom         = 1.f;
     bool         panning          = false;
-
-    // Central viewport rect in physical pixels, updated each frame from the ImGui dock node.
-    // The editor owns this when override layers are active; the UI manager backs off.
-    int vp_x = 0, vp_y = 0, vp_w = 0, vp_h = 0;
 };
 
 editor::editor()  : _d(new editor_p) {}
 editor::~editor()
 {
     if (auto *ui_mgr = entt::locator<ui_manager*>::value())
-        ui_mgr->unregister_overlay("editor_wireframes");
+        ui_mgr->unregister_layer_overlay("editor_wireframes");
     delete _d;
 }
 
@@ -129,7 +125,9 @@ void editor::_apply_override_layers()
     rl.viewport   = {};
     rl.order      = 1;
     rl.follow_ui  = true;
+    rl.ui_overlays = true;
     rl.clear      = false;
+
     engine::instance().set_override_render_layers({rl_grid, rl});
 }
 
@@ -182,7 +180,9 @@ bool editor::init(ryml::ConstNodeRef cfg)
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
     ui_mgr->register_open_resource_editor_callback(open_res_editor);
 
-    ui_mgr->register_overlay("editor_wireframes", [this]() { _draw_overlay(); });
+    ui_mgr->register_layer_overlay("editor_wireframes", [this](const render_layer &rl, glm::vec4 ui_vp) {
+        _draw_overlay(rl, ui_vp);
+    });
 
     return true;
 }
@@ -208,13 +208,6 @@ bool editor::step(step_phase phase)
             if (auto *cam = reg.try_get<ccamera>(_d->editor_cam_eid))
                 cam->cam2d.scale = _d->cam_zoom;
         }
-
-        // also update internal viewport state
-        auto vp = entt::locator<ui_manager*>::value()->central_viewport(true);
-        _d->vp_x = vp.x;
-        _d->vp_y = vp.y;
-        _d->vp_w = vp.z;
-        _d->vp_h = vp.w;
     }
 
     if (_d->enabled)
@@ -373,6 +366,8 @@ bool editor::step(step_phase phase)
 
 bool editor::event(SDL_Event* evt)
 {
+    // TODO better pointer events handling
+
     if (!_d->enabled || !_d->override_layers) return true;
     auto &io = ImGui::GetIO();
     if (io.WantCaptureMouse) return true;
@@ -381,15 +376,16 @@ bool editor::event(SDL_Event* evt)
         && !ImGuizmo::IsOver())
     {
         auto *picker = entt::locator<picker_service*>::value();
-        auto *rs     = entt::locator<renderer_service*>::value();
-        if (picker && rs && engine::instance().render_layers().size())
+        auto *uim    = entt::locator<ui_manager*>::value();
+        auto ui_vp = uim->central_viewport();
+        if (picker && engine::instance().render_layers().size())
         {
             // evt->button.x/y are logical pixels; vp_x/y are physical — scale to match
             const ImGuiIO &io = ImGui::GetIO();
             const float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
             const float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-            const float vp_x = evt->button.x * sx - _d->vp_x;
-            const float vp_y = evt->button.y * sy - _d->vp_y;
+            const float vp_x = evt->button.x * sx - ui_vp.x;
+            const float vp_y = evt->button.y * sy - ui_vp.y;
 
             render_layer rl;
             rl.scene_id   = entt::null;
@@ -424,17 +420,20 @@ bool editor::event(SDL_Event* evt)
     return true;
 }
 
-void editor::_draw_overlay()
+void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
 {
-    if (!_d->override_layers || _d->vp_w <= 0 || _d->vp_h <= 0) return;
+    // TODO use ui_vp correctly
+    // TODO fix coord calculation
+
+    if (!_d->override_layers || ui_vp.z <= 0 || ui_vp.w <= 0) return;
 
     const ImGuiIO &io  = ImGui::GetIO();
     const float scx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
     const float scy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
 
     // Physical→logical pixel helper: convert a world point to an ImGui screen position
-    const float vp_cx_phys = _d->vp_x + _d->vp_w * 0.5f;
-    const float vp_cy_phys = _d->vp_y + _d->vp_h * 0.5f;
+    const float vp_cx_phys = ui_vp.x + ui_vp.z * 0.5f;
+    const float vp_cy_phys = ui_vp.y + ui_vp.w * 0.5f;
     auto w2s = [&](float wx, float wy) -> ImVec2 {
         return {
             ((wx - _d->cam_x) * _d->cam_zoom + vp_cx_phys) / scx,
@@ -445,8 +444,8 @@ void editor::_draw_overlay()
     auto v2s = [&](const glm::vec4 &v) -> ImVec2 { return w2s(v.x, v.y); };
 
     // Viewport clip rect in logical pixels so we don't draw outside it
-    const ImVec2 vp_min{ (float)_d->vp_x / scx, (float)_d->vp_y / scy };
-    const ImVec2 vp_max{ (_d->vp_x + _d->vp_w) / scx, (_d->vp_y + _d->vp_h) / scy };
+    const ImVec2 vp_min{ ui_vp.x / scx, ui_vp.y / scy };
+    const ImVec2 vp_max{ (ui_vp.x + ui_vp.z) / scx, (ui_vp.y + ui_vp.w) / scy };
 
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     dl->PushClipRect(vp_min, vp_max, true);
@@ -533,16 +532,16 @@ void editor::_draw_overlay()
     // --- Gizmo (selected entity, foreground draw list) ---
     if (_d->selected_entity != entt::null)
     {
-        const float lvp_x = _d->vp_x / scx, lvp_y = _d->vp_y / scy;
-        const float lvp_w = _d->vp_w / scx, lvp_h = _d->vp_h / scy;
+        const float lvp_x = ui_vp.x / scx, lvp_y = ui_vp.y / scy;
+        const float lvp_w = ui_vp.z / scx, lvp_h = ui_vp.w / scy;
 
         ImGuizmo::SetDrawlist(dl);
         ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
         ImGuizmo::SetOrthographic(true);
 
         glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
-        const float half_w = (_d->vp_w * 0.5f) / _d->cam_zoom;
-        const float half_h = (_d->vp_h * 0.5f) / _d->cam_zoom;
+        const float half_w = (ui_vp.z * 0.5f) / _d->cam_zoom;
+        const float half_h = (ui_vp.w * 0.5f) / _d->cam_zoom;
         glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
 
         auto *sp = reg.try_get<cspatial>(_d->selected_entity);
