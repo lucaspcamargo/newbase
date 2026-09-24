@@ -16,6 +16,7 @@ target0 = render_target_ref.new(svc_renderer_service(), desc0) -- not local, nee
 local desc1 = render_target_desc.new()
 desc1.size_mode = 2 -- TARGET_RELATIVE
 desc1.size_source = target0:id()
+desc1.init_clear = true
 target1 = render_target_ref.new(svc_renderer_service(), desc1) -- not local, needs to persist in script env
 
 -- now we take the color textures created for the targets, and set them as the
@@ -42,8 +43,8 @@ rl_rt.order      = 0
 rl_rt.camera     = cam_eid
 rl_rt.clear      = true
 rl_rt.clear_r    = 0.0
-rl_rt.clear_g    = 0.0
-rl_rt.clear_b    = 0.0
+rl_rt.clear_g    = 0.02
+rl_rt.clear_b    = 0.03
 rl_rt.target_id  = target0:id()
 rl_rt.layer_mask = 1
 engine:add_render_layer(rl_rt)
@@ -65,3 +66,6 @@ rl_rt.clear      = false
 rl_present.layer_mask = 4
 engine:add_render_layer(rl_present)
 
+
+-- TODO allow changing texture scale interactively (update_scale method in target_handle and service?)
+--      allow changing effect strength interactively (interactive controls could use some new demo system API for UI params)

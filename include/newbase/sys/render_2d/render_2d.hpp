@@ -61,7 +61,8 @@ public:
 private:
     // tries to ensure a texture is ready for rendering, uploading it
     // if possible. for internal use, so raw pointer is fine
-    void _prepare_texture(rtexture *tex);
+    // return whether the texture changed (created, recreated, destroyed)
+    bool _prepare_texture(rtexture *tex);
 
     // draws a scene using the given layer's masking, and the given VP matrix
     // uses batcher2d and collect2d to do it

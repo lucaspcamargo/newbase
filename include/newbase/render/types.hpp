@@ -153,6 +153,7 @@ namespace nb::render
         float size_scale {1.0f};                    // for relative
         target_id_t size_source {TARGET_INVALID};   // for target relative
         bool has_depth {false};
+        bool init_clear {false};
     };
 
 };

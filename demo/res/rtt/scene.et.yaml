@@ -50,10 +50,10 @@
     spatial:
       pos: [0, 0, 0]
       rot: [0, 0, 0]
-      scale: [1, 1, 1]
+      scale: [1.1, 1.1, 1]
     sprite:
       res: "res/rtt/accum.sprite"
-      color: [1.0, 1.0, 1.0, 0.2]
+      color: [1.0, 1.0, 1.0, 0.1]
     layers:
       mask: 2
 
@@ -62,7 +62,7 @@
     spatial:
       pos: [0, 0, 0]
       rot: [0, 0, 0]
-      scale: [8, 8, 1]
+      scale: [1, 1, 1]  # used in the script to determine texture size
     sprite:
       res: "res/rtt/present.sprite"
     layers:

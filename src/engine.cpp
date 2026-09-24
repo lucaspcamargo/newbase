@@ -243,18 +243,6 @@ bool engine::step()
         return false;
     }
 
-    if(_d->pending_scene_id.has_value())
-    {
-        ZoneNamed(scope_scene_change, true);
-        entt::id_type next = *_d->pending_scene_id;
-        _d->pending_scene_id.reset();
-        log::info("[engine] scene change: %x", next);
-        for(auto &s : _d->_systems)
-            s->on_scene_change();
-        _d->default_scene.clear();
-        _d->default_scene.build_etree(next);
-    }
-
     bool ret = true;
 
     for(int i = 0; i < nb::step_phase::_STEP_PHASE_COUNT; i++)
@@ -283,6 +271,21 @@ bool engine::step()
         }
         else
             break;
+
+        if(i <= (int)step_phase::PRE_UPDATE)
+        {
+            if(_d->pending_scene_id.has_value())
+            {
+                ZoneNamed(scope_scene_change, true);
+                entt::id_type next = *_d->pending_scene_id;
+                _d->pending_scene_id.reset();
+                log::info("[engine] scene change: %x", next);
+                for(auto &s : _d->_systems)
+                    s->on_scene_change();
+                _d->default_scene.clear();
+                _d->default_scene.build_etree(next);
+            }
+        }
     }
 
     // update totals and advance end index

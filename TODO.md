@@ -35,7 +35,7 @@ This is a living document.
         * [ ] Validate (and fix?) DPI handling on all platforms
     + [X] Clipping on render_2d (and ImGui)
     + [X] Cleanup render layer and viewport semantics, and create spec - see below section
-    * [~] Basic render-to-texture with render layers
+    * [X] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
     + [ ] Impove UI overlay interface and semantics - see below
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
@@ -119,7 +119,7 @@ This is a living document.
 - [X] Create simple demo: accumulation blur
         Bonus++: Even more script_lua issues were surfaced and fixed!
                  We now handle pointer-like types and use refs appropriately.
-- [ ] Polish: allow definition of clear data for initialization when needed.
+- [X] Polish: allow definition of clear data for initialization when needed.
   
 ## Scope: UI Overlays
     

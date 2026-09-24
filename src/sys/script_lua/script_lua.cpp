@@ -654,7 +654,7 @@ void script_lua::bind_global_api()
 bool script_lua::step(step_phase phase)
 {
     // TODO do not scan everything every frame (use reactive storage)
-    if(phase == step_phase::PREPARE)
+    if(phase == step_phase::PRE_UPDATE)
     {
         auto &reg = engine::instance().default_scene().registry();
         auto view = reg.view<cscript>();

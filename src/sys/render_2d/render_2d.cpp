@@ -22,6 +22,7 @@
 #include <newbase/utility/topological_sort.hpp>
 
 #include "./rtt_private.hpp"
+#include "SDL3/SDL_blendmode.h"
 #include "entt/graph/adjacency_matrix.hpp"
 #include "entt/graph/fwd.hpp"
 
@@ -361,8 +362,18 @@ bool render_2d::step(nb::step_phase phase)
                     auto col = tgt.color_tex;
                     if(col)
                     {
-                        _prepare_texture(col.get()); // create texture or apply size
+                        auto changed = _prepare_texture(col.get()); // (re) create texture or apply size
+                        if(!col->rptr)
+                            continue;   // cannot continue
                         SDL_SetRenderTarget(_d->render, static_cast<SDL_Texture*>(col->rptr));
+                        if(changed && tgt.desc.init_clear && !layer.clear)
+                        {
+                            // clear target if texture was recreated and flag is set
+                            SDL_SetRenderDrawColor(_d->render, 0, 0, 0, 255);
+                            SDL_SetRenderDrawBlendMode(_d->render, SDL_BLENDMODE_NONE);
+                            SDL_FRect area{ 0.f, 0.f, (float)col->width, (float)col->height };
+                            SDL_RenderFillRect(_d->render, &area);
+                        }
                     }
                     else
                     {
@@ -386,7 +397,8 @@ bool render_2d::step(nb::step_phase phase)
                 //log::info("CLEAR %dx%d @ %d,%d", vp.w, vp.h, vp.x, vp.y);
                 SDL_SetRenderDrawColor(_d->render,
                     static_cast<Uint8>(layer.clear_r * 255), static_cast<Uint8>(layer.clear_g * 255),
-                    static_cast<Uint8>(layer.clear_b * 255), 255);
+                                       static_cast<Uint8>(layer.clear_b * 255), 255);
+                SDL_SetRenderDrawBlendMode(_d->render, SDL_BLENDMODE_NONE);
                 SDL_FRect clip { static_cast<float>(vp.x), static_cast<float>(vp.y),
                                     static_cast<float>(vp.w), static_cast<float>(vp.h) };
                 SDL_RenderFillRect(_d->render, &clip);
@@ -609,9 +621,10 @@ void render_2d::_draw_batches(render::batcher2d& batcher, render::clip_t clip)
     SDL_SetRenderClipRect(_d->render, nullptr);
 }
 
-void render_2d::_prepare_texture(rtexture *rtex)
+bool render_2d::_prepare_texture(rtexture *rtex)
 {
     assert(rtex);  // this shuldd never happen
+
 
     auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
 
@@ -619,6 +632,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
     {
         // this texture is a render target
 
+        bool changed {false};
         bool destroy {false};
         bool create {false};
 
@@ -633,7 +647,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
         else if(sdltex && sdltex->w == rtex->width && sdltex->h == rtex->height)
         {
             // target texture exists and size matches, nothing to do
-            return;
+            return changed;
         }
         else if(!sdltex)
         {
@@ -651,6 +665,7 @@ void render_2d::_prepare_texture(rtexture *rtex)
         {
             SDL_DestroyTexture(sdltex);
             rtex->rptr = sdltex = nullptr;
+            changed = true;
         }
 
         if(create && !sdltex)
@@ -668,15 +683,15 @@ void render_2d::_prepare_texture(rtexture *rtex)
                 SDL_ScaleMode sm = rtex->nearest?
                 SDL_SCALEMODE_NEAREST : _d->default_tex_scalemode;
                 SDL_SetTextureScaleMode(sdltex, sm);
+                changed = true;
             }
             else
             {
-
                 log::warn("[render_2d] rt texture creation failure for 0x%08x: '%s'", rtex->id(), SDL_GetError());
             }
         }
 
-        return;
+        return changed;
     }
 
     // common texture
@@ -712,7 +727,9 @@ void render_2d::_prepare_texture(rtexture *rtex)
         // even on upload failure, we destroy the surface, to prevent continuous failure every frame
         SDL_DestroySurface(rtex->surf);
         rtex->surf = nullptr;
+        return true;
     }
+    return false;
 }
 
 entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)

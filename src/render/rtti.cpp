@@ -76,7 +76,9 @@ void nb::render::_rtti_init_render()
     .data<&target_desc::size_source, entt::as_ref_t>("size_source"_hs)
     .custom<rtti::data_info>(rtti::data_info{"size_source"})
     .data<&target_desc::has_depth, entt::as_ref_t>("has_depth"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"has_depth"});
+    .custom<rtti::data_info>(rtti::data_info{"has_depth"})
+    .data<&target_desc::init_clear, entt::as_ref_t>("init_clear"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"init_clear"});
 
     entt::meta_factory<target_ref>{}
     .type("render_target_ref"_hs)
