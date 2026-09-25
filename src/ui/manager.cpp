@@ -136,6 +136,17 @@ void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int saf
     ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(safe_y);
     ImGui::GetMainViewport()->WorkSize.x = static_cast<float>(safe_w);
     ImGui::GetMainViewport()->WorkSize.y = static_cast<float>(safe_h);
+
+    float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
+    float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+    const auto new_scale = glm::vec2{sx, sy};
+    if(_d->ui_scale != new_scale)
+    {
+        // redo font setup when DPI changes
+        imgui_style_fonts_setup(sx);
+    }
+    _d->ui_scale = new_scale;
+    auto prev = _d->ui_scale;
 }
 
 void ui_manager_simple::ui_destroy()
@@ -191,10 +202,9 @@ glm::ivec4 ui_manager_simple::update_viewports()
         work_size = central_node->Size;
     }
 
-    const ImGuiIO &io = ImGui::GetIO();
-    float sx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-    float sy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
-    _d->ui_scale = {sx, sy};
+    float sx = _d->ui_scale.x;
+    float sy = _d->ui_scale.y;
+
     const auto vp_px = render::viewport_t {
         static_cast<int>(work_pos.x  * sx), static_cast<int>(work_pos.y  * sy),
         static_cast<int>(work_size.x * sx), static_cast<int>(work_size.y * sy)

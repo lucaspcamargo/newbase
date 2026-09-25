@@ -91,7 +91,9 @@ void nb::imgui_style_setup()
 
 void nb::imgui_style_fonts_setup(float scale)
 {
-    ImGui::GetIO().Fonts->ClearFonts();
+    // erases all char rects from pack structure
+    // also start with clean font atlas, prevents leftover garbage in seams
+    ImGui::GetIO().Fonts->Clear();
 
     std::string mainfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Regular.ttf";
     std::vector<char> mainfont_data;
@@ -101,7 +103,6 @@ void nb::imgui_style_fonts_setup(float scale)
     {
         ImFontConfig config;
         strncpy(config.Name, "regular", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = scale;
         void * copy = malloc(mainfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, mainfont_data.data(), mainfont_data.size());
         ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, mainfont_data.size(), (float)kUiFontSize, &config);
@@ -119,7 +120,6 @@ void nb::imgui_style_fonts_setup(float scale)
     {
         ImFontConfig config;
         strncpy(config.Name, "icons", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = scale;
         config.MergeMode = true;
         config.GlyphMinAdvanceX = (float)kUiFontSize;
         void * copy = malloc(iconfont_data.size()); // need to copy, imgui takes ownership
@@ -140,7 +140,6 @@ void nb::imgui_style_fonts_setup(float scale)
     {
         ImFontConfig config;
         strncpy(config.Name, "icons_kenney", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = scale;
         config.MergeMode = true;
         config.GlyphMinAdvanceX = (float)kUiFontSize;
         config.GlyphOffset.y = 1.0f; // adjust vertical position
@@ -162,7 +161,6 @@ void nb::imgui_style_fonts_setup(float scale)
     {
         ImFontConfig config;
         strncpy(config.Name, "bold", sizeof(ImFontConfig::Name));
-        config.RasterizerDensity = scale;
         void * copy = malloc(boldfont_data.size()); // need to copy, imgui takes ownership
         memcpy(copy, boldfont_data.data(), boldfont_data.size());
         ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, boldfont_data.size(), (float)kUiFontSize, &config);

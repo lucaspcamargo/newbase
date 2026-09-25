@@ -13,6 +13,9 @@ This is a living document.
     + [ ] Move system-specific resources and components out of engine core
     + [X] Decouple rtexture from SDL_Texture. Texture specialization is a renderer task.
     + [ ] Ship standard "engine intro" scene in core resources
+    + [ ] Ad-hoc event scaling is out of control. Uniformize behavior in render::window.
+          It's our fault for having two different 2D coordinate systems, UI and pixel.
+          But it's also SDL's fault for providing events in logical or real pixels depending on the platform.
 - Editor
     + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs
@@ -61,6 +64,7 @@ This is a living document.
     + [ ] Reusable effect pipelines as subgraphs + graphplan resource IO
     + [ ] Better audio tools layout
 - Tooling UI (ImGui)
+    + [X] Fix DPI change behavior + font reset when needed
     + [ ] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
         * [ ] Restore image editor
         * To avoid constant texture reloads, we may cache loaded textures until the next frame.

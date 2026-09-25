@@ -58,7 +58,7 @@ class window final
          * Gets the current window UI scaling, as reported by the OS.
          * This denotes how large to scale a typical UI, from logical pixels to physical pixels.
          * On all platforms, this should be a reasonable scale factor: typically ~2.0 on hiDPI and ~1.0 in traditional resolutions.
-         * Events need to be passed by the renderer in order to update this.
+         * Window events need to be passed to the renderer in order to update this.
          * Even then, ui scale changes may be flaky.
          */
         float ui_scale() const {return m_ui_scale;}
@@ -68,7 +68,7 @@ class window final
          * This can be used to convert event coordinates (mouse, pointer, etc) to pixel coordinates.
          * On Windows, X11, and Android, as events are passed in pixel coordinates, this should be 1.0.
          * On macOS and Wayland, as events are passed in logical coordinates, this can be larger than 1.0.
-         * Events need to be passed by the renderer in order to update this.
+         * Window events need to be passed to the renderer in order to update this.
          * Even then, ui scale changes may be flaky.
          */
         float event_scale() const {return m_event_scale;}
@@ -96,9 +96,34 @@ class window final
          */
         void center();
 
+        /**
+         * Returns a scaled SDL_Event that has pointer/pen coordinates in pixel dimensions.
+         * This is abstracted away here because the event coordinate system is
+         * platform-dependent.
+         * This assumes an event as provided by SDL.
+         * @returns A copy of the original event, scaled if necessary.
+         */
+        SDL_Event event_to_pixel_coordinates(const SDL_Event* evt) const;
+
+        /**
+         * Returns a scaled SDL_Event that has pointer/pen coordinates in UI dimensions.
+         * This is abstracted away here because the event coordinate system is
+         * platform-dependent.
+         * This assumes an event as provided by SDL.
+         * @returns A copy of the original event, scaled if necessary.
+         */
+        SDL_Event event_to_ui_coordinates(const SDL_Event* evt) const;
+
+        /**
+         * Obtains the ::nb::render::window associated with the SDL_Window
+         */
+        static window* from_sdl_window(SDL_Window *w);
+
 private:
     SDL_Window *m_win {nullptr};
+    SDL_WindowID m_wid {0u};
     int m_pw {0}, m_ph {0};
+    int m_lw {0}, m_lh {0};
     float m_ui_scale {1.0};
     float m_event_scale {1.0};
     SDL_Rect m_safe_area;
