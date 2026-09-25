@@ -1,27 +1,68 @@
 #include <newbase/sdl/logging_handler.hpp>
 #include <SDL3/SDL_log.h>
-#include <unordered_set>
+#include <SDL3/SDL_init.h>
+#include <unordered_map>
+#include <string>
 
-namespace nb {
-namespace log {
+namespace nb::log {
 
+    // listeners with handles
     static std::unordered_map<int, observer_t> _observers;
     static int _handle_counter {0}; 
 
-    void _dispatch(void *userdata, int category, SDL_LogPriority prio, const char *msg)
+    // for thread-safe handling
+    // if something is logged not on the main thread, the message is
+    // serialized and stored for later dispatch on the main thread
+    // note that this incurs heap allocation, so it's best to avoid
+    // excessive logging from other threads
+    struct canned_message
     {
-        // can be called from multiple threads (but only one at once)
+        int category;
+        SDL_LogPriority prio;
+        std::string msg;
+    };
+
+
+    void _dispatch_now(int category, SDL_LogPriority prio, const char *msg)
+    {
         for(auto &pair: _observers)
         {
             pair.second(category, static_cast<int>(prio), msg);
         }
+
     }
+
+
+    void _dispatch(void *, int category, SDL_LogPriority prio, const char *msg)
+    {
+        // can be called from multiple threads (but only one at once)
+
+        if(SDL_IsMainThread())
+        {
+            _dispatch_now(category, prio, msg);
+        }
+        else
+        {
+            // send log to main thread via SDL's event loop instead, with a thread identifier prepended
+            auto newmsg = new canned_message(category, prio, "[thread " + std::to_string(SDL_GetCurrentThreadID()) + "] ");
+            newmsg->msg += msg;
+            SDL_RunOnMainThread(+[](void* msg) {
+                canned_message *cm = static_cast<canned_message*>(msg);
+                _dispatch_now(cm->category, cm->prio, cm->msg.c_str());
+                delete cm;
+
+            }, newmsg, false);
+
+        }
+    }
+
 
     int register_observer(observer_t observer)
     {
         _observers[_handle_counter] = observer;
         return _handle_counter++;
     }
+
 
     bool unregister_observer(int handle)
     {
@@ -33,10 +74,12 @@ namespace log {
         return false;
     }
 
+
     void setup_handler()
     {
         SDL_SetLogOutputFunction(_dispatch, nullptr);
     }
+
 
     const char * category_str(category cat)
     {
@@ -56,6 +99,7 @@ namespace log {
         return it != strings.end()? it->second : "UNKNOWN";
     }
 
+
     const char * priority_str(priority prio)
     {
         static std::unordered_map<priority, const char *> strings {
@@ -71,6 +115,7 @@ namespace log {
         auto it = strings.find(prio);
         return it != strings.end()? it->second : "UNKNOWN";
     }
+
 
     std::pair<const char *, const char *> priority_ansi_decor(priority prio)
     {
@@ -106,5 +151,4 @@ namespace log {
             return {nullptr, nullptr};
         
     }
-}
 }
