@@ -38,11 +38,12 @@ This is a living document.
         * [X] Get basic support working
         * [X] Specify and implement clipping behavior
         * [ ] Validate (and fix?) DPI handling on all platforms
+              Added event transformation utility to window, use in editor and input system.
     + [X] Clipping on render_2d (and ImGui)
     + [X] Cleanup render layer and viewport semantics, and create spec - see below section
     * [X] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
-    + [ ] Impove UI overlay interface and semantics - see below
+    + [X] Impove UI overlay interface and semantics - see below
     + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
     + [ ] Elementary 3D rendering with render_gpu
         * [ ] Do some research and come up with MVP requirements
@@ -54,6 +55,7 @@ This is a living document.
     + [ ] PBR material system
     + [ ] GLTF import and rendering
     + [ ] Fancier techniques
+        * [ ] Create render_pass system, distinct from render layers (but similar)
         * [ ] Shadow mapping
         * [ ] HDR and Tonemapping
         * [ ] SSAO, SSR 
@@ -137,11 +139,11 @@ This is a living document.
   
 ## Scope: UI Overlays
     
-- [ ] Refine overlay API
+- [X] Refine overlay API
         Right now, overlay callback takes no arguments and provides no context.
         That's fine but in case of, for example, physics overlay, it may have no
         idea of what camera to use. Perhaps tie overllay renndering to render layers.
         We could have a bool flag has_overlays and make ui_manager traverse it, 
         perhaps? Providing a render_layer should give the overlay enough context.
         If/when RTT is being used is another story in this scenario.
-- [ ] Update UI overlay callback signature and code
+- [X] Update UI overlay callback signature and code

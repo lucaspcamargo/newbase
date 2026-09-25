@@ -35,6 +35,7 @@
 #include "IconsForkAwesome.h"
 #include "entt/locator/locator.hpp"
 #include "newbase/render/batcher2d.hpp"
+#include "newbase/render/camera.hpp"
 #include "newbase/render/types.hpp"
 #include <algorithm>
 #include <string>
@@ -101,7 +102,6 @@ void editor::_apply_override_layers()
     auto *uim = entt::locator<ui_manager*>::value();
     if (!uim || _d->editor_cam_eid == entt::null)
         return;
-    ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
 
     render_layer rl_grid;
     rl_grid.scene_id   = entt::null;
@@ -111,9 +111,6 @@ void editor::_apply_override_layers()
     rl_grid.order      = 0;
     rl_grid.follow_ui  = true;
     rl_grid.clear      = true;
-    rl_grid.clear_r    = bg.x * 0.5;
-    rl_grid.clear_g    = bg.y * 0.5;
-    rl_grid.clear_b    = bg.z * 0.5;
     rl_grid.custom_2d_draw = [&](const render_layer &l, render::batcher2d &batcher){
         this->_draw_grid(l, batcher);
     };
@@ -426,24 +423,19 @@ bool editor::event(SDL_Event* evt)
 
 void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
 {
-    // TODO use ui_vp correctly
-    // TODO fix coord calculation
-
     if (!_d->override_layers || ui_vp.z <= 0 || ui_vp.w <= 0) return;
 
-    const ImGuiIO &io  = ImGui::GetIO();
-    const float scx = io.DisplayFramebufferScale.x > 0.f ? io.DisplayFramebufferScale.x : 1.f;
-    const float scy = io.DisplayFramebufferScale.y > 0.f ? io.DisplayFramebufferScale.y : 1.f;
+    const render::camera_2d cam { _d->cam_zoom };
+    auto wb = cam.calc_world_bounds(_d->cam_x, _d->cam_y, rl.viewport);
 
-    // Physical→logical pixel helper: convert a world point to an ImGui screen position
-    const float ui_vp_cx = ui_vp.x + ui_vp.z * 0.5f;
-    const float ui_vp_cy = ui_vp.y + ui_vp.w * 0.5f;
+    // Physical→ui pixel helper: convert a world point to an ImGui screen position
     auto w2s = [&](float wx, float wy) -> ImVec2 {
         return {
-            ((wx - _d->cam_x) * _d->cam_zoom) / scx + ui_vp_cx,
-            ((wy - _d->cam_y) * _d->cam_zoom) / scy + ui_vp_cy
+            ui_vp.x + ui_vp.z*(wx-wb.x)/wb.z,
+            ui_vp.y + ui_vp.w*(wy-wb.y)/wb.w
         };
     };
+
     // Transform a world-space glm vec4 to screen
     auto v2s = [&](const glm::vec4 &v) -> ImVec2 { return w2s(v.x, v.y); };
 
@@ -511,15 +503,9 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
             }
             else if (auto *emit = reg.try_get<const cparticle_emitter>(id))
             {
-                float radius = 24.f;
-                if (emit->res)
-                {
-                    const glm::vec2 &pv = emit->res->emitter.pos_variance;
-                    radius = std::max(24.f, glm::length(pv));
-                }
                 const ImVec2 center = w2s(spatial.pos.x, spatial.pos.y);
-                const float r_screen = radius * _d->cam_zoom / scx;
-                dl->AddCircle(center, r_screen, col, 0, thick);
+                constexpr float PE_RADIUS = 10.f;
+                dl->AddCircle(center, PE_RADIUS, col, 0, thick);
                 dl->AddLine({center.x-6,center.y}, {center.x+6,center.y}, col, thick);
                 dl->AddLine({center.x,center.y-6}, {center.x,center.y+6}, col, thick);
             }
@@ -543,10 +529,10 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
         ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
         ImGuizmo::SetOrthographic(true);
 
-        glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
-        const float half_w = (ui_vp.z * 0.5f * scx) / _d->cam_zoom; // real pixels
-        const float half_h = (ui_vp.w * 0.5f * scy) / _d->cam_zoom; // real pixels
-        glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
+        const glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
+        const float half_w = wb.z*0.5f;
+        const float half_h = wb.w*0.5f;
+        const glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
 
         auto *sp = reg.try_get<cspatial>(_d->selected_entity);
         if (sp)
@@ -666,6 +652,24 @@ void editor::_draw_main_menu()
 
 void editor::_draw_grid(const render_layer &l, render::batcher2d &batcher)
 {
+    // First, update grid layer baackground color
+    ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+    auto &rl = engine::instance().render_layers()[0];
+    if(bg.x+bg.y+bg.z >= 1.8f)
+    {
+        //light theme, use mid gray
+        rl.clear_r = rl.clear_g = rl.clear_b = .46f;
+    }
+    else
+    {
+        // dark theme
+        // darken window bg color further
+        rl.clear_r = bg.x * 0.4f;
+        rl.clear_g = bg.y * 0.4f;
+        rl.clear_b = bg.z * 0.4f;
+    }
+
+
     // Helper lambda to push an axis-aligned line as a 1-pixel thick quad (4 vertices, 6 indices)
     auto push_line = [&batcher](const glm::vec2& p0, const glm::vec2& p1, const glm::vec4& color) {
 
