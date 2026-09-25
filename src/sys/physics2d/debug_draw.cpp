@@ -1,4 +1,5 @@
 #include <newbase/sys/physics2d/debug_draw.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <newbase/log.hpp>
 #include <imgui.h>
 #include <vector>
@@ -65,20 +66,42 @@ static float sx {1.0f};
 static float sy {1.0f};
 static float line_thickness {1.0f};
 
-void nb::physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float scale_x, float scale_y, float world_scale, float ui_scale, float screen_center_x, float screen_center_y)
+void nb::physics2d_pre_debug_draw(b2DebugDraw &draw, float cx, float cy, float world_scale, float ui_scale,  glm::vec4 wb, glm::vec4 ui_vp)
 {
-    ImGui::GetBackgroundDrawList();
+    static constexpr auto BORDER_COL = 0x800000ff;
 
-    sx = scale_x / ui_scale;
-    sy = scale_y / ui_scale;
+    // clip
+    ImVec2 clip_min {ui_vp.x, ui_vp.y};
+    ImVec2 clip_max {ui_vp.x+ui_vp.z, ui_vp.y+ui_vp.w};
+    auto *dl = ImGui::GetBackgroundDrawList();
+    dl->PushClipRect(clip_min, clip_max);
+    dl->AddRect(clip_min, clip_max, BORDER_COL, 0, 4);
+    dl->AddRectFilled({clip_min.x + 4, clip_min.y + 4}, {clip_min.x + 98, clip_min.y + 24}, BORDER_COL, 3);
+    dl->AddText({clip_min.x + 6, clip_min.y + 6}, 0xffffffff, ICON_FK_BUG" Physics 2D");
 
-    dx = screen_center_x - cx * sx;
-    dy = screen_center_y - cy * sy;
+    // center of ui viewport
+    const float ui_vp_cx = ui_vp.x + ui_vp.z  * .5f;
+    const float ui_vp_cy = ui_vp.y + ui_vp.w  * .5f;
 
-    //log::info("PRE DEBUG DRAW dx=%f, dy=%f, sx=%f, sy=%f", dx, dy, sx, sy);
+    // scale factor from world to ui
+    const float scale_x = ui_vp.z/wb.z;
+    const float scale_y = ui_vp.w/wb.w;
 
-    // HACK, fix later
-    draw.drawingBounds = b2AABB{b2Vec2{-100000000.0f, -100000000.0f}, b2Vec2{100000000.0f, 100000000.0f}};
+    sx = scale_x;
+    sy = scale_y;
+
+    dx = ui_vp_cx - cx * sx;
+    dy = ui_vp_cy - cy * sy;
+
+    const auto phys_world_min = b2Vec2{wb.x * world_scale, wb.y * world_scale};
+    const auto phys_world_max = b2Vec2{(wb.x+wb.z)*world_scale, (wb.y+wb.w)*world_scale};
+    draw.drawingBounds = b2AABB{phys_world_min, phys_world_max};
+}
+
+void nb::physics2d_post_debug_draw()
+{
+    auto *dl = ImGui::GetBackgroundDrawList();
+    dl->PopClipRect();
 }
 
 /// Draw a closed polygon provided in CCW order.

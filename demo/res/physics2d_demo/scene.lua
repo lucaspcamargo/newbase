@@ -9,6 +9,7 @@ if cam_eid then
     rl.order      = 0
     rl.camera     = cam_eid
     rl.follow_ui  = true
+    rl.ui_overlays  = true
     rl.clear      = true
     rl.clear_r    = 0.373
     rl.clear_g    = 0.553

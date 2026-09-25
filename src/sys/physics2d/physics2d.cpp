@@ -4,6 +4,7 @@
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/character2d.hpp>
 #include <newbase/components/spatial.hpp>
+#include <newbase/components/camera.hpp>
 #include <newbase/sys/clock/clock.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
@@ -105,19 +106,33 @@ public:
         if(!data->debug_draw_enabled || B2_IS_NULL(data->world_id))
             return;
 
-        /* TODO - do it with ui viewport and camera data
-         * Which camera? Good question.
-         * Need to tie overlays with render layers.
-        const float cx = (extents.right + extents.left) / 2.0f;
-        const float cy = (extents.top + extents.bottom) / 2.0f;
-        const float sx = extents.width / extents.xspan;
-        const float sy = extents.height / extents.yspan;
-        const float screen_center_x = extents.screen_x / extents.ui_scale + extents.width / (2.f * extents.ui_scale);
-        const float screen_center_y = extents.screen_y / extents.ui_scale + extents.height / (2.f * extents.ui_scale);
-        physics2d_pre_debug_draw(data->debug_draw, cx, cy, sx, sy, data->world_scale,
-            extents.ui_scale, screen_center_x, screen_center_y);
+        const auto scene = engine::instance().find_scene(rl.scene_id);
+        if(!scene)
+            return;
+
+        const auto cam = scene->registry().try_get<ccamera>(rl.camera);
+        if(!cam)
+            return;
+
+        float cx {0.f};
+        float cy {0.f};
+        const auto spatial = scene->registry().try_get<cspatial>(rl.camera);
+        if(spatial)
+        {
+            cx = spatial->pos.x;
+            cy = spatial->pos.y;
+        }
+
+        auto world_bounds = cam->cam2d.calc_world_bounds(cx, cy, rl.viewport);
+        if (world_bounds == render::camera_2d::CAM_WORLD_BOUNDS_INVALID)
+            return;
+
+
+        const float ui_scale = rl.viewport.w/ui_vp.z;
+        physics2d_pre_debug_draw(data->debug_draw, cx, cy, data->world_scale,
+            ui_scale, world_bounds, ui_vp);
         b2World_Draw(data->world_id, &data->debug_draw);
-        */
+        physics2d_post_debug_draw();
     }
 
 private:

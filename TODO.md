@@ -19,8 +19,10 @@ This is a living document.
 - Editor
     + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs
+    + [ ] Some UI prefs and love
 - Resources
     + [ ] Load jobs
+        + [ ] Well-defined nb::resource states, preloaded state with list of deps
         + [ ] Resource dependencies in components and other resources(scene->cscript->rscript->rtexture, for example)
     + [ ] Background loading
     + [ ] Organize loaders and resource types together, split loaders TU
@@ -80,6 +82,7 @@ This is a living document.
     + [ ] Refactor some the API glue out of script_lua.cpp (too big, and decoupled)
     + [ ] Mechanism for automatic callback cleanup
     + [ ] Wire up enum RTTI when they are in place
+    + [ ] Allow "header" annotations for linked resouce loading
     + [ ] Reduce usage of lua_box::owner. ~~And improve support for pointer-like types in the bindings.~~(done?). This way we can use meta_any<shared_ptr<T>> directly. And cleanup the resource shared_ptr mess.
 - Lupi
     + [ ] Music and sfx, when Lupinho has it too and it is better documented

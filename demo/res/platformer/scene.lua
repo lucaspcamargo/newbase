@@ -20,6 +20,7 @@ if cam_eid then
     rl.layer_mask = 0x1   -- world layer
     rl.camera     = cam_eid
     rl.follow_ui  = true
+    rl.ui_overlays = true
     rl.clear      = true
     rl.clear_r    = 0.82
     rl.clear_g    = 0.96
