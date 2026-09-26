@@ -18,7 +18,8 @@ namespace nb::lupi {
 // Registered as an nb::resource/RTTI type (see _rtti_init_lupi in lupi.cpp)
 // so it loads through the normal rman()/rloader_* pipeline, reusing
 // rscript/rloader_script for the actual game.lua text.
-struct rlupi_cart : public resource {
+class rlupi_cart : public resource {
+public:
     explicit rlupi_cart(entt::id_type id = 0)
         : resource(id, entt::hashed_string{"rlupi_cart"}.value()) {}
 
@@ -26,6 +27,8 @@ struct rlupi_cart : public resource {
     std::string dir; // resource-path directory the manifest lives in, trailing slash included
     std::string main_lua_src;
     std::string chunkname;
+protected:
+    bool do_load() override;
 };
 
 }

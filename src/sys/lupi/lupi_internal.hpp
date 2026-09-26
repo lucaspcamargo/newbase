@@ -58,11 +58,6 @@ lupi_spritesheet* lupi_check_sprite_ref(lua_State* L, int idx);
 std::shared_ptr<lupi_spritesheet> lupi_load_spritesheet_indexed(
     const std::vector<char>& png_bytes, lupi_palette& pal, const std::string& path = {});
 
-// Loads a cart resource (lupi.yaml manifest + sibling game.lua via rscript) by resource id.
-struct rloader_lupi_cart {
-    using result_type = std::shared_ptr<rlupi_cart>;
-    result_type operator()(entt::id_type id) const;
-};
 
 // Real Lupi carts use `0b1010...` binary integer literals (e.g. ui.fillp bit
 // patterns) — standard Lua (5.5 included) has no such literal syntax, only

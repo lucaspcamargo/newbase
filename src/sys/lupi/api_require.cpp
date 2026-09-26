@@ -32,7 +32,7 @@ bool load_and_run_sibling(lua_State* L, lupi_p& p, const std::string& name)
     std::replace(rel.begin(), rel.end(), '.', '/');
     std::string path = p.cart_dir + rel + ".lua";
     auto id = entt::hashed_string{path.c_str()}.value();
-    auto script = rman().get<rscript>(id);
+    auto script = rman().load_sync<rscript>(id);
     if (!script || !script->valid) {
         lua_pushfstring(L, "module '%s' not found (looked for %s)", name.c_str(), path.c_str());
         return false;

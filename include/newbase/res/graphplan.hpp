@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <newbase/res/resource.hpp>
 #include <entt/core/hashed_string.hpp>
 #include <entt/meta/meta.hpp>
@@ -10,8 +11,9 @@
 
 namespace nb {
 
-struct rgraphplan : public resource
+class rgraphplan : public resource
 {
+public:
     using hashed_string = entt::hashed_string;
     explicit rgraphplan(entt::id_type id = 0)
         : resource(id, hashed_string{"rgraphplan"}.value()) {}
@@ -39,6 +41,16 @@ struct rgraphplan : public resource
 
     std::vector<node_desc> nodes;
     std::vector<link_desc> links;
+
+    // TODO rework or remove
+    /// parse a new graphplan directly from a file path, bypassing the res system
+    static std::shared_ptr<rgraphplan> from_path(const char *path);
+
+protected:
+    bool do_load() override;
+
+private:
+    bool _parse_graphplan(std::vector<char> &data);
 };
 
 } // namespace nb

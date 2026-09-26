@@ -28,7 +28,7 @@ void res_editor_window::open(entt::id_type type_id, entt::id_type asset_id, std:
 {
     _type_id  = type_id;
     _asset_id = asset_id;
-    _resource = rman().get(type_id, asset_id);
+    _resource = rman().load_sync(type_id, asset_id);
     _ref      = {};
     _tex_widget.reset();
     _audio_widget.reset();

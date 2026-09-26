@@ -1,4 +1,5 @@
 #include <newbase/sys/lupi/lupi.hpp>
+#include "newbase/sys/lupi/cart.hpp"
 #include "newbase/sys/lupi/framebuffer.hpp"
 #include <newbase/sys/input/input.hpp>
 #include <newbase/engine.hpp>
@@ -230,7 +231,7 @@ bool nb::lupi::lupi::start(const std::string &cart_path)
     stop();
 
     auto cart_id = entt::hashed_string{cart_path.c_str()}.value();
-    auto cart = rman().get<rlupi_cart>(cart_id);
+    auto cart = rman().load_sync<rlupi_cart>(cart_id);
     if (!cart || !cart->valid)
     {
         log::error("[lupi] failed to load cart '%s'", cart_path.c_str());
@@ -527,9 +528,11 @@ extern "C" void _rtti_init_lupi()
         .custom<nb::rtti::type_info>(nb::rtti::type_info{
             .identifier = "lupi_cart",
             .type_class = nb::rtti::TYPE_CLASS_RESOURCE,
-            .data = {.resource = {.editor_icon = nullptr, .extensions = "yaml"}}, // real carts: lupi.yaml
-            .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource>
-            {
-                return rloader_lupi_cart{}(id);
-            }});
+            .data = {.resource = {.editor_icon = nullptr, .extensions = "",
+                .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource>
+                {
+                    return std::make_shared<rlupi_cart>(id);
+                }
+            }}
+            });
 }

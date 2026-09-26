@@ -1,6 +1,6 @@
 #pragma once
 
-#include <newbase/res/particle_emitter.hpp>
+#include <newbase/sys/particle_system/particle_emitter.hpp>
 #include <newbase/geom/geometry_buffer_2d.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>

@@ -144,12 +144,20 @@ add_library(newbase STATIC
 
     # resource system
     src/res/manager.cpp
-    src/res/loaders.cpp
     src/res/resource.cpp
     src/res/storage/sdl_file.cpp
     src/res/storage/sdl_storage.cpp
+    src/res/async_load.cpp
     src/res/rtti.cpp
     src/res/writers.cpp
+    src/res/impl/etree.cpp
+    src/res/impl/graphplan.cpp
+    src/res/impl/script.cpp
+    src/res/impl/sprite.cpp
+    src/res/impl/texture.cpp
+    src/res/impl/vorbis.cpp
+    src/res/impl/wav.cpp
+    src/res/impl/yaml.cpp
 
     # yaml conversions
     src/yaml/glm.cpp

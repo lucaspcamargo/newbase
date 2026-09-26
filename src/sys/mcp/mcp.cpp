@@ -362,7 +362,7 @@ bool assign_json_to_meta_any(entt::meta_any& target, ryml::ConstNodeRef valnode,
                 valnode >> hash_id;
             }
 
-            auto ptr = rman().get(type_rtti->data.resource_ptr.resource_type_id, hash_id);
+            auto ptr = rman().load_sync(type_rtti->data.resource_ptr.resource_type_id, hash_id);
             if (!ptr)
             {
                 *out_error = "resource not found";

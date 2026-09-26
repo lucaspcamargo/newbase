@@ -1,12 +1,13 @@
 #pragma once
 
-#include <newbase/res/texfont.hpp>
+#include <newbase/sys/textext/rtexfont.hpp>
 #include <newbase/utility/glm.hpp>
 #include <string>
 #include <memory>
 
 namespace nb {
 
+// TODO move component to textext system, after we have component building via RTTI in place
 struct ctextext
 {
     std::shared_ptr<rtexfont> font;

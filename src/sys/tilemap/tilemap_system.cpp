@@ -281,14 +281,18 @@ static const nb::tilemap_layer* find_layer(const nb::rtilemap* map, const std::s
 
 unsigned int nb::tilemap_system::get_layer_object_count(entt::id_type map_id, std::string layer_name) const
 {
-    auto res = nb::rman().get<nb::rtilemap>(map_id);
+    // TODO this is real bad
+    // we should take an rtilemap resource instead (shptr), we can safely do that now
+    auto res = nb::rman().load_sync<nb::rtilemap>(map_id);
     const auto* layer = find_layer(res.get(), layer_name);
     return layer ? static_cast<unsigned int>(layer->objects.size()) : 0u;
 }
 
 nb::tilemap_object nb::tilemap_system::get_layer_object(entt::id_type map_id, std::string layer_name, unsigned int idx) const
 {
-    auto res = nb::rman().get<nb::rtilemap>(map_id);
+    // TODO this is real bad
+    // we should take an rtilemap resource instead (shptr), we can safely do that now
+    auto res = nb::rman().load_sync<nb::rtilemap>(map_id);
     const auto* layer = find_layer(res.get(), layer_name);
     if (!layer || idx >= layer->objects.size()) return {};
     return layer->objects[idx];

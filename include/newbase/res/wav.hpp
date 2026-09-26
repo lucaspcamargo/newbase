@@ -13,6 +13,9 @@ struct rwav : public resource {
     audio_spec spec {};
     uint8_t *buf {nullptr};
     uint32_t len {0};
+
+protected:
+    bool do_load() override;
 };
 
 }

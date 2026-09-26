@@ -77,6 +77,9 @@ struct nb::editor_p
 editor::editor()  : _d(new editor_p) {}
 editor::~editor()
 {
+    if (_d->log_observer != -1)
+        log::unregister_observer(_d->log_observer);
+
     if (auto *ui_mgr = entt::locator<ui_manager*>::value())
         ui_mgr->unregister_layer_overlay("editor_wireframes");
     delete _d;

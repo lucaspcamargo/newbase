@@ -86,6 +86,9 @@ struct rtilemap : public resource {
                 best = &ts;
         return best;
     }
+
+protected:
+    bool do_load() override;
 };
 
 } // namespace nb

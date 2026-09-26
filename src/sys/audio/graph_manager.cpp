@@ -11,8 +11,8 @@
 #include <newbase/graphplan/editor.hpp>
 #include <newbase/graphplan/domain_registry.hpp>
 #include <newbase/res/graphplan.hpp>
-#include <newbase/res/loaders.hpp>
 #include <newbase/res/writers.hpp>
+#include <newbase/res/graphplan.hpp>
 #include <newbase/yaml/meta_any.hpp>
 #include <newbase/reflection/contexts.hpp>
 #include <newbase/reflection/data.hpp>
@@ -26,7 +26,6 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
-#include "imgui_node_editor.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -863,7 +862,7 @@ void audio_graph_manager::_apply_rgraphplan(impl* d, const rgraphplan& gp)
 
 void audio_graph_manager::_load_plan_from_file(impl* d, const char* path)
 {
-    auto gp = rloader_graphplan::from_path(path);
+    auto gp = rgraphplan::from_path(path);
     if (!gp)
     {
         log::error("[audio] failed to load graphplan from '%s'", path);
@@ -970,7 +969,7 @@ audio_graph_manager::group_expand_result audio_graph_manager::_expand_group_impl
         {
             entt::id_type res_id = pid(nd, "res_id");
             if (!res_id) { log::warn("[audio] group: nested GROUP has no res_id"); continue; }
-            auto sub_res = rman().get<rgraphplan>(res_id);
+            auto sub_res = rman().load_sync<rgraphplan>(res_id);
             if (!sub_res)
             {
                 log::warn("[audio] group: nested GROUP rgraphplan %x not found", res_id);
@@ -1054,7 +1053,7 @@ audio_graph_manager::group_expand_result audio_graph_manager::_expand_group_impl
         {
             entt::id_type res_id = pid(nd, "res_id");
             if (!res_id) continue;
-            auto vres = rman().get<rvorbis>(res_id);
+            auto vres = rman().load_sync<rvorbis>(res_id);
             if (!vres || !vres->valid) { log::warn("[audio] group vorbis: resource %x not found", res_id); continue; }
             auto vp = std::make_unique<audio_producer_vorbis>(vres);
             if (!vp->is_valid()) { log::warn("[audio] group vorbis: producer init failed"); continue; }
@@ -1173,7 +1172,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     {
         entt::id_type res_id = prop_id(nd, "vocab_res_id");
         if (res_id == 0) { _d->lpc_vocab_cache[gp_id] = nullptr; return nullptr; }
-        auto vres = rman().get<rlpcvocab>(res_id);
+        auto vres = rman().load_sync<rlpcvocab>(res_id);
         _d->lpc_vocab_cache[gp_id] = vres;
         if (!vres || !vres->valid)
             log::warn("[audio] lpc_node %llu: vocab resource not found", gp_id);
@@ -1186,7 +1185,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
         entt::id_type res_id = prop_id(nd, "res_id");
         if (res_id == 0) { _d->vorbis_res_cache[gp_id] = nullptr; return nullptr; }
 
-        auto vres = rman().get<rvorbis>(res_id);
+        auto vres = rman().load_sync<rvorbis>(res_id);
         _d->vorbis_res_cache[gp_id] = vres;
         if (!vres || !vres->valid)
         {
@@ -1262,7 +1261,7 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
         {
             entt::id_type res_id = prop_id(nd, "res_id");
             if (!res_id) { log::warn("[audio] GROUP node %llu has no res_id", gp_id); continue; }
-            auto sub_res = rman().get<rgraphplan>(res_id);
+            auto sub_res = rman().load_sync<rgraphplan>(res_id);
             if (!sub_res)
             {
                 log::warn("[audio] GROUP node %llu: rgraphplan resource %x not found", gp_id, res_id);

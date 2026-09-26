@@ -433,7 +433,7 @@ void script_lua::bind_resource_getters()
             auto type_id   = static_cast<entt::id_type>(lua_tointeger(L, lua_upvalueindex(1)));
             auto ptr_tid   = static_cast<entt::id_type>(lua_tointeger(L, lua_upvalueindex(2)));
 
-            auto base = nb::rman().get(type_id, asset_id);
+            auto base = nb::rman().load_sync(type_id, asset_id);
             if(!base) { lua_pushnil(L); return 1; }
 
             auto ptr_mtype = entt::resolve(ptr_tid);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "entt/core/fwd.hpp"
 #include <memory>
 #include <cstring>
 #include <entt/entt.hpp>
@@ -110,6 +111,7 @@ struct type_info
         struct {
             const char *editor_icon; // icon glyph (e.g. from ForkAwesome) shown in the resource browser
             const char *extensions;  // space-separated list of handled file extensions (without dot, e.g. "png jpg jpeg")
+            std::shared_ptr<nb::resource> (*factory_fn)(entt::id_type id);
         } resource;
 
         struct {
@@ -123,9 +125,6 @@ struct type_info
     } data;
 
     void *uptr {nullptr};
-
-    // for TYPE_CLASS_RESOURCE: load function returning a base resource pointer
-    std::shared_ptr<nb::resource>(*loader_fn)(entt::id_type) {nullptr};
 
     // for TYPE_CLASS_RESOURCE: optional save function — serializes the in-memory resource
     // back to storage via rman().write_all_sync(). Returns false if unsupported or failed.

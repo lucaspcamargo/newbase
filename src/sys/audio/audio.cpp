@@ -317,7 +317,7 @@ static void stop_bus_players(audio_p* d, audio_graph_manager& gm,
 
 bool audio::bgm_play(entt::id_type res_id)
 {
-    auto vorbis_res = rman().get<rvorbis>(res_id);
+    auto vorbis_res = rman().load_sync<rvorbis>(res_id);
     if (!vorbis_res || !vorbis_res->valid)
     {
         log::error("[audio] bgm_play: invalid resource: %x", res_id);
@@ -372,7 +372,7 @@ void audio::sfx_gain(float db)
 
 bool audio::sfx_play(entt::id_type res_id, float gain_db)
 {
-    auto vorbis_res = rman().get<rvorbis>(res_id);
+    auto vorbis_res = rman().load_sync<rvorbis>(res_id);
     if (!vorbis_res || !vorbis_res->valid)
     {
         log::error("[audio] sfx_play: invalid resource: %x", res_id);
@@ -391,7 +391,7 @@ bool audio::sfx_play(entt::id_type res_id, float gain_db)
 
 bool audio::sfx_play_pitched(entt::id_type res_id, float gain_db, float pitch_ratio)
 {
-    auto vorbis_res = rman().get<rvorbis>(res_id);
+    auto vorbis_res = rman().load_sync<rvorbis>(res_id);
     if (!vorbis_res || !vorbis_res->valid)
     {
         log::error("[audio] sfx_play_pitched: invalid resource: %x", res_id);

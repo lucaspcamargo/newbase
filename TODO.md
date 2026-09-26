@@ -11,6 +11,7 @@ This is a living document.
     + [ ] Port to entt v4. Quite a bit of work, especially in script_lua. REQUIRES C++20.
         + [ ] Use entt's new support for names associated with members and functions, reducing usage of custom data.
     + [ ] Move system-specific resources and components out of engine core
+        * [ ] Required: use RTTI for dynamic dispatch of component building
     + [X] Decouple rtexture from SDL_Texture. Texture specialization is a renderer task.
     + [ ] Ship standard "engine intro" scene in core resources
     + [ ] Ad-hoc event scaling is out of control. Uniformize behavior in render::window.
@@ -20,12 +21,15 @@ This is a living document.
     + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs
     + [ ] Some UI prefs and love
+    + [ ] Allow opening non-asset resources in asset editor
+    * [ ] Move some stuff to general UI, perhaps (resource/entity inspectors)
 - Resources
-    + [ ] Load jobs
-        + [ ] Well-defined nb::resource states, preloaded state with list of deps
+    + [X] Move resource loading to ::nb::resource virtual methods, one TU per class. 
+    + [~] Load jobs
+        + [~] Well-defined nb::resource states, preloaded state with list of deps
+              Need implementation in concrete resource types
+        + [~] Implement async loading and thread-safe resource cache management
         + [ ] Resource dependencies in components and other resources(scene->cscript->rscript->rtexture, for example)
-    + [ ] Background loading
-    + [ ] Organize loaders and resource types together, split loaders TU
     + [ ] HTTP(S) resource provider, for emscripten mostly
     + [ ] Archive resource provider, for resource packing (WAD-like)
     + [ ] Support for resource providers to override each other in vfs with priorities (for mods and stuff)
@@ -60,6 +64,8 @@ This is a living document.
         * [ ] HDR and Tonemapping
         * [ ] SSAO, SSR 
 - Audio
+    + [ ] Take audio resources instead of handles in playback functions (don't force load anything ever)
+        + [ ] Only play if loaded
     + [ ] Spatial sound support, 2D and 3D
     + [ ] Basic HRTF support in spatial functionality
     + [ ] Sequenced music and sfx usin synths. Look into tsf/tml, and pl_synth.
@@ -87,6 +93,7 @@ This is a living document.
     + [ ] Allow "header" annotations for linked resouce loading
     + [ ] Reduce usage of lua_box::owner. ~~And improve support for pointer-like types in the bindings.~~(done?). This way we can use meta_any<shared_ptr<T>> directly. And cleanup the resource shared_ptr mess.
 - Lupi
+    + [ ] Validade how it we interact with rtexture and the ImGUI preview (never touch SDL_Texture)
     + [ ] Music and sfx, when Lupinho has it too and it is better documented
 - Sensors
     + [ ] Add Android-specific sensor handling

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <newbase/ui/imgui_icons.hpp>
 #include <imgui.h>
-#include "IconsForkAwesome.h"
+#include <cctype>
+#include <cstdio>  // for vsnprintf
 
 namespace nb {
 

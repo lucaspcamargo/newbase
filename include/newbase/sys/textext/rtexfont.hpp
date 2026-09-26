@@ -7,6 +7,8 @@
 
 namespace nb {
 
+// TODO move to textext system
+
 struct rtexfont : resource
 {
     struct glyph {
@@ -31,6 +33,9 @@ struct rtexfont : resource
         auto it = glyphs.find(cp);
         return it != glyphs.end() ? &it->second : nullptr;
     }
+
+protected:
+    bool do_load() override;
 };
 
 }

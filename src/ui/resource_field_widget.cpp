@@ -66,7 +66,7 @@ bool draw_resource_field(const char* label, entt::id_type res_type_id,
             const res_drag_payload* p = static_cast<const res_drag_payload*>(payload->Data);
             if (p->res_type_id == res_type_id)
             {
-                ptr = rman().get(res_type_id, p->asset_id);
+                ptr = rman().load_sync(res_type_id, p->asset_id);
                 changed = true;
             }
             else

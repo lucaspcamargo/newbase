@@ -143,11 +143,11 @@ void _rtti_init_audio_rlpcvocab()
             .type_class = rtti::TYPE_CLASS_RESOURCE,
             .data = {.resource = {
                 .editor_icon = ICON_FK_COMMENTS,
-                .extensions  = "rlpcvocab"
-            }},
-            .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                return load_rlpcvocab(id);
-            }
+                .extensions  = "rlpcvocab",
+                .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return std::make_shared<rlpcvocab>(id);
+                }
+            }}
         });
 
     // shared_ptr<rlpcvocab> registration so resource fields can reference this type in the editor

@@ -18,6 +18,9 @@ struct rscript : public resource {
     script_type type {script_type::LUA_SOURCE};
     std::vector<char> raw {};
     std::string chunkname;
+
+protected:
+    bool do_load() override;
 };
 
 }

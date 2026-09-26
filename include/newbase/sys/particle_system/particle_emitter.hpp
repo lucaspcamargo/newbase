@@ -38,7 +38,9 @@ struct particle_emitter_config {
     float     rotation_variance  { 0.f  };   // degrees
 };
 
-struct rparticle_emitter : public resource {
+class rparticle_emitter : public resource
+{
+public:
     explicit rparticle_emitter(entt::id_type id = 0)
         : resource(id, entt::hashed_string{"rparticle_emitter"}.value()) {}
 
@@ -49,6 +51,9 @@ struct rparticle_emitter : public resource {
     std::shared_ptr<rtexture>             tex;
     particle_emitter_config               emitter;
     std::vector<particle_affector_config> affectors;
+
+protected:
+    bool do_load() override;
 };
 
 } // namespace nb

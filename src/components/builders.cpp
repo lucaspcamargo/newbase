@@ -9,8 +9,7 @@
 #include <newbase/components/character2d.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
-#include <newbase/res/particle_emitter.hpp>
-#include <newbase/res/texfont.hpp>
+#include <newbase/sys/textext/rtexfont.hpp>  // TODO remove once we have component building via RTTI
 #include <newbase/res/tilemap.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/yaml/glm.hpp>
@@ -39,11 +38,10 @@ bool ::nb::build_spatial(ryml::ConstNodeRef def, cspatial &dst)
 
 bool ::nb::build_sprite(ryml::ConstNodeRef def, csprite &dst)
 {
-    // TODO should components have resource handles or just ids?
     std::string respath;
     c4::from_chars(def["res"].val(), &respath);
     auto hash = entt::hashed_string(respath.c_str());
-    dst.spr = rman().get<rsprite>(hash.value());
+    dst.spr = rman().load_sync<rsprite>(hash.value());
     if(def.has_child("color"))
         load_vec4(def["color"], dst.color);
     if(def.has_child("visible"))
@@ -69,7 +67,7 @@ bool ::nb::build_script(ryml::ConstNodeRef def, cscript &dst)
     std::string respath;
     c4::from_chars(def["lua"].val(), &respath);
     auto hash = entt::hashed_string(respath.c_str());
-    dst.script = rman().get<rscript>(hash.value());
+    dst.script = rman().load_sync<rscript>(hash.value());
     return true;
 }
 
@@ -133,27 +131,13 @@ bool nb::build_body2d(ryml::ConstNodeRef def, cbody2d &dst)
     return true;
 }
 
-bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
-{
-    if (def.has_child("res"))
-    {
-        std::string respath;
-        c4::from_chars(def["res"].val(), &respath);
-        auto hash = entt::hashed_string(respath.c_str());
-        dst.res = rman().get<rparticle_emitter>(hash.value());
-    }
-    if (def.has_child("emitting"))
-        def["emitting"] >> dst.emitting;
-    return true;
-}
-
 bool nb::build_tilemap(ryml::ConstNodeRef def, ctilemap &dst)
 {
     if (def.has_child("res"))
     {
         std::string respath;
         c4::from_chars(def["res"].val(), &respath);
-        dst.map = rman().get<rtilemap>(entt::hashed_string{respath.c_str()}.value());
+        dst.map = rman().load_sync<rtilemap>(entt::hashed_string{respath.c_str()}.value());
     }
     if (def.has_child("render_layer"))
     {
@@ -208,7 +192,7 @@ bool nb::build_textext(ryml::ConstNodeRef def, ctextext &dst)
     {
         std::string respath;
         c4::from_chars(def["font"].val(), &respath);
-        dst.font = rman().get<rtexfont>(entt::hashed_string{respath.c_str()}.value());
+        dst.font = rman().load_sync<rtexfont>(entt::hashed_string{respath.c_str()}.value());
     }
     if (def.has_child("text"))
     {

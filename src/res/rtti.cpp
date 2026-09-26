@@ -1,6 +1,5 @@
 #include <newbase/res/rtti.hpp>
 #include <newbase/reflection/data.hpp>
-#include <newbase/res/loaders.hpp>
 #include <newbase/res/writers.hpp>
 #include <newbase/res/etree.hpp>
 #include <newbase/res/sprite.hpp>
@@ -9,8 +8,6 @@
 #include <newbase/res/vorbis.hpp>
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
-#include <newbase/res/particle_emitter.hpp>
-#include <newbase/res/texfont.hpp>
 #include <newbase/res/tilemap.hpp>
 #include <newbase/res/graphplan.hpp>
 #include <newbase/log.hpp>
@@ -30,11 +27,12 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "script",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_CODE_O, .extensions = "lua"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_script{}(id);
-                }
-            });
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_CODE_O, .extensions = "lua",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rscript>(id);
+                        }
+                    }}
+                });
 
         entt::meta_factory<rtexture>{}
         .type("rtexture"_hs)
@@ -42,10 +40,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "texture",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_texture{}(id);
-                },
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rtexture>(id);
+                    }
+                }},
                 .saver_fn = rwriter_texture,
             })
         .data<&rtexture::nearest, entt::as_ref_t>("nearest"_hs)
@@ -57,10 +56,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "sprite",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "sprite"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_sprite{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "sprite",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rsprite>(id);
+                    }
+                }},
             })
             .ctor<>()
             .data<&rsprite::anchor, entt::as_ref_t>("anchor"_hs)
@@ -70,26 +70,6 @@ namespace nb::rtti {
             .data<&rsprite::tex, entt::as_ref_t>("tex"_hs)
                 .custom<rtti::data_info>(rtti::data_info{"tex"});
 
-        entt::meta_factory<rparticle_emitter>{}
-        .type("rparticle_emitter"_hs)
-        .base<resource>()
-            .custom<type_info>(type_info{
-                .identifier = "particle_emitter",
-                .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_STAR_O, .extensions = "particle"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_particle_emitter{}(id);
-                }
-            })
-            .ctor<>()
-            .data<&rparticle_emitter::max_particles>("max_particles"_hs)
-                .custom<data_info>(data_info{"max_particles"})
-            .data<&rparticle_emitter::tex>("tex"_hs)
-                .custom<data_info>(data_info{
-                    .identifier       = "tex",
-                    .subtype          = DATA_SUBTYPE_RESOURCE,
-                    .resource_type_id = "rtexture"_hs.value()
-                });
 
         entt::meta_factory<rvorbis>{}
         .type("rvorbis"_hs)
@@ -97,10 +77,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "vorbis",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "ogg"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_vorbis{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "ogg",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rvorbis>(id);
+                    }
+                }}
             });
 
         entt::meta_factory<rwav>{}
@@ -109,10 +90,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "wav",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "wav"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_wav{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_AUDIO_O, .extensions = "wav",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rwav>(id);
+                    }
+                }}
             });
 
         entt::meta_factory<ryaml>{}
@@ -121,10 +103,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "yaml",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "yaml yml"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_yaml{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "yaml yml",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<ryaml>(id);
+                    }
+                }}
             });
 
         entt::meta_factory<retree>{}
@@ -133,22 +116,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "etree",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "etree"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_etree{}(id);
-                }
-            });
-
-        entt::meta_factory<rtexfont>{}
-        .type("rtexfont"_hs)
-        .base<resource>()
-            .custom<type_info>(type_info{
-                .identifier = "texfont",
-                .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FONT, .extensions = "texfont"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_texfont{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_TEXT_O, .extensions = "etree",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<retree>(id);
+                    }
+                }}
             });
 
         entt::meta_factory<rtilemap>{}
@@ -157,10 +129,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "tilemap",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_MAP, .extensions = "tmj"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_tilemap{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_MAP, .extensions = "tmj",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rtilemap>(id);
+                    }
+                }}
             });
 
         entt::meta_factory<rgraphplan>{}
@@ -169,10 +142,11 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "graphplan",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_SITEMAP, .extensions = "graphplan"}},
-                .loader_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
-                    return rloader_graphplan{}(id);
-                }
+                .data = {.resource = {.editor_icon = ICON_FK_SITEMAP, .extensions = "graphplan",
+                    .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                        return std::make_shared<rgraphplan>(id);
+                    }
+                }}
             });
 
         // shared_ptr<T> registrations — used by meta_any_editor to display resource fields
@@ -209,8 +183,6 @@ namespace nb::rtti {
         NB_REG_RES_PTR(rwav,              "rwav")
         NB_REG_RES_PTR(ryaml,             "ryaml")
         NB_REG_RES_PTR(retree,            "retree")
-        NB_REG_RES_PTR(rparticle_emitter, "rparticle_emitter")
-        NB_REG_RES_PTR(rtexfont,          "rtexfont")
         NB_REG_RES_PTR(rtilemap,          "rtilemap")
         NB_REG_RES_PTR(rgraphplan,        "rgraphplan")
 #undef NB_REG_RES_PTR

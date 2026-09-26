@@ -1,4 +1,5 @@
 #include "lupi_internal.hpp"
+#include "newbase/sys/lupi/cart.hpp"
 #include <newbase/res/manager.hpp>
 #include <newbase/res/script.hpp>
 #include <newbase/log.hpp>
@@ -141,14 +142,14 @@ bool has_suffix(const std::string& s, const std::string& suffix)
 // metadata only) sitting next to `game.lua`. No asset list — see cart.hpp.
 // ---------------------------------------------------------------------------
 
-lupi::rloader_lupi_cart::result_type lupi::rloader_lupi_cart::operator()(entt::id_type id) const
+bool rlupi_cart::do_load()
 {
-    log::info("[rloader_lupi_cart] loading: %x", id);
+    log::info("[rlupi_cart] loading: %x", id());
 
     std::vector<char> data;
-    if (!rman().read_all_sync(id, data, true)) {
-        log::error("[rloader_lupi_cart] cannot read: %x", id);
-        return nullptr;
+    if (!rman().read_all_sync(id(), data, true)) {
+        log::error("[rlupi_cart] cannot read: %x", id());
+        return false;
     }
 
     // Parsed only for logging — real carts declare no fields we depend on.
@@ -158,23 +159,22 @@ lupi::rloader_lupi_cart::result_type lupi::rloader_lupi_cart::operator()(entt::i
     if (root.has_child("name"))    root["name"]    >> name;
     if (root.has_child("version")) { std::string v; root["version"] >> v; version = v; }
 
-    auto ret = std::make_shared<rlupi_cart>(id);
-    ret->dir = dir_of_resource(id);
+    dir = dir_of_resource(id());
 
-    auto game_lua_path = ret->dir + "game.lua";
+    auto game_lua_path = dir + "game.lua";
     auto main_id = entt::hashed_string{game_lua_path.c_str()}.value();
-    auto script = rman().get<rscript>(main_id);
+    auto script = rman().load_sync<rscript>(main_id);
     if (!script || !script->valid) {
-        log::error("[rloader_lupi_cart] cannot load '%s': %x", game_lua_path.c_str(), id);
-        return nullptr;
+        log::error("[rlupi_cart] cannot load '%s': %x", game_lua_path.c_str(), id());
+        return false;
     }
-    ret->main_lua_src = lupi_preprocess_binary_literals(
+    main_lua_src = lupi_preprocess_binary_literals(
         std::string(script->raw.begin(), script->raw.end()));
-    ret->chunkname = script->chunkname;
+    chunkname = script->chunkname;
 
-    ret->valid = true;
-    log::info("[rloader_lupi_cart] '%s' v%s, dir='%s'", name.c_str(), version.c_str(), ret->dir.c_str());
-    return ret;
+    valid = true;
+    log::info("[rlupi_cart] '%s' v%s, dir='%s'", name.c_str(), version.c_str(), dir.c_str());
+    return true;
 }
 
 // ---------------------------------------------------------------------------

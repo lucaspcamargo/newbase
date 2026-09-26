@@ -173,10 +173,6 @@ engine::~engine()
 {
     log::info("[engine] destroying");
 
-    // ensure there are not more system references from the engine
-    _d->_systems.clear();
-    _d->_systems_meta.clear();
-
     log::unregister_observer(_d->log_handler_handle);
     delete _d;
 
@@ -226,8 +222,8 @@ bool engine::teardown()
     // destroy all system shared_ptrs
     _d->_systems.clear();
     _d->_systems_meta.clear();
-    nb::i18n::shutdown();
-    ::nb::rman().clear();
+    ::nb::rman().teardown();
+    ::nb::i18n::shutdown();
     return true;
 }
 
@@ -502,7 +498,6 @@ void engine::log_handler(int category, int prio, const char *msg)
     static bool use_color = false;
     if(!checked_color)
     {
-        // maybe move check to ::nb::log?
         const char * term = SDL_getenv("TERM");
         if(term && strstr(term, "xterm") == term)
             use_color = true;

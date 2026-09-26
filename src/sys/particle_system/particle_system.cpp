@@ -7,6 +7,7 @@
 #include <newbase/log.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/reflection/contexts.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
 #include <glm/trigonometric.hpp>
@@ -268,4 +269,79 @@ extern "C" void _rtti_init_particle_system()
         .type("particle_system_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::particle_system>>()
         .conv<std::shared_ptr<nb::system>>();
+
+    using namespace ::nb::rtti;
+
+    entt::meta_factory<rparticle_emitter>{}
+        .type("rparticle_emitter"_hs)
+        .base<resource>()
+        .custom<type_info>(type_info{
+            .identifier = "particle_emitter",
+            .type_class = TYPE_CLASS_RESOURCE,
+            .data = {.resource = {.editor_icon = ICON_FK_STAR_O, .extensions = "particle",
+                .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return std::make_shared<rparticle_emitter>(id);
+                }
+            }},
+        })
+        .ctor<>()
+        .data<&rparticle_emitter::max_particles>("max_particles"_hs)
+        .custom<data_info>(data_info{"max_particles"})
+        .data<&rparticle_emitter::tex>("tex"_hs)
+        .custom<data_info>(data_info{
+            .identifier       = "tex",
+            .subtype          = DATA_SUBTYPE_RESOURCE,
+            .resource_type_id = "rtexture"_hs.value()
+        });
+
+    entt::meta_factory<std::shared_ptr<rparticle_emitter>>{}
+        .type(entt::hashed_string{"rparticle_emitter_ptr"}.value())
+        .ctor<>()
+        .custom<type_info>(type_info{
+            .identifier = "rparticle_emitter_ptr",
+            .type_class = TYPE_CLASS_RESOURCE_PTR,
+            .data = {.resource_ptr = {
+                .resource_type_id = entt::hashed_string{"rparticle_emitter"}.value(),
+                .get_ptr = +[](const entt::meta_any& a) -> std::shared_ptr<nb::resource> {
+                    auto* p = a.try_cast<std::shared_ptr<rparticle_emitter>>();
+                    return p ? *p : nullptr;
+                },
+                .set_ptr = +[](entt::meta_any& a, std::shared_ptr<nb::resource> p) {
+                    if(!a.assign(std::static_pointer_cast<rparticle_emitter>(p))) {
+                        auto target_type = a.type().info().name(); /*not sure if this is correct btw*/
+                        auto source_type = typeid(rparticle_emitter).name();
+                        log::warn("[res] resource pointer assignment failed: target='%s' source='%s' resource_type_id='%s'",
+                        target_type.length() ? std::string{target_type}.c_str() : "<unknown>",
+                        source_type ? source_type : "<unknown>",
+                        "rparticle_emitter");
+                    }
+                }
+            }}
+        });
 }
+
+
+
+// TODO
+// will make component building use RTTI
+// Then we can move component to this system
+// for now we define it here, every game must link this system
+
+#include <newbase/components/builders.hpp>
+#include <newbase/res/manager.hpp>
+
+bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
+{
+    if (def.has_child("res"))
+    {
+        std::string respath;
+        c4::from_chars(def["res"].val(), &respath);
+        auto hash = entt::hashed_string(respath.c_str());
+        auto res = rman().load_sync(entt::hashed_string("rparticle_emitter").value(), hash.value());
+        dst.res = std::static_pointer_cast<rparticle_emitter>(res);
+    }
+    if (def.has_child("emitting"))
+        def["emitting"] >> dst.emitting;
+    return true;
+}
+

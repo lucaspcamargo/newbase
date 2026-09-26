@@ -10,12 +10,7 @@ class rtexture : public resource
 {
 public:
     explicit rtexture(entt::id_type id = 0) : resource(id, entt::hashed_string{"rtexture"}.value()) {}
-    ~rtexture() override {
-        if(on_delete)
-            on_delete(*this, on_delete_uptr);
-        if(surf)
-            SDL_DestroySurface(surf);
-    }
+    ~rtexture() override;
 
     bool uploaded {false};
     SDL_Surface *surf {nullptr};
@@ -45,6 +40,9 @@ public:
     // to be used by the renderer
     void (*on_delete)(rtexture &t, void *uptr) {nullptr};
     void *on_delete_uptr {nullptr};
+
+protected:
+    bool do_load() override;
 };
 
 }

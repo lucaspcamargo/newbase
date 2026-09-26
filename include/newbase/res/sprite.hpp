@@ -9,21 +9,26 @@
 #include <string>
 #include <vector>
 
-namespace nb {
+namespace nb
+{
 
-struct sprite_frame {
+struct sprite_frame
+{
     glm::vec4 source_rect { 0.f, 0.f, -1.f, -1.f }; // x, y, w, h; -1 w/h = full texture
     float     duration    { 0.1f };
 };
 
-struct sprite_sequence {
+struct sprite_sequence
+{
     std::string              name;
     bool                     loop { true };
     std::string              next; // sequence to play after this one ends (empty = stay/stop)
     std::vector<sprite_frame> frames;
 };
 
-struct rsprite : public resource {
+
+struct rsprite : public resource
+{
     explicit rsprite(entt::id_type id = 0) : resource(id, entt::hashed_string{"rsprite"}.value()) {}
 
     std::shared_ptr<rtexture>     tex    {};
@@ -42,6 +47,9 @@ struct rsprite : public resource {
     {
         return sequences.empty() ? nullptr : &sequences[0];
     }
+
+protected:
+    bool do_load() override;
 };
 
 }

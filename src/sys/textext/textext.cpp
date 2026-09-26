@@ -6,8 +6,10 @@
 #include <newbase/scene.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/reflection/contexts.hpp>
+#include <newbase/ui/imgui_icons.hpp>
 #include <entt/entt.hpp>
 #include <entt/meta/factory.hpp>
+#include <memory>
 
 using namespace nb;
 using entt::operator""_hs;
@@ -96,4 +98,38 @@ extern "C" void _rtti_init_textext()
         .type("textext_shared"_hs)
         .ctor<&rtti::shared_ptr_builder<nb::textext>>()
         .conv<std::shared_ptr<nb::system>>();
+
+    using namespace rtti;
+
+    entt::meta_factory<rtexfont>{}
+        .type("rtexfont"_hs)
+        .base<resource>()
+        .custom<type_info>(type_info{
+            .identifier = "texfont",
+            .type_class = TYPE_CLASS_RESOURCE,
+            .data = {.resource = {.editor_icon = ICON_FK_FONT, .extensions = "texfont",
+                .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return std::make_shared<rtexfont>(id);
+                }
+            }}
+        });
+
+    // shared_ptr<rtexfont> registration so resource fields can reference this type in the editor
+    entt::meta_factory<std::shared_ptr<nb::rtexfont>>{}
+    .type("rtexfont_ptr"_hs)
+    .ctor<>()
+    .custom<rtti::type_info>(rtti::type_info{
+        .identifier = "rtexfont_ptr",
+        .type_class = rtti::TYPE_CLASS_RESOURCE_PTR,
+        .data = {.resource_ptr = {
+            .resource_type_id = "rtexfont"_hs.value(),
+            .get_ptr = +[](const entt::meta_any& a) -> std::shared_ptr<nb::resource> {
+                auto* p = a.try_cast<std::shared_ptr<nb::rtexfont>>();
+                return p ? *p : nullptr;
+            },
+            .set_ptr = +[](entt::meta_any& a, std::shared_ptr<nb::resource> p) {
+                a.assign(std::static_pointer_cast<nb::rtexfont>(p));
+            }
+        }}
+    });
 }

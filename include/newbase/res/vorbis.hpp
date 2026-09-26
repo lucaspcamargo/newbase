@@ -17,6 +17,9 @@ struct rvorbis : public resource {
     // Not set for longer files; the producer streams from storage on demand.
     bool cached {false};
     std::vector<char> frames {};
+
+protected:
+    bool do_load() override;
 };
 
 }

@@ -1,13 +1,6 @@
 #include <newbase/res/manager.hpp>
+#include <newbase/res/async_load.hpp>
 #include <newbase/res/vfs.hpp>
-#include <newbase/res/loaders.hpp>
-#include <newbase/res/etree.hpp>
-#include <newbase/res/sprite.hpp>
-#include <newbase/res/texture.hpp>
-#include <newbase/res/script.hpp>
-#include <newbase/res/vorbis.hpp>
-#include <newbase/res/wav.hpp>
-#include <newbase/res/yaml.hpp>
 #include <newbase/res/storage/interface.hpp>
 #include <newbase/res/storage/sdl_file.hpp>
 #include <newbase/res/storage/sdl_storage.hpp>
@@ -27,13 +20,14 @@
 #include <ryml.hpp>
 #include <ryml_std.hpp>
 #include <cstdlib>
-#include <iostream> // temp
+#include <mutex>
 
 namespace nb{
 
 struct rmanager_p {
     // weak cache: resource_type_id -> { asset_id -> weak_ptr<resource> }
     // entries expire automatically when no live shared_ptr references remain
+    std::mutex cache_mtx;
     std::unordered_map<entt::id_type,
         std::unordered_map<entt::id_type, std::weak_ptr<nb::resource>>> caches;
 
@@ -41,6 +35,8 @@ struct rmanager_p {
     std::unordered_map<entt::id_type, res_storage::asset_handle> asset_handles;
 
     vfs_tree vfs;
+
+    res::load::worker async_worker;
 };
 
 static rmanager _rman_inst;
@@ -49,19 +45,22 @@ rmanager& rman() {return _rman_inst;}
 rmanager::rmanager()
 {
     _d = new rmanager_p();
+    _d->async_worker.run();
+    log::info("[rmanager] async worker started");
 }
 
 rmanager::~rmanager()
 {
-    // called in exit handlers!
     delete _d;
 }
 
 void rmanager::clear()
 {
     log::info("[rmanager] clearing resource pools and storage interfaces");
-
-    _d->caches.clear();
+    {
+        std::lock_guard _{_d->cache_mtx};
+        _d->caches.clear();
+    }
     _d->asset_handles.clear();
     _d->storage_interfaces.clear();
     _d->vfs = vfs_tree{};
@@ -122,7 +121,16 @@ bool rmanager::configure(const ryml::NodeRef &config)
     return true;
 }
 
-void rmanager::collect()
+void rmanager::teardown()
+{
+    clear();
+
+    log::info("[rmanager] stopping async worker");
+    _d->async_worker.stop();
+    log::info("[rmanager] async worker stopped");
+}
+
+void rmanager::prune_cache()
 {
     for (auto& [type_id, type_cache] : _d->caches)
     {
@@ -234,19 +242,20 @@ const vfs_tree& rmanager::vfs() const
     return _d->vfs;
 }
 
-std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type asset_id, bool forceload)
+std::shared_ptr<nb::resource> rmanager::create(entt::id_type type_id, entt::id_type asset_id)
 {
+    std::lock_guard<std::mutex> lock(_d->cache_mtx);
     auto &type_cache = _d->caches[type_id];
 
-    if (!forceload)
+    auto it = type_cache.find(asset_id);
+    bool replace_it = false;
+    if (it != type_cache.end())
     {
-        auto it = type_cache.find(asset_id);
-        if (it != type_cache.end())
+        if (auto res = it->second.lock())
         {
-            if (auto locked = it->second.lock())
-                return locked;
-            // expired — fall through to reload
+            return res; // Return existing instance regardless of state
         }
+        replace_it = true;
     }
 
     auto mtype = entt::resolve(type_id);
@@ -255,16 +264,46 @@ std::shared_ptr<nb::resource> rmanager::get(entt::id_type type_id, entt::id_type
         log::error("[rmanager] unregistered resource type: %x", type_id);
         return nullptr;
     }
+
     const rtti::type_info *info = mtype.custom().operator rtti::type_info*();
-    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->loader_fn)
+    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->data.resource.factory_fn)
     {
-        log::error("[rmanager] resource type has no loader: %x", type_id);
+        log::error("[rmanager] resource type missing factory: %x", type_id);
         return nullptr;
     }
 
-    auto res = info->loader_fn(asset_id);
-    if (res)
+    auto res = info->data.resource.factory_fn(asset_id);
+    if (!res)
+    {
+        log::error("[rmanager] failed to instantiate resource shell: %x", type_id);
+        return nullptr;
+    }
+
+    if(replace_it)
+        it->second = res;
+    else
         type_cache[asset_id] = res;
+
+    return res;
+}
+
+std::shared_ptr<nb::resource> rmanager::load_sync(entt::id_type type_id, entt::id_type asset_id)
+{
+    auto res = create(type_id, asset_id);
+    if (!res)
+    {
+        return nullptr;
+    }
+
+    // Force synchronous load or wait for active worker thread to finish
+    res->force_load_sync();
+
+    // If load failed, don't hand out broken handle
+    if (res->is_failed())
+    {
+        return nullptr;
+    }
+
     return res;
 }
 
@@ -274,16 +313,34 @@ std::shared_ptr<nb::resource> rmanager::load_nocache(entt::id_type type_id, entt
     auto mtype = entt::resolve(type_id);
     if (!mtype)
     {
-        log::error("[rmanager] load_nocache: unregistered resource type: %x", type_id);
+        log::error("[rmanager] unregistered resource type: %x", type_id);
         return nullptr;
     }
+
     const rtti::type_info *info = mtype.custom().operator rtti::type_info*();
-    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->loader_fn)
+    if (!info || info->type_class != rtti::TYPE_CLASS_RESOURCE || !info->data.resource.factory_fn)
     {
-        log::error("[rmanager] load_nocache: resource type has no loader: %x", type_id);
+        log::error("[rmanager] resource type missing factory: %x", type_id);
         return nullptr;
     }
-    return info->loader_fn(asset_id);
+
+    auto res = info->data.resource.factory_fn(asset_id);
+    if (!res)
+    {
+        log::error("[rmanager] failed to instantiate resource shell: %x", type_id);
+        return nullptr;
+    }
+
+    // Force synchronous load or wait for active worker thread to finish
+    res->force_load_sync();
+
+    // If load failed, don't hand out broken handle
+    if (res->is_failed())
+    {
+        return nullptr;
+    }
+
+    return res;
 }
 
 
