@@ -59,6 +59,3 @@
 [submodule "vendored/miniz"]
 	path = vendored/miniz
 	url = https://github.com/richgel999/miniz.git
-[submodule "vendored/ImGuiColorTextEdit"]
-	path = vendored/ImGuiColorTextEdit
-	url = https://github.com/BalazsJako/ImGuiColorTextEdit.git
