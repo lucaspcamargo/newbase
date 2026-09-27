@@ -154,3 +154,12 @@ This is a living document.
         perhaps? Providing a render_layer should give the overlay enough context.
         If/when RTT is being used is another story in this scenario.
 - [X] Update UI overlay callback signature and code
+
+
+## Scope: render_gpu and 3D
+
+- [ ] Rewrite render_gpu on a clean slate, based off of the 2D work we did before
+- [ ] Define primitives for shaders, wrap the base 2D shaders on those for validation
+- [ ] Pipeline state cache types and machinery
+- [ ] 3D camera math
+- [ ] Materials system and resources

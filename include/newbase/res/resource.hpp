@@ -26,13 +26,17 @@
 //
 
 // NOTE
-// If we need hot-reloading at some later point, we do have a reset() operation
+// If we need hot-reloading at some later point, we do have a reset() operation.
 // that has to put the resource back to the CREATED state and release resources.
-// Resetting and reloading is a good starting point.
+// Resetting and reloading at a specific point on the main thread is a good starting point.
+// We could add some sort of barrier on the async worker thread to prevent race conditions.
+// On the other hand, we might not want to reload stuff on the main thread at all.
 //
-// One idea: dispatch a "special" loading operation in the baackground that does not touch
+// One idea: dispatch a "special" loading operation in the background that does not touch
 // the main resource cache. Once that is done we "swap" the data of the reloaded
 // resources into the real ones, in a well-defined sync point in the main thread.
+//
+// Consider the header-only lib `filewatch` for the storage backend notifications.
 
 
 namespace nb {

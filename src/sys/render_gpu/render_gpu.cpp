@@ -156,7 +156,7 @@ bool render_gpu::init(ryml::ConstNodeRef cfg)
     }
 
     // -- window icon ----------------------------------------------------------------------------
-    auto icon_tex = rman().get<rtexture>("_nb_core/icon_192.png"_hs);
+    auto icon_tex = rman().get<rtexture>("_nb_core/icons/icon_192.png"_hs);
     if (icon_tex && icon_tex->surf)
         SDL_SetWindowIcon(_win, icon_tex->surf);
 

@@ -224,7 +224,7 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
 
     // attempt to load and set window icon
     // TODO move to render::window
-    auto icon_tex = rman().load_sync<rtexture>("_nb_core/icon_192.png"_hs);
+    auto icon_tex = rman().load_sync<rtexture>("_nb_core/icons/icon_192.png"_hs);
     if(icon_tex && icon_tex->surf)
     {
         SDL_SetWindowIcon(_d->rwin.get(), icon_tex->surf);
