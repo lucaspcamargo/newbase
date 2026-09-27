@@ -127,9 +127,11 @@ void imgui_nb::_rebuild_font_atlas(bool force)
 // Event handling
 // This is a simplified rendition of ImGui_ImplSDL3_ProcessEvent
 // Multi-viewport support has been striped out, as well as "display" stuff
-bool imgui_nb::event(SDL_Event *event)
+bool imgui_nb::event(SDL_Event *orig_event)
 {
     ImGuiIO& io = ImGui::GetIO();
+    auto event_stack = _d->win.event_to_ui_coordinates(orig_event);
+    const auto event = &event_stack;
 
     switch (event->type)
     {

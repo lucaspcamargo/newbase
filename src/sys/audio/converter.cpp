@@ -24,6 +24,8 @@ inline static void as_sdl_spec(const audio_spec &in, SDL_AudioSpec &out)
         case audio_format::S8:
             out.format = SDL_AUDIO_S8;
             break;
+        case audio_format::UNKNOWN:
+            break;
     }
 }
 

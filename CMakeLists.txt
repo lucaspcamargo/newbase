@@ -271,7 +271,8 @@ if(DEFINED ANDROID_NDK)
     get_target_property( REAL_SDL3 SDL3::SDL3 ALIASED_TARGET)
     message("[newbase] Android: ensuring 16kb page boundary for SDL3 main lib (${REAL_SDL3}) and newbase")
     target_link_options( ${REAL_SDL3} PRIVATE "-Wl,-z,max-page-size=16384")
-    target_link_options( newbase PRIVATE "-Wl,-z,max-page-size=16384")
+    target_link_options( newbase PRIVATE "-Wl,-z,max-page-size=16384" -llog)
+    target_link_options( newbase PUBLIC -llog)
     target_compile_definitions( newbase PUBLIC ANDROID ) # TODO recently changed to __ANDROID__, adapt in source
 endif()
 

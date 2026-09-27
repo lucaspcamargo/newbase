@@ -110,7 +110,7 @@ bool render::window::event(SDL_Event * evt)
     {
         m_ui_scale = SDL_GetWindowDisplayScale(m_win);
         m_event_scale = SDL_GetWindowPixelDensity(m_win);
-        log::info("[window] scale chnged, ui=%f, event=%f", m_ui_scale, m_event_scale);
+        log::info("[window] scale changed, ui=%f, event=%f", m_ui_scale, m_event_scale);
         return true;
     }
     else if(evt->type == SDL_EVENT_WINDOW_SAFE_AREA_CHANGED)
@@ -130,12 +130,13 @@ bool render::window::show()
 
     if(SDL_ShowWindow(m_win))
     {
+        m_wid = SDL_GetWindowID(m_win);
+        SDL_GetWindowSafeArea(m_win, &m_safe_area);
         SDL_GetWindowSizeInPixels(m_win, &m_pw, &m_ph);
         m_ui_scale = SDL_GetWindowDisplayScale(m_win);
         m_event_scale = SDL_GetWindowPixelDensity(m_win);
-        SDL_GetWindowSafeArea(m_win, &m_safe_area);
-        log::info("[window] opened, size %dx%d, ui_scale %f, safe area: %dx%d@%d,%d",
-                  m_pw, m_ph, m_ui_scale,
+        log::info("[window] opened, size %dx%d, ui_scale %f, event_scale %f, safe area: %dx%d@%d,%d",
+                  m_pw, m_ph, m_ui_scale, m_event_scale,
                   m_safe_area.w, m_safe_area.h, m_safe_area.x, m_safe_area.y);
         return true;
     }

@@ -24,6 +24,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #endif
+#ifdef ANDROID
+#include <android/log.h>
+#endif
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_thread.h>
@@ -506,6 +509,10 @@ void engine::log_handler(int category, int prio, const char *msg)
     auto ansi = ::nb::log::priority_ansi_decor(static_cast<::nb::log::priority>(prio));
     std::cout << (ansi.first? ansi.first : "") <<"["<< ::nb::log::priority_str(static_cast<::nb::log::priority>(prio)) <<
          "] [" << ::nb::log::category_str(static_cast<::nb::log::category>(category)) << "] "<< msg << (ansi.second? ansi.second : "") << std::endl;
+#ifdef ANDROID
+    // we could do better but still
+    __android_log_print(ANDROID_LOG_DEBUG, "newbase", msg);
+#endif
 }
 
 

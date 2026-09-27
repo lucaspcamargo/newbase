@@ -2,7 +2,7 @@
 #include <newbase/sys/input/overlay.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/log.hpp>
-#include <newbase/services/renderer_service.hpp>
+#include <newbase/render/window.hpp>
 #include <entt/entt.hpp>
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_video.h>
@@ -164,10 +164,14 @@ void input_overlay::event(const SDL_Event &event)
         return;
 
     SDL_Window *window = SDL_GetWindowFromID(event.tfinger.windowID);
-    int width = 0, height = 0;
-    if(!window || !SDL_GetWindowSize(window, &width, &height) || width <= 0 || height <= 0)
+    if(!window)
         return;
-    const glm::vec2 position {event.tfinger.x * width, event.tfinger.y * height};
+    auto rwin = render::window::from_sdl_window(window);
+    if(!rwin)
+        return;
+    auto ui_w = rwin->width()/rwin->ui_scale();
+    auto ui_h = rwin->height()/rwin->ui_scale();
+    const glm::vec2 position {event.tfinger.x * ui_w, event.tfinger.y * ui_h};
     if(event.type == SDL_EVENT_FINGER_DOWN)
         begin_touch(event.tfinger.fingerID, position);
     else if(event.type == SDL_EVENT_FINGER_MOTION)
