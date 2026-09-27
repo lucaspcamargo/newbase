@@ -466,6 +466,9 @@ bool nb::lupi::lupi::step(step_phase phase)
 
 bool nb::lupi::lupi::event(SDL_Event *ev)
 {
+    /*
+     * TODO: check if application is actively requesting text input before bringing up keyboard
+     * also only do this when activelly running content
     if (!_d->text_input_started)
     {
         if (SDL_Window *win = SDL_GetKeyboardFocus())
@@ -473,7 +476,7 @@ bool nb::lupi::lupi::event(SDL_Event *ev)
             SDL_StartTextInput(win);
             _d->text_input_started = true;
         }
-    }
+    }*/
 
     switch (ev->type)
     {
