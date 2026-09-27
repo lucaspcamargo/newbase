@@ -1,4 +1,6 @@
+#include <memory>
 #include <newbase/sys/lupi/lupi.hpp>
+#include "SDL3/SDL_surface.h"
 #include "newbase/sys/lupi/cart.hpp"
 #include "newbase/sys/lupi/framebuffer.hpp"
 #include <newbase/sys/input/input.hpp>
@@ -96,8 +98,8 @@ nb::lupi::lupi::~lupi()
         m->unregister_tool_window("lupi framebuffer");
     if (_d->L)
         lua_close(_d->L);
-    if (auto *r = rs(); r && _d->tex)
-        r->destroy_texture(_d->tex);
+    if (auto *u = uim(); u && _d->fb_tex_hnd != ui_manager::TEXTURE_INVALID)
+        u->texture_unregister(_d->fb_tex_hnd);
     delete _d;
 }
 
@@ -109,12 +111,16 @@ bool nb::lupi::lupi::init(ryml::ConstNodeRef cfg)
         input_system->set_overlay_dpad(true);
 
     // --- GPU texture + debug tool window (persistent for the system's lifetime) ---
-    if (auto *r = rs())
-    {
-        _d->tex = r->create_texture(LUPI_SCREEN_W, LUPI_SCREEN_H);
-    }
+    _d->fb_tex = std::make_shared<rtexture>(0);
+    _d->fb_tex->width = LUPI_SCREEN_W;
+    _d->fb_tex->height = LUPI_SCREEN_H;
+    _d->fb_tex->nearest = true;
+
+    // UI texture registration and tool window
     if (auto *m = uim())
     {
+        _d->fb_tex_hnd = m->texture_register(_d->fb_tex);
+
         m->register_tool_window("lupi_debug", [this](bool *open)
                                 {
             if (!ImGui::Begin("Lupi Debug", open)) { ImGui::End(); return; }
@@ -124,14 +130,14 @@ bool nb::lupi::lupi::init(ryml::ConstNodeRef cfg)
                                         &_d->fixed_rate_snap_tolerance, 0.0001, 0.001, "%.4f");
             if(ImGui::TreeNodeEx("Framebuffer", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                if (_d->tex) {
+                if (_d->fb_tex_hnd != ui_manager::TEXTURE_INVALID) {
                     constexpr float W = (float)LUPI_SCREEN_W, H = (float)LUPI_SCREEN_H;
                     ImVec2 avail = ImGui::GetContentRegionAvail();
                     float scale = std::min(avail.x / W, avail.y / H);
                     if (scale <= 0.f) scale = 1.f;
-                    ImGui::Image((ImTextureID)_d->tex, ImVec2(W * scale, H * scale));
+                    ImGui::Image((ImTextureID)_d->fb_tex_hnd, ImVec2(W * scale, H * scale));
                 } else {
-                    ImGui::TextDisabled("(no renderer service)");
+                    ImGui::TextDisabled("(no ui textures)");
                 }
                 ImGui::TreePop();
             }
@@ -294,16 +300,11 @@ bool nb::lupi::lupi::start(const std::string &cart_path)
         return false;
     }
 
-    // --- show it in the default scene as an ordinary sprite ---
-    if (!_d->screen_tex)
+    // --- show fb texture in the default scene as an ordinary sprite ---
+    if (!_d->screen_sprite)
     {
-        _d->screen_tex = std::make_shared<rtexture>(entt::hashed_string{"lupi_screen_texture"}.value());
-        _d->screen_tex->rptr = _d->tex;
-        _d->screen_tex->width = LUPI_SCREEN_W;
-        _d->screen_tex->height = LUPI_SCREEN_H;
-        _d->screen_tex->uploaded = true;
         _d->screen_sprite = std::make_shared<rsprite>(entt::hashed_string{"lupi_screen_sprite"}.value());
-        _d->screen_sprite->tex = _d->screen_tex;
+        _d->screen_sprite->tex = _d->fb_tex;
     }
     auto &reg = engine::instance().default_scene().registry();
     _d->screen_entity = reg.create();
@@ -457,8 +458,14 @@ bool nb::lupi::lupi::step(step_phase phase)
             uint8_t idx = _d->fb.pixels[i];
             _d->rgba_scratch[i] = idx == 0 ? 0u : lupi_palette::bgr555_to_rgba8888(_d->pal.bgr555[idx]);
         }
-        if (auto *r = rs(); r && _d->tex)
-            r->update_texture(_d->tex, _d->rgba_scratch.data(), LUPI_SCREEN_W * 4);
+        if (_d->fb_tex)
+        {
+            _d->fb_tex->surf = SDL_CreateSurfaceFrom(LUPI_SCREEN_W, LUPI_SCREEN_H,
+                                                     SDL_PIXELFORMAT_RGBA32, _d->rgba_scratch.data(),
+                                                     4*LUPI_SCREEN_W);
+            _d->fb_tex->uploaded = false;
+
+        }
     }
 
     return true;

@@ -1,3 +1,4 @@
+#include "SDL3/SDL_surface.h"
 #include <newbase/sys/audio/graph_manager.hpp>
 #include <newbase/sys/audio/res/rlpcvocab.hpp>
 #include <newbase/sys/audio/vorbis_feedback.hpp>
@@ -385,9 +386,8 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
         vis_it->draw_fn = [](graphplan::node_data& nd) -> bool {
             auto* fb = static_cast<visualizer_feedback*>(nd.user_data.get());
             if (!fb) { ImGui::TextDisabled("(no signal)"); return false; }
-            auto* rs = entt::locator<renderer_service*>::has_value()
-                       ? entt::locator<renderer_service*>::value() : nullptr;
-            if (!rs) { ImGui::TextDisabled("(no renderer)"); return false; }
+            auto* uim = entt::locator<ui_manager*>::value_or(nullptr);
+            if (!uim) { ImGui::TextDisabled("(no ui mgr)"); return false; }
 
             // Mode toggle
             {
@@ -406,8 +406,11 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
             }
             if (!fb->texture)
             {
-                fb->texture = rs->create_texture(fb->tex_w, fb->tex_h);
+                fb->texture = std::make_shared<rtexture>(0);
+                fb->texture->width = fb->tex_w;
+                fb->texture->height = fb->tex_h;
                 if (!fb->texture) return false;
+                fb->texture_hnd = uim->texture_register(fb->texture);
             }
 
             size_t n = fb->snapshot();
@@ -505,10 +508,15 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                     }
                 }
 
-                rs->update_texture(fb->texture, fb->surface->pixels, fb->surface->pitch);
+                // create a reference to our internal surface data for upload
+                // no copy is made
+                fb->texture->surf = SDL_CreateSurfaceFrom(fb->surface->w, fb->surface->h,
+                                                          fb->surface->format, fb->surface->pixels,
+                                                          fb->surface->pitch);
+                fb->texture->uploaded = false;
             }
 
-            ImGui::Image((ImTextureID)fb->texture,
+            ImGui::Image(ImTextureID{fb->texture_hnd},
                          ImVec2(static_cast<float>(fb->tex_w), static_cast<float>(fb->tex_h)));
             return false;
         };
@@ -749,13 +757,6 @@ void audio_graph_manager::shutdown()
     _d->fan_out_cache.clear();
     _d->vorbis_res_cache.clear();
     _d->vorbis_fb_cache.clear();
-
-    if (auto* rs = entt::locator<renderer_service*>::has_value()
-                   ? entt::locator<renderer_service*>::value() : nullptr)
-    {
-        for (auto& [id, fb] : _d->vis_fb_cache)
-            if (fb && fb->texture) { rs->destroy_texture(fb->texture); fb->texture = nullptr; }
-    }
     _d->vis_fb_cache.clear();
     _d->bus_cache.clear();
 
@@ -791,12 +792,6 @@ void audio_graph_manager::_reset_plan_caches(impl* d)
     d->vorbis_fb_cache.clear();
     d->lpc_fb_cache.clear();
     d->lpc_vocab_cache.clear();
-    if (auto* rs = entt::locator<renderer_service*>::has_value()
-                   ? entt::locator<renderer_service*>::value() : nullptr)
-    {
-        for (auto& [id, fb] : d->vis_fb_cache)
-            if (fb && fb->texture) { rs->destroy_texture(fb->texture); fb->texture = nullptr; }
-    }
     d->vis_fb_cache.clear();
     d->bus_cache.clear();
     d->player_slots.clear();
@@ -1612,19 +1607,13 @@ void audio_graph_manager::rebuild(audio_graph::graph& live_graph, SDL_Mutex* mtx
     {
         if (!_d->gplan->nodes.count(it->first))
         {
+            // erase any feedback data that might exist for this node id in the caches
             _d->vorbis_res_cache.erase(it->first);
             _d->vorbis_fb_cache.erase(it->first);
             _d->lpc_fb_cache.erase(it->first);
             _d->lpc_vocab_cache.erase(it->first);
-            auto vit = _d->vis_fb_cache.find(it->first);
-            if (vit != _d->vis_fb_cache.end())
-            {
-                auto* rs = entt::locator<renderer_service*>::has_value()
-                           ? entt::locator<renderer_service*>::value() : nullptr;
-                if (rs && vit->second && vit->second->texture)
-                    rs->destroy_texture(vit->second->texture);
-                _d->vis_fb_cache.erase(vit);
-            }
+            _d->vis_fb_cache.erase(it->first);
+            // then destroy the node
             it = _d->node_cache.erase(it);
         }
         else

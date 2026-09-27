@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <newbase/layer.hpp>
 #include <newbase/utility/glm.hpp>
 
@@ -62,5 +63,16 @@ namespace nb
         using open_resource_editor_fn = std::function<void(entt::id_type type_id, entt::id_type asset_id, std::string_view name)>;
         virtual void register_open_resource_editor_callback(open_resource_editor_fn fn) = 0;
         virtual void request_open_resource_editor(entt::id_type type_id, entt::id_type asset_id, std::string_view name) = 0;
+
+        // UI texture registry
+        // Holds references to textures to be used in UI rendering
+        // the texture handl can always be used as an ImTextureId
+        using texture_ref_t = std::shared_ptr<rtexture>;
+        using texture_handle_t = uint64_t;
+        static constexpr texture_handle_t TEXTURE_INVALID = 0;
+        virtual texture_handle_t texture_register(texture_ref_t tex) = 0;
+        virtual bool texture_unregister(texture_handle_t handle) = 0;
+        virtual texture_ref_t texture_get(texture_handle_t handle) = 0;
+
     };
 }

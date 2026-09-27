@@ -1,9 +1,11 @@
+#include <memory>
 #include <newbase/editor/texture_editor_widget.hpp>
 #include <newbase/res/texture.hpp>
-#include <newbase/services/renderer_service.hpp>
+#include <newbase/services/ui_manager.hpp>
 #include <entt/locator/locator.hpp>
 #include <imgui.h>
 #include "IconsForkAwesome.h"
+#include "SDL3/SDL_surface.h"
 #include <SDL3/SDL_pixels.h>
 #include <algorithm>
 #include <cmath>
@@ -43,24 +45,26 @@ static constexpr int kPaletteRows = 2;
 
 texture_editor_widget::~texture_editor_widget()
 {
-    if (_tex)
+    if (_ui_tex_hnd != ui_manager::TEXTURE_INVALID)
     {
-        auto* rs = entt::locator<renderer_service*>::has_value()
-                   ? entt::locator<renderer_service*>::value() : nullptr;
-        if (rs) rs->destroy_texture(_tex);
+        // unregister ui texture handle
+        // texture itself is destroyed when shared pointers expire
+        auto uim = entt::locator<ui_manager*>::value_or(nullptr);
+        if (uim) uim->texture_unregister(_ui_tex_hnd);
     }
     if (_canvas) SDL_DestroySurface(_canvas);
 }
 
 texture_editor_widget::texture_editor_widget(texture_editor_widget&& o) noexcept
-    : _canvas(o._canvas), _tex(o._tex),
+    : _canvas(o._canvas), _ui_tex(o._ui_tex), _ui_tex_hnd(o._ui_tex_hnd),
       _tool(o._tool), _primary(o._primary), _secondary(o._secondary),
       _brush_size(o._brush_size), _zoom(o._zoom),
       _dirty(o._dirty), _last_pos(o._last_pos),
       _line_start(o._line_start), _line_end(o._line_end), _line_primary(o._line_primary)
 {
     o._canvas = nullptr;
-    o._tex    = nullptr;
+    o._ui_tex = nullptr;
+    o._ui_tex_hnd = ui_manager::TEXTURE_INVALID;
 }
 
 texture_editor_widget& texture_editor_widget::operator=(texture_editor_widget&& o) noexcept
@@ -84,12 +88,17 @@ void texture_editor_widget::apply(resource* res)
 
 void texture_editor_widget::open(SDL_Surface* source)
 {
-    if (_tex)
+
+    auto uim = entt::locator<ui_manager*>::value_or(nullptr);
+    if(!uim)
+        return; // no ui manager, we're screwed
+
+    if (_ui_tex_hnd != ui_manager::TEXTURE_INVALID)
     {
-        auto* rs = entt::locator<renderer_service*>::has_value()
-                   ? entt::locator<renderer_service*>::value() : nullptr;
-        if (rs) rs->destroy_texture(_tex);
-        _tex = nullptr;
+        // unregister ui texture handle
+        uim->texture_unregister(_ui_tex_hnd);
+        _ui_tex_hnd = ui_manager::TEXTURE_INVALID;
+        _ui_tex.reset();
     }
     if (_canvas) { SDL_DestroySurface(_canvas); _canvas = nullptr; }
 
@@ -98,12 +107,12 @@ void texture_editor_widget::open(SDL_Surface* source)
     _canvas = SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
     if (!_canvas) return;
 
-    auto* rs = entt::locator<renderer_service*>::has_value()
-               ? entt::locator<renderer_service*>::value() : nullptr;
-    if (!rs) return;
-
-    _tex = rs->create_texture(_canvas->w, _canvas->h);
-    rs->update_texture(_tex, _canvas->pixels, _canvas->pitch);
+    _ui_tex = std::make_shared<rtexture>(0);
+    _ui_tex_hnd = uim->texture_register(_ui_tex);
+    _ui_tex->width = _canvas->w;
+    _ui_tex->height = _canvas->h;
+    _ui_tex->nearest = true;
+    _ui_tex->surf = SDL_DuplicateSurface(_canvas);
 
     // Start zoomed so the texture fills roughly 256px
     float max_dim = (float)std::max(_canvas->w, _canvas->h);
@@ -195,10 +204,9 @@ void texture_editor_widget::_flood_fill(int x, int y, ImVec4 replacement)
 
 void texture_editor_widget::_push_texture()
 {
-    if (!_canvas || !_tex) return;
-    auto* rs = entt::locator<renderer_service*>::has_value()
-               ? entt::locator<renderer_service*>::value() : nullptr;
-    if (rs) rs->update_texture(_tex, _canvas->pixels, _canvas->pitch);
+    if (!_canvas || !_ui_tex) return;
+    _ui_tex->surf = SDL_DuplicateSurface(_canvas);
+    _ui_tex->uploaded = false;
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
@@ -305,7 +313,7 @@ void texture_editor_widget::_draw_canvas(ImVec2 size)
     }
 
     // ── Texture image ───────────────────────────────────────────────────────
-    ImGui::Image((ImTextureID)_tex, display);
+    ImGui::Image(ImTextureID{_ui_tex_hnd}, display);
 
     // ── Invisible button on top for mouse interaction ───────────────────────
     ImGui::SetCursorScreenPos(canvas_screen);
@@ -449,7 +457,7 @@ void texture_editor_widget::_palette(float swatch_size)
 
 void texture_editor_widget::draw()
 {
-    if (!_canvas || !_tex) { ImGui::TextDisabled("(no texture)"); return; }
+    if (!_canvas || !_ui_tex_hnd) { ImGui::TextDisabled("(no texture)"); return; }
 
     const float swatch_size = 20.0f;
     const float sp          = ImGui::GetStyle().ItemSpacing.y;

@@ -1,6 +1,8 @@
 #pragma once
 
-#include <newbase/services/renderer_service.hpp>
+#include "entt/locator/locator.hpp"
+#include <newbase/services/ui_manager.hpp>
+#include <newbase/res/texture.hpp>
 #include <SDL3/SDL.h>
 #include <cstddef>
 #include <cstring>
@@ -33,7 +35,8 @@ struct visualizer_feedback
     // ---- main thread only (no lock needed) ----
     bool                          spectrum_mode {false};
     SDL_Surface*                  surface {nullptr};
-    renderer_service::texture_handle texture {nullptr};
+    std::shared_ptr<rtexture>     texture {nullptr};
+    ui_manager::texture_handle_t  texture_hnd {ui_manager::TEXTURE_INVALID};
     int                           tex_w {256};
     int                           tex_h {80};
 
@@ -48,6 +51,12 @@ struct visualizer_feedback
         // texture must be destroyed by the owner before the feedback is freed
         // (renderer_service is not accessible here)
         if (mtx) { SDL_DestroyMutex(mtx); mtx = nullptr; }
+        if (texture_hnd != ui_manager::TEXTURE_INVALID)
+        {
+            auto uim = entt::locator<ui_manager*>::value_or(nullptr);
+            if (uim)
+                uim->texture_unregister(texture_hnd);
+        }
     }
 
     // Called from audio thread: push channel-0 samples into write_buf (ring).

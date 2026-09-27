@@ -1,4 +1,5 @@
 #include "newbase/render/types.hpp"
+#include "newbase/services/ui_manager.hpp"
 #include <newbase/ui/manager.hpp>
 #include <newbase/ui/imgui_style.hpp>
 #include <newbase/ui/imgui_icons.hpp>
@@ -42,6 +43,9 @@ struct nb::ui_manager_p
     glm::vec4 viewport_gui {0.0f};
     glm::ivec4 viewport_px {0};
     glm::vec2 ui_scale {1.0f};
+
+    std::unordered_map<ui_manager::texture_handle_t, ui_manager::texture_ref_t> textures;
+    ui_manager::texture_handle_t texture_next_handle {1};
 };
 
 
@@ -549,4 +553,31 @@ void ui_manager_simple::unregister_ui_overlay(const char* name)
     auto &v = _d->ui_overlays;
     v.erase(std::remove_if(v.begin(), v.end(),
                            [name](const auto &p){ return p.first == name; }), v.end());
+}
+
+
+ui_manager_simple::texture_handle_t ui_manager_simple::texture_register(texture_ref_t tex)
+{
+    if(!tex)
+        return TEXTURE_INVALID;
+    auto hnd = _d->texture_next_handle++;
+    _d->textures.emplace(hnd, tex);
+    return hnd;
+}
+
+bool ui_manager_simple::texture_unregister(texture_handle_t handle)
+{
+    auto it = _d->textures.find(handle);
+    if(it != _d->textures.end())
+    {
+        _d->textures.erase(it);
+        return true;
+    }
+    return false;
+}
+
+std::shared_ptr<rtexture> ui_manager_simple::texture_get(texture_handle_t handle)
+{
+    auto it = _d->textures.find(handle);
+    return it != _d->textures.end()? it->second : nullptr;
 }

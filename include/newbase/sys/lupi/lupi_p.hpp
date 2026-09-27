@@ -1,5 +1,6 @@
 #pragma once
 
+#include "newbase/services/ui_manager.hpp"
 #include <newbase/sys/lupi/lupi_lua.hpp>
 #include <newbase/sys/lupi/framebuffer.hpp>
 #include <newbase/sys/lupi/sprite.hpp>
@@ -67,7 +68,8 @@ struct lupi_p {
     // scratch RGBA8888 buffer, reused every RENDER-phase blit
     std::vector<uint32_t> rgba_scratch;
 
-    renderer_service::texture_handle tex { nullptr };
+    std::shared_ptr<rtexture> fb_tex {nullptr};
+    ui_manager::texture_handle_t fb_tex_hnd { ui_manager::TEXTURE_INVALID };
 
     // Wraps `tex` as an rtexture/rsprite so it can be shown via an ordinary
     // csprite entity in the default scene. render_simple-specific: it stores
@@ -75,7 +77,6 @@ struct lupi_p {
     // pre-uploaded — render_gpu, which caches GPU textures separately keyed
     // by rtexture identity, isn't supported by this path. Built once, reused
     // across start()/stop() cycles.
-    std::shared_ptr<rtexture> screen_tex;
     std::shared_ptr<rsprite>  screen_sprite;
     entt::entity screen_entity { entt::null };
 

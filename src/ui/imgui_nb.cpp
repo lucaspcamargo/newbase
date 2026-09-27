@@ -32,6 +32,8 @@ struct nb::imgui_nb_p
 
     std::vector<render::vertex2d> cvt_buf;
 
+    imgui_nb::texture_getter_t tex_getter {};
+
     // int mouse_btns_down; -- This could help with handling dragging stuff past the window, bu we don't handle that
 };
 
@@ -273,10 +275,14 @@ void imgui_nb::render_flush()
                 clip_dims.x, clip_dims.y
             };
 
-            // TODO we need to figure out how to convert ImTextureRef <=> std::shared_ptr<rtexture>
-            // this will also reduce or eliminate the need for the texture handling APIs in the renderer
-            // ENTT resource IDs seem to be a good choice
-            std::shared_ptr<rtexture> rtex = (cmd.TexRef == FONT_REF)? _d->font_tex : nullptr;
+
+            // In order to feed textures to this backend, you provide a callback
+            std::shared_ptr<rtexture> rtex = (cmd.TexRef.GetTexID() == FONT_REF)
+                ? _d->font_tex
+                : (_d->tex_getter
+                    ? _d->tex_getter(cmd.TexRef.GetTexID())
+                    : nullptr
+                );
 
             _d->batcher.add_geom(_d->cvt_buf.data() + cmd.VtxOffset, vtx_count,
                                  cmd_idx_base, cmd.ElemCount,
@@ -296,6 +302,10 @@ render::batcher2d& imgui_nb::render_data()
     return _d->batcher;
 }
 
+void imgui_nb::set_texture_lookup_callback(texture_getter_t getter)
+{
+    _d->tex_getter = getter;
+}
 
 
 //  Helpers impl

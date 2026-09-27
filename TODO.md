@@ -18,6 +18,7 @@ This is a living document.
           It's our fault for having two different 2D coordinate systems, UI and pixel.
           But it's also SDL's fault for providing events in logical or real pixels depending on the platform.
 - Editor
+    + [ ] Use render::window conversion for all pointer events
     + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs
     + [ ] Some UI prefs and love
@@ -41,8 +42,9 @@ This is a living document.
     + [~] Implement ImGui backend specific to newbase, stop using the sample code.
         * [X] Get basic support working
         * [X] Specify and implement clipping behavior
-        * [ ] Validate (and fix?) DPI handling on all platforms
-              Added event transformation utility to window, use in editor and input system.
+        * [~] Validate (and fix?) DPI handling on all platforms
+              Added event transformation utility to window, use in editor and input system, others.
+              Validated on Android, seems ok now.
     + [X] Clipping on render_2d (and ImGui)
     + [X] Cleanup render layer and viewport semantics, and create spec - see below section
     * [X] Basic render-to-texture with render layers

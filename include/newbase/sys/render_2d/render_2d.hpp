@@ -31,17 +31,6 @@ public:
     int   window_height() const override;
     float display_scale() const override;
 
-    // picker_service interface
-    // TODO move to nb::render namespace, generalize, drop service
-    entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
-
-    // opaque texture management interface from renderer_service
-    // for UI usage and simpler rendering purposes
-    // we guarantee that the handle can be used as an ImGui TexID
-    texture_handle create_texture(int w, int h) override;
-    void update_texture(texture_handle tex, const void* pixels, int pitch) override;
-    void destroy_texture(texture_handle tex) override;
-
     // RTT target management interface
     // prefer to use these via render::target_ref
     render::target_id_t target_create(const render::target_desc& desc) override;
@@ -50,13 +39,15 @@ public:
     std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const override;
     bool           target_has_depth(render::target_id_t id) const override;
     glm::ivec2     target_get_size(render::target_id_t id) const override;
-
     // NOTE for target_get_size: you may not be able to query calculated sizes for
     // newly-created render targets immediately. Timing for this calculation is
     // at the discretion of the renderer. You may have to wait a frame. It is
     // expected that at render time, and after window reizes and ui rendering,
     // the sizes will be updated correctly, by the beginning of the next general
     // update cycle.
+
+    // picker_service interface
+    entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
 
 private:
     // tries to ensure a texture is ready for rendering, uploading it

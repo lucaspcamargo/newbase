@@ -51,7 +51,21 @@ namespace nb
          */
         void render_flush();
 
+        /**
+         * Getter for 2d batches prepared by render_flush()
+         */
         render::batcher2d& render_data();
+
+
+        /**
+         * Function type for texture lookup callback
+         */
+        using texture_getter_t = std::function<std::shared_ptr<rtexture>(uint64_t)>;
+
+        /**
+         * Setter for texture getter callback
+         */
+        void set_texture_lookup_callback(texture_getter_t getter);
 
     private:
         void _rebuild_font_atlas(bool force = false);

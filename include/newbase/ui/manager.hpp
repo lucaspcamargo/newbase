@@ -40,6 +40,11 @@ namespace nb
         void register_ui_overlay(const char* name, ui_overlay_fn fn) override;
         void unregister_ui_overlay(const char* name) override;
 
+        texture_handle_t texture_register(texture_ref_t tex) override;
+        bool texture_unregister(texture_handle_t handle) override;
+        texture_ref_t texture_get(texture_handle_t handle) override;
+
+
     private:
         ui_manager_p *_d;
     };

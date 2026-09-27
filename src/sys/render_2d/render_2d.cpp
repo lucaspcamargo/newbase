@@ -25,6 +25,7 @@
 #include "SDL3/SDL_blendmode.h"
 #include "entt/graph/adjacency_matrix.hpp"
 #include "entt/graph/fwd.hpp"
+#include "imgui.h"
 
 #include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
@@ -244,6 +245,10 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
         log::warn("[render_2d] ui init");
         _d->imgui.init(_d->rwin);
         ui_mgr->ui_init_finish(_d->ui_scale);
+        // connect textures registered in ui manager to our imgui backend
+        _d->imgui.set_texture_lookup_callback([ui_mgr](uint64_t id){
+            return ui_mgr->texture_get(id);
+        });
     }
     else
     {
@@ -740,24 +745,6 @@ entt::entity render_2d::pick(const render_layer &layer, float vp_x, float vp_y)
     return _d->picker.pick(layer, vp_x, vp_y);
 }
 
-renderer_service::texture_handle render_2d::create_texture(int w, int h)
-{
-    auto ret = SDL_CreateTexture(_d->render, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, w, h);
-    SDL_SetTextureScaleMode(ret, _d->default_tex_scalemode);
-    return ret;
-}
-
-void render_2d::update_texture(texture_handle tex, const void* pixels, int pitch)
-{
-    assert(tex);
-    SDL_UpdateTexture(static_cast<SDL_Texture*>(tex), nullptr, pixels, pitch);
-}
-
-void render_2d::destroy_texture(texture_handle tex)
-{
-    SDL_DestroyTexture(static_cast<SDL_Texture*>(tex));
-}
-
 
 int   render_2d::window_width()  const { return _d->wx; }
 int   render_2d::window_height() const { return _d->wy; }
@@ -773,8 +760,8 @@ void _texture_cleanup(rtexture &tex, void*)
     }
 }
 
-// RTT interface
 
+// RTT interface
 
 render::target_id_t render_2d::target_create(const render::target_desc& desc)
 {

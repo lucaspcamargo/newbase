@@ -1,6 +1,9 @@
 #pragma once
 
+#include <newbase/services/ui_manager.hpp>
 #include <SDL3/SDL_surface.h>
+#include <memory>
+#include <newbase/res/texture.hpp>
 #include <imgui.h>
 
 namespace nb {
@@ -46,7 +49,8 @@ private:
     ImVec4 _from_pixel(Uint32 pixel) const;
 
     SDL_Surface* _canvas  {nullptr};
-    void*        _tex     {nullptr};
+    std::shared_ptr<rtexture> _ui_tex {nullptr};
+    ui_manager::texture_handle_t _ui_tex_hnd {ui_manager::TEXTURE_INVALID};
 
     tool_t _tool          {tool_t::pencil};
     ImVec4 _primary       {0.18f, 0.18f, 0.18f, 1.0f};
