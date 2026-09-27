@@ -3,6 +3,10 @@
 #include <newbase/res/tilemap.hpp>
 #include <newbase/utility/strings.hpp>
 
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+
+
 using namespace nb;
 
 // Resolve a relative path from the map file's directory. Tileset image paths

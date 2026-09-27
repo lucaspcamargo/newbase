@@ -329,6 +329,8 @@ extern "C" void _rtti_init_particle_system()
 
 #include <newbase/components/builders.hpp>
 #include <newbase/res/manager.hpp>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
 
 bool nb::build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst)
 {

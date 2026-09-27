@@ -5,6 +5,9 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <imstb_truetype.h>
 
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+
 
 using namespace nb;
 

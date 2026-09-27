@@ -5,6 +5,8 @@
 #include <newbase/log.hpp>
 
 #include <SDL3/SDL_iostream.h>
+#include <ryml.hpp>
+#include <ryml_std.hpp>
 
 
 using namespace nb;

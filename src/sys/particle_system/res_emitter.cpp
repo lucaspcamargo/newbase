@@ -3,6 +3,9 @@
 #include <newbase/yaml/glm.hpp>
 #include <newbase/log.hpp>
 
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+
 
 using namespace nb;
 
