@@ -38,6 +38,7 @@ struct nb::imgui_nb_p
 };
 
 // Helpers
+static void _imgui_nb_set_ime_data(ImGuiContext* ctx, ImGuiViewport* viewport, ImGuiPlatformImeData* data);
 static void _imgui_nb_update_kmods(SDL_Keymod sdl_key_mods);
 static ImGuiKey _imgui_nb_convert_key_evt(SDL_Keycode keycode, SDL_Scancode scancode);
 static void _imgui_nb_update_monitors();
@@ -59,6 +60,9 @@ void imgui_nb::init(render::window &win)
                         ImGuiBackendFlags_HasSetMousePos |
                         ImGuiBackendFlags_RendererHasTextures |
                         ImGuiBackendFlags_RendererHasVtxOffset;
+
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    platform_io.Platform_SetImeDataFn = _imgui_nb_set_ime_data;
 
     // create a texture resouce for the font atlas
     _d->font_tex = std::make_shared<rtexture>(entt::hashed_string("_imgui_nb_font"));
@@ -302,6 +306,12 @@ render::batcher2d& imgui_nb::render_data()
     return _d->batcher;
 }
 
+render::window& imgui_nb::window() const
+{
+    return _d->win;
+}
+
+
 void imgui_nb::set_texture_lookup_callback(texture_getter_t getter)
 {
     _d->tex_getter = getter;
@@ -309,6 +319,32 @@ void imgui_nb::set_texture_lookup_callback(texture_getter_t getter)
 
 
 //  Helpers impl
+
+void _imgui_nb_set_ime_data(ImGuiContext* ctx, ImGuiViewport* viewport, ImGuiPlatformImeData* data)
+{
+    imgui_nb *backend = static_cast<imgui_nb *>(ImGui::GetIO().BackendPlatformUserData);
+    render::window &rwin = backend->window();
+    // Without multi-viewport support, this is always your main window
+    SDL_Window* window = rwin.get();
+    if (!window) return;
+
+    if (data->WantTextInput)
+    {
+        // TODO transform coodinates
+        SDL_Rect rect;
+        rect.x = (int)data->InputPos.x;
+        rect.y = (int)data->InputPos.y;
+        rect.w = 1;
+        rect.h = (int)data->InputLineHeight;
+
+        SDL_SetTextInputArea(window, &rect, 0);
+        SDL_StartTextInput(window);
+    }
+    else
+    {
+        SDL_StopTextInput(window);
+    }
+}
 
 ImGuiKey _imgui_nb_convert_key_evt(SDL_Keycode keycode, SDL_Scancode scancode)
 {

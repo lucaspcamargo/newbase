@@ -24,6 +24,7 @@ private:
     std::string _text;
     const char* _language {nullptr}; // display hint only (e.g. "Lua", "YAML")
     bool _draw_whitespace {false};
+    bool _word_wrap {true};
     int _theme_idx {0};
 };
 

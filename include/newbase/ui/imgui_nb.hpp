@@ -67,6 +67,11 @@ namespace nb
          */
         void set_texture_lookup_callback(texture_getter_t getter);
 
+        /**
+         * Getter for main window of this backend
+         */
+        render::window& window() const;
+
     private:
         void _rebuild_font_atlas(bool force = false);
 

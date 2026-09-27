@@ -12,12 +12,13 @@ void text_editor_widget::open(const char* text, size_t len, const char* language
     _language = language;
     if(!strcmp(_language, "Lua"))
     {
-        _editor->SetLanguageDefinition(TextEditor::LanguageDefinition::Lua());
-        _editor->SetColorizerEnable(true);
+        _editor->SetLanguage(TextEditor::Language::Lua());
     }
     _text.assign(text, len);
-    _editor->SetText(_text);
+    _word_wrap = _editor->IsWordWrapEnabled();
     setPaletteFromTheme();
+    _editor->SetText(_text);
+    _editor->SetReadOnlyEnabled(false);
 }
 
 void text_editor_widget::setPaletteFromTheme()
@@ -31,10 +32,10 @@ void text_editor_widget::setPaletteFromTheme()
 
 void text_editor_widget::draw()
 {
-    ImGui::Text("%s -- line %d, col %d   ",
+    auto pos = _editor->GetCurrentCursorPosition();
+    ImGui::Text("%s -- line %zu, col %zu   ",
                 _language? _language : "Text",
-                _editor->GetCursorPosition().mLine + 1,
-                _editor->GetCursorPosition().mColumn + 1);
+                pos.line + 1, pos.index + 1);
 
     // options menu
     ImGui::SameLine();
@@ -43,11 +44,12 @@ void text_editor_widget::draw()
     if (ImGui::Button(ICON_FK_BARS)) {
         ImGui::OpenPopup("text_editor_options_popup");
     }
-    static const char* themes[] = { "Default", "Dark", "Light", "Retro Blue" };
+    static const char* themes[] = { "Auto", "Dark", "Light", "Editor Default" };
 
     // 2. Renderize o menu/popup (esta função só retorna true se o popup estiver aberto)
     if (ImGui::BeginPopup("text_editor_options_popup")) {
         ImGui::Checkbox("Show whitespace", &_draw_whitespace);
+        ImGui::Checkbox("Word Wrap", &_word_wrap);
         ImGui::Separator();
         for(int i = 0; i < 4; i++)
             if(ImGui::MenuItem(themes[i], nullptr, _theme_idx == i))
@@ -57,7 +59,8 @@ void text_editor_widget::draw()
 
     // apply options
 
-    _editor->SetShowWhitespaces(_draw_whitespace);
+    _editor->SetShowWhitespacesEnabled(_draw_whitespace);
+    _editor->SetWordWrapEnabled(_word_wrap);
     switch (_theme_idx) {
         case 1:
             _editor->SetPalette(TextEditor::GetDarkPalette());
@@ -66,7 +69,7 @@ void text_editor_widget::draw()
             _editor->SetPalette(TextEditor::GetLightPalette());
             break;
         case 3:
-            _editor->SetPalette(TextEditor::GetRetroBluePalette());
+            _editor->SetPalette(TextEditor::GetDefaultPalette());
             break;
         default:
             setPaletteFromTheme();
@@ -74,7 +77,7 @@ void text_editor_widget::draw()
     }
 
     ImVec2 avail = ImGui::GetContentRegionAvail();
-    _editor->Render("TITLE???", avail, false);
+    _editor->Render("TITLE???", avail, true);
 }
 
 } // namespace nb
