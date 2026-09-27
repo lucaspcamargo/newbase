@@ -30,9 +30,18 @@ public:
     virtual SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) = 0;
     virtual entt::id_type metatype_id() = 0;
 
+    /// intialization method
+    /// invoked when all configured systems have been created
     virtual bool init(ryml::ConstNodeRef cfg) = 0;
+
     virtual bool step(step_phase) = 0;
+
     virtual bool event(SDL_Event*) = 0;
+
+    /// shutdown method
+    /// invoked on all systems before general system destruction
+    /// also invoked before resource manager teardown
+    virtual void shutdown() {}
 
     // Called by the engine just before a scene change clears the current scene.
     // Systems that hold scene-lifetime state (e.g. callbacks registered by scripts)

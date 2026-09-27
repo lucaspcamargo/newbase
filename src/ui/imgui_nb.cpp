@@ -1,17 +1,18 @@
-#include "SDL3/SDL_surface.h"
-#include "SDL3/SDL_timer.h"
-#include "entt/core/fwd.hpp"
-#include "newbase/render/batcher2d.hpp"
-#include "newbase/render/types.hpp"
-#include <memory>
+#include <newbase/render/batcher2d.hpp>
+#include <newbase/render/types.hpp>
 #include <newbase/ui/imgui_nb.hpp>
 #include <newbase/res/texture.hpp>
 #include <newbase/nb_config.h>
 #include <newbase/log.hpp>
-
 #include <imgui.h>
+
+#include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_timer.h>
 #include <SDL3/SDL_time.h>
+#include <SDL3/SDL_clipboard.h>
 #include <entt/entt.hpp>
+#include <entt/core/fwd.hpp>
+#include <memory>
 
 
 using namespace nb;
@@ -33,8 +34,6 @@ struct nb::imgui_nb_p
     std::vector<render::vertex2d> cvt_buf;
 
     imgui_nb::texture_getter_t tex_getter {};
-
-    // int mouse_btns_down; -- This could help with handling dragging stuff past the window, bu we don't handle that
 };
 
 // Helpers
@@ -42,7 +41,8 @@ static void _imgui_nb_set_ime_data(ImGuiContext* ctx, ImGuiViewport* viewport, I
 static void _imgui_nb_update_kmods(SDL_Keymod sdl_key_mods);
 static ImGuiKey _imgui_nb_convert_key_evt(SDL_Keycode keycode, SDL_Scancode scancode);
 static void _imgui_nb_update_monitors();
-
+static const char* _imgui_nb_get_clipboard_text(ImGuiContext* ctx);                      // Should return NULL on failure (e.g. clipboard data is not text).
+static void  _imgui_nb_set_clipboard_text(ImGuiContext* ctx, const char* text);
 
 imgui_nb::imgui_nb() = default;
 imgui_nb::~imgui_nb() = default;
@@ -63,8 +63,10 @@ void imgui_nb::init(render::window &win)
 
     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
     platform_io.Platform_SetImeDataFn = _imgui_nb_set_ime_data;
+    platform_io.Platform_GetClipboardTextFn = _imgui_nb_get_clipboard_text;
+    platform_io.Platform_SetClipboardTextFn = _imgui_nb_set_clipboard_text;
 
-    // create a texture resouce for the font atlas
+    // create a texture resource for the font atlas
     _d->font_tex = std::make_shared<rtexture>(entt::hashed_string("_imgui_nb_font"));
     io.Fonts->TexID = FONT_REF; // we will always use this special texture ref for the font atlas
     _rebuild_font_atlas(true);
@@ -73,6 +75,13 @@ void imgui_nb::init(render::window &win)
 void imgui_nb::teardown()
 {
     assert(_d);
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    platform_io.Platform_SetImeDataFn = nullptr;
+    platform_io.Platform_GetClipboardTextFn = nullptr;
+    platform_io.Platform_SetClipboardTextFn = nullptr;
+
+    auto &io = ImGui::GetIO();
+    io.BackendPlatformUserData = io.BackendRendererUserData = nullptr;
     _d.reset(nullptr);
 }
 
@@ -80,7 +89,6 @@ void imgui_nb::teardown()
 void imgui_nb::new_frame(float delta)
 {
     assert(_d);
-
     auto &io = ImGui::GetIO();
     auto w = _d->win.width();
     auto h = _d->win.height();
@@ -320,6 +328,23 @@ void imgui_nb::set_texture_lookup_callback(texture_getter_t getter)
 
 //  Helpers impl
 
+const char* _imgui_nb_get_clipboard_text(ImGuiContext* ctx)
+{
+    static char * clipboard {nullptr};
+    if(clipboard)
+        SDL_free(clipboard);
+    clipboard = SDL_GetClipboardText();
+    if(!clipboard[0])
+        return nullptr;
+    else
+        return clipboard;
+}
+
+void  _imgui_nb_set_clipboard_text(ImGuiContext* ctx, const char* text)
+{
+    SDL_SetClipboardText(text);
+}
+
 void _imgui_nb_set_ime_data(ImGuiContext* ctx, ImGuiViewport* viewport, ImGuiPlatformImeData* data)
 {
     imgui_nb *backend = static_cast<imgui_nb *>(ImGui::GetIO().BackendPlatformUserData);
@@ -330,12 +355,11 @@ void _imgui_nb_set_ime_data(ImGuiContext* ctx, ImGuiViewport* viewport, ImGuiPla
 
     if (data->WantTextInput)
     {
-        // TODO transform coodinates
         SDL_Rect rect;
-        rect.x = (int)data->InputPos.x;
-        rect.y = (int)data->InputPos.y;
+        rect.x = (int)(data->InputPos.x * rwin.ui_scale());
+        rect.y = (int)(data->InputPos.y * rwin.ui_scale());
         rect.w = 1;
-        rect.h = (int)data->InputLineHeight;
+        rect.h = (int)(data->InputLineHeight * rwin.ui_scale());
 
         SDL_SetTextInputArea(window, &rect, 0);
         SDL_StartTextInput(window);

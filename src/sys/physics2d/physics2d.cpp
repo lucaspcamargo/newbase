@@ -153,6 +153,9 @@ physics2d::~physics2d()
     if(auto *ui_mgr = entt::locator<ui_manager*>::value_or(nullptr))
         ui_mgr->unregister_layer_overlay("physics2d_debug_draw");
 
+    // NOTE we may want to go over our existing bodies and cleanup any
+    //      leftover references in scene components
+
     if(B2_IS_NON_NULL(_d->world_id))
     {
         b2DestroyWorld(_d->world_id);

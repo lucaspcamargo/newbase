@@ -29,6 +29,7 @@ struct nb::script_lua_p {
     lua_State * L {nullptr};
     unsigned int seed {0};
     // per-entity list of luaL_ref handles to destroy callbacks
+    // TODO multiscene: needs to be per-scene entity IDs
     std::unordered_map<entt::entity, std::vector<int>> on_destroy_callbacks;
 };
 
@@ -41,7 +42,7 @@ script_lua::script_lua()
 script_lua::~script_lua()
 {
     log::info("[script_lua] destroying");
-    lua_close(_d->L);
+    assert(!_d->L);
     delete _d;
     log::info("[script_lua] destroyed");
 }
@@ -104,6 +105,17 @@ bool script_lua::init(ryml::ConstNodeRef cfg)
     log::info("[script_lua] initialized");
     return true;
 
+}
+
+void script_lua::shutdown()
+{
+    log::info("[script_lua] shutdown");
+    // I expected this to be much more complicated...
+    // But since Lua rocks, I just need to do this:
+    lua_close(_d->L);
+    _d->L = nullptr;
+    log::info("[script_lua] shutdown completed");
+    // ALEXIS MATEO: "Sickening, no?!"
 }
 
 void script_lua::bind_meta_types()
@@ -248,6 +260,8 @@ void script_lua::bind_systems()
         if (type.can_cast(system_t))
         {
             // this is a system
+            // note that for storing a reference to it, we use a raw pointer
+            // this is to avoid having circular references between systems
             const rtti::type_info *info = type.custom();
             if(!info)
             {
@@ -259,7 +273,7 @@ void script_lua::bind_systems()
                 log::warn("[script_lua] skipping system with wrong type class: %s (%x)", (const char*)info->identifier, type.id());
                 continue;
             }
-            auto sys = engine::instance().system_from_id(type.id());
+            auto sys = engine::instance().system_from_id(type.id()).get();
             if(!sys)
             {
                 log::warn("[script_lua] skipping system with no instance: %s (%x)", (const char*)info->identifier, type.id());
@@ -268,7 +282,7 @@ void script_lua::bind_systems()
 
             std::string global_name = "sys_";
             global_name += info->identifier;
-            lua::push_meta_any(_d->L, type.from_void(sys.get()), sys);
+            lua::push_meta_any(_d->L, type.from_void(sys));
             lua_setglobal(_d->L, global_name.c_str());
             log::info("[script_lua] bound system: %s", global_name.c_str());
 
@@ -282,7 +296,7 @@ void script_lua::bind_systems()
                 std::string fname = std::string(info->identifier) + "_" + static_cast<const char*>(func_info->identifier);
                 log::info("[script_lua] registering system function: %s", fname.c_str());
 
-                lua_pushlightuserdata(_d->L, sys.get());
+                lua_pushlightuserdata(_d->L, sys);
                 lua_pushinteger(_d->L, (lua_Integer)type.id());
                 lua_pushinteger(_d->L, (lua_Integer)fhash);
                 lua_pushcclosure(_d->L, [](lua_State *L) -> int {

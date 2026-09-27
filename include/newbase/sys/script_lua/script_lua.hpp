@@ -18,6 +18,7 @@ public:
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
+    void shutdown() override;
     void on_scene_change() override;
 
     // Compiles and runs an arbitrary chunk of Lua code on the main thread

@@ -1,3 +1,4 @@
+#include "entt/meta/resolve.hpp"
 #include <newbase/engine.hpp>
 #include <newbase/system.hpp>
 #include <newbase/res/manager.hpp>
@@ -162,9 +163,13 @@ engine::engine()
         }
         else
         {
+            auto mid = sys->metatype_id();
+            assert(!_d->_systems_meta.contains(mid));
+
             _d->initflags |= sys->sdl_subsystems(n);
+
             _d->_systems.emplace_back(sys);
-            _d->_systems_meta[sys->metatype_id()] = sys;
+            _d->_systems_meta[mid] = sys;
             _d->_sys_cfgs.push_back(n);
         }
     }
@@ -222,11 +227,34 @@ char** engine::argv() const { return _d->argv; }
 
 bool engine::teardown()
 {
+    log::info("[engine] teardown");
+
+    log::info("[engine] clearing scenes");
+    _d->default_scene.clear();
+    log::info("[engine] scenes cleared");
+
+
+    log::info("[engine] systems shutdown");
+    for(auto &s: _d->_systems)
+        s->shutdown();
+    log::info("[engine] systems shutdown completed");
+
+    log::info("[engine] system refcounts:");
+
+    for(auto &s: _d->_systems)
+    {
+        log::info("[engine] %s (0x%08x), uc=%ld",
+                  std::string(entt::resolve(s->metatype_id()).info().name()).c_str(),
+                  s->metatype_id(), s.use_count());
+    }
     // destroy all system shared_ptrs
+    log::info("[engine] clearing systems");
     _d->_systems.clear();
     _d->_systems_meta.clear();
+    log::info("[engine] systems cleared");
     ::nb::rman().teardown();
     ::nb::i18n::shutdown();
+    log::info("[engine] teardown complete");
     return true;
 }
 

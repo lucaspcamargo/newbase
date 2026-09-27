@@ -92,7 +92,7 @@ class window final
         bool show();
 
         /**
-         * Attempts to center window on screen. Can eb calledd before show()
+         * Attempts to center window on screen. Can be called before show()
          */
         void center();
 
