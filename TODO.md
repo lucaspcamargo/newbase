@@ -77,13 +77,13 @@ This is a living document.
     + [ ] Better audio tools layout
 - Tooling UI (ImGui)
     + [X] Fix DPI change behavior + font reset when needed
-    + [ ] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
-        * [ ] Restore image editor
-        * To avoid constant texture reloads, we may cache loaded textures until the next frame.
-          Mostly a contingency, as UI that renders with textures should itself hold references to the textures it uses.
+    + [X] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
+        * [X] Explicit UI texture registration
+        * [X] Restore image editor
     + [ ] Unify tool window toggle, remove dedicated debug actions
     + [ ] Default dock layout mechanism for tool and editor windows
-    + [ ] Integrate imgui-text-editor for scripts and text files
+    + [~] Integrate imgui-text-editor for scripts and text files
+          Initial integration done, still RO. Script reload will be tricky.
     + [ ] Make resource editor work with plain shared_ptr, resource system registration should be optional
 - In-Game UI
     + [ ] Integrate LVGL

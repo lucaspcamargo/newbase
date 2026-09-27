@@ -10,9 +10,12 @@ set(IMGUI_SOURCES
     vendored/imgui-node-editor/crude_json.cpp
     vendored/imgui-node-editor/imgui_canvas.cpp
     vendored/ImGuizmo/src/ImGuizmo.cpp
+    vendored/ImGuiColorTextEdit/TextEditor.cpp
 )
 
 set(IMGUI_INCLUDES
     vendored/imgui
     vendored/imgui-node-editor
-    vendored/ImGuizmo/src)
+    vendored/ImGuizmo/src
+    vendored/ImGuiColorTextEdit
+)
