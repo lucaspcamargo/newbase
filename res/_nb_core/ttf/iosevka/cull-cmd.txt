@@ -1,0 +1,9 @@
+This is the font culling command used:
+
+pyftsubset iosevka-fixed-regular.ttf \
+  --unicodes="U+0020-007E,U+00A0-00FF,U+2500-257F,U+2580-259F,U+2190-2195,U+263A-263B,U+2640,U+2642,U+2660,U+2663,U+2665-2666,U+0393,U+0398,U+03A3,U+03A6,U+03A9,U+03B1,U+03B2,U+03B4,U+03BC,U+03C0,U+03C3,U+03C4,U+221E,U+2205,U+2208,U+2229,U+2261,U+2264-2265,U+2310,U+2320-2321,U+25AC,U+25BA,U+25C4,U+207F,U+221A,U+25CB,U+2232,U+2013-201D" \
+  --layout-features='*' \
+  --output-file="iosevka-fixed-regular-culled.ttf"
+
+If someone needs more complete unicode coverage we can and will revert this.
+Just submit an issue.

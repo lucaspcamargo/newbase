@@ -107,6 +107,17 @@
 
   <script>
     (function () {
+
+      // TODO Have some mechanism for sngle-threaded fallback?
+      //      Something like the beow code.
+      //      We may need to change CI and CMake scripts to support this
+      //      and build two versions of the engine/app.
+      //if ("SharedArrayBuffer" in window) {
+      //  // use code optimized for SharedArrayBuffer
+      //} else {
+      //  // use fallback
+      //}
+
       var overlay  = document.getElementById('loading-overlay');
       var statusEl = document.getElementById('loading-status');
       var fillEl   = document.getElementById('progress-fill');

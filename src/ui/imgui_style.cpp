@@ -95,7 +95,7 @@ void nb::imgui_style_fonts_setup(float scale)
     // also start with clean font atlas, prevents leftover garbage in seams
     ImGui::GetIO().Fonts->Clear();
 
-    std::string mainfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Regular.ttf";
+    std::string mainfont_path = "_nb_core/ttf/iosevka/iosevka-fixed-regular-culled.ttf";
     std::vector<char> mainfont_data;
     auto mainfont_hash = entt::hashed_string{mainfont_path.c_str()}.value();
     log::info("[imgui_style] system font: %x", mainfont_hash);
@@ -153,7 +153,7 @@ void nb::imgui_style_fonts_setup(float scale)
         log::error("[imgui_style] cannot read icon font: %x", iconfont_hash);
     }
 
-    std::string boldfont_path = "_nb_core/ttf/iosevka/IosevkaFixed-Bold.ttf";
+    std::string boldfont_path = "_nb_core/ttf/iosevka/iosevka-fixed-bold-culled.ttf";
     std::vector<char> boldfont_data;
     auto boldfont_hash = entt::hashed_string{boldfont_path.c_str()}.value();
     log::info("[imgui_style] bold font: %x", boldfont_hash);

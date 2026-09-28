@@ -21,8 +21,9 @@ This is a living document.
           But it's also SDL's fault for providing events in logical or real pixels depending on the platform.
 - Editor
     + [ ] Use render::window conversion for all pointer events
+    + [ ] Pre-docked windows
     + [ ] Scene editing: loading from etree, saving to etree
-    + [ ] Multiple scenes in separate tabs
+    + [ ] Multiple scenes in separate tabs. Requires MULTISCENE.
     + [ ] Some UI prefs and love
     + [ ] Allow opening non-asset resources in asset editor
     * [ ] Move some stuff to general UI, perhaps (resource/entity inspectors)
