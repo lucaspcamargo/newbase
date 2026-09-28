@@ -249,6 +249,10 @@ target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT l
 if(NEWBASE_WII)
     target_compile_definitions(newbase PUBLIC NEWBASE_WII IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
 endif()
+if(EMSCRIPTEN)
+    target_compile_options(newbase PUBLIC -pthread)
+    target_link_options(newbase PUBLIC -pthread)
+endif()
 
 # CONFIG HEADER
 configure_file(include/newbase/nb_config.h.in ./include/newbase/nb_config.h @ONLY)

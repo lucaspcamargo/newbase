@@ -4,7 +4,9 @@ The tasks that are still meant to be done. Some have dependencies or subtasks.
 
 This is a living document.
 
+
 - Core
+    + [X] Fix shutdown sequence
     + [ ] MULTISCENE. This will be a big refactor.
     + [ ] RTTI, scene: generalized serialization and deserialization system (yaml/meta_any gets close)
     + [ ] RTTI: enums support
@@ -44,7 +46,7 @@ This is a living document.
         * [X] Specify and implement clipping behavior
         * [~] Validate (and fix?) DPI handling on all platforms
               Added event transformation utility to window, use in editor and input system, others.
-              Validated on Android, seems ok now.
+              OK: Android, Linux
     + [X] Clipping on render_2d (and ImGui)
     + [X] Cleanup render layer and viewport semantics, and create spec - see below section
     * [X] Basic render-to-texture with render layers
@@ -80,11 +82,12 @@ This is a living document.
     + [X] Drop ImTextureRef being SDL_Texture, change to rtexture::id instead
         * [X] Explicit UI texture registration
         * [X] Restore image editor
+    + [X] Clipboard, IME area
     + [ ] Unify tool window toggle, remove dedicated debug actions
     + [ ] Default dock layout mechanism for tool and editor windows
     + [~] Integrate imgui-text-editor for scripts and text files
-          Initial integration done, still RO. Script reload will be tricky.
-    + [ ] Make resource editor work with plain shared_ptr, resource system registration should be optional
+          Initial integration done, but cannot save. Script reload will be tricky.
+    + [ ] Make resource editor work with plain shared_ptr, resource manager registration should be optional for resource types.
 - In-Game UI
     + [ ] Integrate LVGL
     + [ ] Integrate RmlUi
@@ -95,7 +98,8 @@ This is a living document.
     + [ ] Allow "header" annotations for linked resouce loading
     + [ ] Reduce usage of lua_box::owner. ~~And improve support for pointer-like types in the bindings.~~(done?). This way we can use meta_any<shared_ptr<T>> directly. And cleanup the resource shared_ptr mess.
 - Lupi
-    + [ ] Validade how it we interact with rtexture and the ImGUI preview (never touch SDL_Texture)
+    + [X] Validade how we interact with rtexture and the ImGUI preview
+    + [ ] Restore text input, use "has request from game" as heuristic
     + [ ] Music and sfx, when Lupinho has it too and it is better documented
 - Sensors
     + [ ] Add Android-specific sensor handling

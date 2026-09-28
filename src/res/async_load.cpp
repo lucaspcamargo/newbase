@@ -1,6 +1,7 @@
-#include "entt/core/fwd.hpp"
 #include <newbase/res/async_load.hpp>
+#include <newbase/nb_config.h>
 
+#include "entt/core/fwd.hpp"
 #include <atomic>
 #include <thread>
 #include <mutex>
@@ -9,6 +10,12 @@
 
 using namespace nb;
 using namespace nb::res::load;
+
+#ifdef __EMSCRIPTEN__
+#ifndef __EMSCRIPTEN_PTHREADS__
+#error EMSCRIPTEN build incrrectly configured for thread usage.
+#endif
+#endif
 
 
 // internal data

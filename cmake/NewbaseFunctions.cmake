@@ -81,14 +81,17 @@ function(newbase_prepare_executable)
     endif()
 
     if(DEFINED EMSCRIPTEN)
-        set(target_opts -sALLOW_MEMORY_GROWTH -sEXIT_RUNTIME=1 -sSTACK_SIZE=131072 -sEXPORTED_FUNCTIONS=_main,_free,__nb_engine_request_exit -sENVIRONMENT=web -lidbfs.js -sPTHREAD_POOL_SIZE=8)
+        set(target_opts -sALLOW_MEMORY_GROWTH -sEXIT_RUNTIME=1 -sSTACK_SIZE=131072 -sEXPORTED_FUNCTIONS=_main,_free,__nb_engine_request_exit -sENVIRONMENT=web,worker -lidbfs.js -pthread -sPTHREAD_POOL_SIZE=4 -sINITIAL_MEMORY=67108864 -sMALLOC=mimalloc )
+        # TODO : We could greatly speed up IO with WASMFS (-sWASMFS=1) but then we lose IDBFS for the persistent mount.
+        #        One alternative is to use OPFS, but we need to understand what it is better. See: https://columbaengine.org/blog/wasmfs-opfs/
+
         if(NEWBASE_EMSCRIPTEN_HTML)
             set(shell_file "${NEWBASE_ROOT}/res/_nb_core/emscripten/shell.html")
             list(APPEND target_opts "--shell-file=${shell_file}")
             set_property(TARGET ${arg_TARGET} APPEND PROPERTY LINK_DEPENDS "${shell_file}")
         endif()
         message("[newbase_prepare_executable] setting emscripten options for '${arg_TARGET}': ${target_opts}")
-        target_link_options(${arg_TARGET} PRIVATE ${target_opts})
+        target_link_options(${arg_TARGET} PRIVATE ${target_opts} $<$<CONFIG:Debug>:-sASSERTIONS>)
     endif()
 
     # implement dynamic system lists

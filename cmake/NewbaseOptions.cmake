@@ -45,11 +45,18 @@ endif()
 
 # resolve option configuration
 if(DEFINED EMSCRIPTEN)
+    find_package(Threads REQUIRED)
     set(NEWBASE_EMSCRIPTEN ON)
     if(NEWBASE_EMSCRIPTEN_HTML)
         set(CMAKE_EXECUTABLE_SUFFIX ".html")
     endif()
     set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_EMSCRIPTEN_RES_PREFIX}")
+    if(EMSCRIPTEN)
+        # THE NUCLEAR OPTION
+        # Force -pthread into global C and C++ flags, for compilation and linking
+        add_compile_options(-pthread)
+        add_link_options(-pthread)
+    endif()
 else()
     set(NEWBASE_EMSCRIPTEN OFF)
     set(NEWBASE_DEFAULT_RES_PREFIX "${NEWBASE_NATIVE_RES_PREFIX}")
