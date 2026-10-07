@@ -97,6 +97,12 @@ class window final
         void center();
 
         /**
+         * Attempts to set a window icon, by loading a texture
+         * from the resource maanager
+         */
+        void set_icon(uint32_t res_id);
+
+        /**
          * Returns a scaled SDL_Event that has pointer/pen coordinates in pixel dimensions.
          * This is abstracted away here because the event coordinate system is
          * platform-dependent.

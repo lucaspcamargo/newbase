@@ -61,6 +61,9 @@ struct render_layer
     /// Blue channel of the clear color. Unused if clear is false.
     float               clear_b     { 0.f };
 
+    /// Whether to render this layer in 3D mode
+    bool three_dee {false};
+
     /// The type of the custom 2d drawing function.
     /// A callback that is supplied the layer and a batcher reference.
     /// The custom drawing function is expected to fill the batcher with custom

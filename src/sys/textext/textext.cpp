@@ -18,7 +18,7 @@ bool textext::init(ryml::ConstNodeRef /*cfg*/) { return true; }
 
 bool textext::step(step_phase phase)
 {
-    if (phase != step_phase::PRE_RENDER) return true;
+    if (phase != step_phase::POST_UPDATE) return true;
 
     auto& reg  = engine::instance().default_scene().registry();
     auto  view = reg.view<ctextext, cmesh2d>();

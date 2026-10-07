@@ -31,6 +31,7 @@ struct nb::script_lua_p {
     // per-entity list of luaL_ref handles to destroy callbacks
     // TODO multiscene: needs to be per-scene entity IDs
     std::unordered_map<entt::entity, std::vector<int>> on_destroy_callbacks;
+    bool destroy_reconnect {false};
 };
 
 
@@ -42,7 +43,7 @@ script_lua::script_lua()
 script_lua::~script_lua()
 {
     log::info("[script_lua] destroying");
-    assert(!_d->L);
+    assert((!_d->L) && "[script_lua] still have lua context?!");
     delete _d;
     log::info("[script_lua] destroyed");
 }
@@ -112,8 +113,11 @@ void script_lua::shutdown()
     log::info("[script_lua] shutdown");
     // I expected this to be much more complicated...
     // But since Lua rocks, I just need to do this:
-    lua_close(_d->L);
-    _d->L = nullptr;
+    if(_d && _d->L)
+    {
+        lua_close(_d->L);
+        _d->L = nullptr;
+    }
     log::info("[script_lua] shutdown completed");
     // ALEXIS MATEO: "Sickening, no?!"
 }
@@ -515,6 +519,19 @@ void script_lua::bind_global_api()
     });
     lua_setglobal(_d->L, "entity_spawn");
 
+
+    // entity_create() -> eid -- create a new, empty entity
+    lua_pushcfunction(_d->L, [](lua_State *L) -> int {
+        auto eid = engine::instance().default_scene().registry().create();
+        if(eid == entt::null)
+            lua_pushnil(L);
+        else
+            lua_pushinteger(L, static_cast<lua_Integer>(entt::to_integral(eid)));
+        return 1;
+    });
+    lua_setglobal(_d->L, "entity_create");
+
+
     // script_get_env(eid) -> env table or nil
     lua_pushcfunction(_d->L, [](lua_State *L) -> int {
         auto eid = static_cast<entt::entity>(lua_tointeger(L, 1));
@@ -670,12 +687,21 @@ bool script_lua::step(step_phase phase)
     // TODO do not scan everything every frame (use reactive storage)
     if(phase == step_phase::PRE_UPDATE)
     {
+        if(_d->destroy_reconnect)
+        {   // HACK-y but we'll redo this with multiscene anyway'
+            engine::instance().default_scene().registry().on_destroy<cscript>().connect<&script_lua::_on_cscript_destroy>();
+            _d->destroy_reconnect = false;
+        }
+
         auto &reg = engine::instance().default_scene().registry();
         auto view = reg.view<cscript>();
         for (auto [id, script]: view.each())
         {
             auto &script_res = script.script;
             if(script.ready || script.skip)
+                continue;
+
+            if(!script.script)
                 continue;
 
             log::info("[script_lua] preparing: %x", id);
@@ -843,14 +869,7 @@ bool script_lua::event(SDL_Event*)
 
 void script_lua::on_scene_change()
 {
-    // Disconnect signal from old registry before it's cleared.
-    // EnTT fires on_destroy signals during registry::clear(), so callbacks will
-    // already have been called for any remaining cscript entities. We just need
-    // to clean up our map and reconnect to the new scene's registry afterward.
-    _d->on_destroy_callbacks.clear();
-
-    // Reconnect to the new scene's registry.
-    engine::instance().default_scene().registry().on_destroy<cscript>().connect<&script_lua::_on_cscript_destroy>();
+    _d->destroy_reconnect = true;
 }
 
 std::string script_lua::eval(const std::string &code)

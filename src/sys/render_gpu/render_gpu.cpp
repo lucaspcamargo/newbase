@@ -1,1056 +1,823 @@
-// THIS IS GOING TO BE REWRITTEN
-// 2D rendering, including GUI, went through a major rewrite and refactor
-// This is now quite bad and needs to go
-// End result will be much simplified, and should provide a nice base for 3D
-
-
+#include "newbase/render/material.hpp"
+#include "newbase/render/vertex.hpp"
 #include <newbase/sys/render_gpu/render_gpu.hpp>
+#include <newbase/sys/render_gpu/buffers.hpp>
+#include <newbase/sys/render_gpu/pipelines.hpp>
+#include <newbase/sys/render_gpu/pass_control.hpp>
+#include <newbase/sys/render_gpu/shaders.hpp>
+#include <newbase/sys/render_gpu/targets.hpp>
+#include <newbase/sys/render_gpu/textures.hpp>
+#include <newbase/sys/render_gpu/util2d.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/layer.hpp>
-#include <newbase/components/sprite.hpp>
-#include <newbase/components/mesh2d.hpp>
-#include <newbase/components/particle_emitter.hpp>
-#include <newbase/components/spatial.hpp>
-#include <newbase/components/structure.hpp>
-#include <newbase/components/camera.hpp>
-#include <newbase/components/layers.hpp>
+#include <newbase/geom/picker2d.hpp>
+#include <newbase/render/batcher2d.hpp>
+#include <newbase/render/collector2d.hpp>
+#include <newbase/render/shader.hpp>
+#include <newbase/render/types.hpp>
+#include <newbase/render/window.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
 #include <newbase/res/manager.hpp>
-#include <newbase/reflection/contexts.hpp>
-#include <newbase/reflection/data.hpp>
-#include <newbase/ui/imgui_style.hpp>
 #include <newbase/services/ui_manager.hpp>
+#include <newbase/ui/imgui_nb.hpp>
 #include <newbase/log.hpp>
 
-#include "imgui.h"
-#include "backends/imgui_impl_sdl3.h"
-#include "backends/imgui_impl_sdlgpu3.h"
-#include <SDL3_shadercross/SDL_shadercross.h>
-#include <entt/entt.hpp>
-#include <newbase/utility/glm.hpp>
-#include <ryml.hpp>
-#include <ryml_std.hpp>
-#include <tracy/Tracy.hpp>
+#include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_video.h>
 
-#include <cmath>
-#include <cstring>
-#include <vector>
-
-#include "render_gpu_shaders.hpp"
+// TEST
+#include <newbase/sys/render_gpu/test_cube.hpp>
+#include <newbase/res/shader.hpp>
+#include <newbase/components/mesh.hpp>
+#include <newbase/components/camera.hpp>
+#include <newbase/components/spatial.hpp>
 
 using namespace nb;
 using entt::operator""_hs;
 
-// ---- vertex layout (matches geometry_buffer_2d::vertex and sprite_vertex) --------------------
-// location 0: vec2 pos  (offset  0, 8 bytes)
-// location 1: vec2 uv   (offset  8, 8 bytes)
-// location 2: vec4 color(offset 16, 16 bytes)
-// stride = 32 bytes
 
-// ---- helpers -----------------------------------------------------------------------------------
-
-static SDL_Rect _safe {};
-
-static SDL_GPUBuffer* _create_gpu_buffer(SDL_GPUDevice* dev, SDL_GPUBufferUsageFlags usage, uint32_t size)
+struct nb::render_gpu_p
 {
-    SDL_GPUBufferCreateInfo info {};
-    info.usage = usage;
-    info.size  = size;
-    return SDL_CreateGPUBuffer(dev, &info);
-}
+    render::window rwin {};
+    render::viewport_t ui_vp {};
+    bool debug {false};
 
-static SDL_GPUTransferBuffer* _create_transfer_buffer(SDL_GPUDevice* dev, SDL_GPUTransferBufferUsage usage, uint32_t size)
-{
-    SDL_GPUTransferBufferCreateInfo info {};
-    info.usage = usage;
-    info.size  = size;
-    return SDL_CreateGPUTransferBuffer(dev, &info);
-}
+    // GPU
+    SDL_GPUDevice *gdev {nullptr};
+    SDL_GPUCommandBuffer *cmds {nullptr};
+    gpu::pipeline_cache pipelines;
 
-// ---- render_gpu --------------------------------------------------------------------------------
+    // GPU Resource Managers
+    gpu::buffer_manager buffers {};
+    gpu::texture_manager textures {};
+    gpu::shader_manager shaders {};
+    gpu::target_manager targets {textures};
+    gpu::pass_control passes {targets};
+
+    // 2D rendering data
+    render::batcher2d batcher;
+    render::collector2d collector;
+    render::collector2d::results collector_results;
+    gpu::shaders2d shaders2d;
+    gpu::buffers2d buffers2d;
+
+    // UI integration
+    bool has_ui {false};
+    imgui_nb imgui;
+    render::batcher2d::sync_id_t ui_sync;
+
+    // picking
+    geom::picker_2d picker;
+
+    // TEST
+    SDL_GPUBuffer *m_cube_v;
+    SDL_GPUBuffer *m_cube_i;
+    std::shared_ptr<rshader> m_cube_frag;
+    std::shared_ptr<rshader> m_cube_vert;
+};
+
+
+
+// intialization and teardown
 
 render_gpu::render_gpu()
 {
+    _d = std::make_unique<render_gpu_p>();
     entt::locator<renderer_service*>::emplace(this);
     entt::locator<picker_service*>::emplace(this);
+    log::info("[render_gpu] constructed");
 }
+
+
 render_gpu::~render_gpu()
 {
-    if (_has_ui)
+    log::info("[render_gpu] destroying");
+    if (_d->has_ui)
     {
-        ImGui_ImplSDLGPU3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
-        if (auto *ui_mgr = entt::locator<ui_manager*>::value())
-            ui_mgr->ui_destroy();
-    }
-
-    if (_device)
-    {
-        SDL_WaitForGPUIdle(_device);
-
-        for (auto &[k, e] : _tex_cache)
-            if (e.tex) SDL_ReleaseGPUTexture(_device, e.tex);
-
-        for (auto &[k, e] : _service_textures)
+        _d->imgui.teardown();
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
         {
-            if (e.tex)          SDL_ReleaseGPUTexture(_device, e.tex);
-            if (e.transfer_buf) SDL_ReleaseGPUTransferBuffer(_device, e.transfer_buf);
+            ui_mgr->ui_destroy();
         }
-
-        if (_vbuf_sprite) SDL_ReleaseGPUBuffer(_device, _vbuf_sprite);
-        if (_vbuf_mesh)   SDL_ReleaseGPUBuffer(_device, _vbuf_mesh);
-        if (_ibuf_mesh)   SDL_ReleaseGPUBuffer(_device, _ibuf_mesh);
-        if (_tbuf_sprite) SDL_ReleaseGPUTransferBuffer(_device, _tbuf_sprite);
-        if (_tbuf_mesh)   SDL_ReleaseGPUTransferBuffer(_device, _tbuf_mesh);
-        if (_titbuf_mesh) SDL_ReleaseGPUTransferBuffer(_device, _titbuf_mesh);
-
-        if (_pipeline_sprite) SDL_ReleaseGPUGraphicsPipeline(_device, _pipeline_sprite);
-        if (_pipeline_mesh2d) SDL_ReleaseGPUGraphicsPipeline(_device, _pipeline_mesh2d);
-        if (_default_sampler) SDL_ReleaseGPUSampler(_device, _default_sampler);
-
-        if (_win) SDL_ReleaseWindowFromGPUDevice(_device, _win);
-        SDL_DestroyGPUDevice(_device);
+        else
+            log::warn("[render_gpu] could not locate ui service for teardown");
     }
 
-    if (_win) SDL_DestroyWindow(_win);
-    SDL_ShaderCross_Quit();
+    if (_d->gdev)
+    {
+        SDL_WaitForGPUIdle(_d->gdev);
+
+        // finalize GPU resources managers
+        _d->targets.teardown();
+        _d->textures.teardown(_d->gdev);
+        _d->shaders.teardown(_d->gdev, _d->pipelines);
+        _d->buffers.teardown(_d->gdev);
+
+        // release pipelines
+        _d->pipelines.clear(_d->gdev);
+
+        // relase streaming 2d geometry buffers
+        _d->buffers2d.teardown(_d->gdev);
+
+        // decouple gpu device from window
+        if (_d->rwin.get())
+            SDL_ReleaseWindowFromGPUDevice(_d->gdev, _d->rwin.get());
+
+        // destroy gpu device
+        SDL_DestroyGPUDevice(_d->gdev);
+    }
+
+    // release our private data
+    // render::window is destroyed in tandem
+    _d.reset();
+
+    log::info("[render_gpu] destroyed");
 }
 
 bool render_gpu::init(ryml::ConstNodeRef cfg)
 {
+
+    // setup default debug mode according to build config
+    // can be overriden in config yaml
+    #ifdef NDEBUG
+    _d->debug = false;
+    #else
+    _d->debug = true;
+    #endif
+    if(cfg.has_child("debug"))
+    {
+        cfg["debug"] >> _d->debug;
+    }
+
     log::info("[render_gpu] init");
 
-    // -- window ---------------------------------------------------------------------------------
-    const Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_MAXIMIZED;
-    _win = SDL_CreateWindow(SDL_GetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING),
-                            1024, 768, window_flags);
-    if (!_win)
+    // probe available drivers if in debug mode
+    if(_d->debug)
     {
-        log::error("[render_gpu] SDL_CreateWindow: %s", SDL_GetError());
+        std::string msg {"[render_gpu] available gpu drivers: "};
+        const auto num_drivers = SDL_GetNumGPUDrivers();
+        for(int i = 0; i < num_drivers; i++)
+        {
+            msg += SDL_GetGPUDriver(i);
+            msg += " ";
+        }
+        log::info(msg.c_str());
+    }
+
+
+    log::info("[render_gpu] current video driver: %s", SDL_GetCurrentVideoDriver());
+
+    if(!_d->rwin.create(cfg))
+    {
+        log::error("[render_gpu] window creation failed");
         return false;
     }
-    _scale = SDL_GetWindowDisplayScale(_win);
-    SDL_SetWindowPosition(_win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    SDL_ShowWindow(_win);
-    SDL_GetWindowSizeInPixels(_win, &_wx, &_wy);
-    log::info("[render_gpu] window %dx%d scale=%.2f", _wx, _wy, _scale);
+    _d->rwin.show();
+    _d->ui_vp = {0, 0, _d->rwin.width(), _d->rwin.height()};
 
-    // -- GPU device -----------------------------------------------------------------------------
-    if (!SDL_ShaderCross_Init())
-        log::warn("[render_gpu] SDL_ShaderCross_Init failed: %s", SDL_GetError());
-
-    _device = SDL_CreateGPUDevice(SDL_ShaderCross_GetSPIRVShaderFormats(), false, nullptr);
-    if (!_device)
+    // TODO what about metal? webgpu in the future?
+    // On Windows, we are not going to support DX12 yet, sticking with Vulkan
+    _d->gdev = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, _d->debug, nullptr);
+    if (!_d->gdev)
     {
         log::error("[render_gpu] SDL_CreateGPUDevice: %s", SDL_GetError());
         return false;
     }
-    log::info("[render_gpu] GPU driver: %s", SDL_GetGPUDeviceDriver(_device));
+    log::info("[render_gpu] GPU driver: %s", SDL_GetGPUDeviceDriver(_d->gdev));
 
-    if (!SDL_ClaimWindowForGPUDevice(_device, _win))
+    if (!SDL_ClaimWindowForGPUDevice(_d->gdev, _d->rwin.get()))
     {
         log::error("[render_gpu] SDL_ClaimWindowForGPUDevice: %s", SDL_GetError());
         return false;
     }
 
-    // -- window icon ----------------------------------------------------------------------------
-    auto icon_tex = rman().get<rtexture>("_nb_core/icons/icon_192.png"_hs);
-    if (icon_tex && icon_tex->surf)
-        SDL_SetWindowIcon(_win, icon_tex->surf);
+    _d->rwin.set_icon("_nb_core/icons/icon_192.png"_hs);
 
-    // -- ImGui ----------------------------------------------------------------------------------
-    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
-    if (ui_mgr)
-        _has_ui = ui_mgr->ui_init();
-    else
-        log::warn("[render_gpu] no ui_manager service");
+    _d->buffers.init(_d->gdev);
+    _d->textures.init(_d->gdev, _d->debug);
+    _d->shaders.init(_d->gdev);
+    _d->buffers2d.init(_d->gdev);
+    _d->targets.init(_d->rwin.width(), _d->rwin.height(), true, false); // TODO configurable depth?
 
-    if (_has_ui)
+    if(!_d->shaders2d.load(_d->gdev))
     {
-        ImGui_ImplSDL3_InitForOther(_win);
-        ImGui_ImplSDLGPU3_InitInfo gpu_init {};
-        gpu_init.Device            = _device;
-        gpu_init.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(_device, _win);
-        gpu_init.MSAASamples       = SDL_GPU_SAMPLECOUNT_1;
-        ImGui_ImplSDLGPU3_Init(&gpu_init);
-        ui_mgr->ui_init_finish(_scale);
+        log::warn("[render_gpu] failed to load basic 2d shaders");
+    }
+    else if(!_d->shaders2d.prepare([&](rshader*s)->bool{return _d->shaders.prepare(_d->gdev, s);}))
+    {
+        log::warn("[render_gpu] failed to prepare basic 2d shaders");
     }
 
-    // -- default sampler ------------------------------------------------------------------------
-    SDL_GPUSamplerCreateInfo samp_info {};
-    samp_info.min_filter    = SDL_GPU_FILTER_NEAREST;
-    samp_info.mag_filter    = SDL_GPU_FILTER_NEAREST;
-    samp_info.mipmap_mode   = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-    samp_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    samp_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    _default_sampler = SDL_CreateGPUSampler(_device, &samp_info);
-
-    // -- pipelines ------------------------------------------------------------------------------
-    if (!_init_pipelines())
-        return false;
-
-    // -- vertex / transfer buffers --------------------------------------------------------------
-    const uint32_t sprite_buf_size = MAX_VERTS * sizeof(sprite_vertex);
-    const uint32_t mesh_buf_size   = MAX_VERTS * sizeof(mesh_vertex);
-    const uint32_t idx_buf_size    = MAX_VERTS * sizeof(uint32_t);
-
-    _vbuf_sprite  = _create_gpu_buffer(_device, SDL_GPU_BUFFERUSAGE_VERTEX, sprite_buf_size);
-    _tbuf_sprite  = _create_transfer_buffer(_device, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, sprite_buf_size);
-    _vbuf_mesh    = _create_gpu_buffer(_device, SDL_GPU_BUFFERUSAGE_VERTEX, mesh_buf_size);
-    _ibuf_mesh    = _create_gpu_buffer(_device, SDL_GPU_BUFFERUSAGE_INDEX,  idx_buf_size);
-    _tbuf_mesh    = _create_transfer_buffer(_device, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, mesh_buf_size);
-    _titbuf_mesh  = _create_transfer_buffer(_device, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, idx_buf_size);
-
-    // -- safe area / default viewport -----------------------------------------------------------
-    SDL_GetWindowSafeArea(_win, &_safe);
-    _default_vp = create_viewport(0, 0, _wx, _wy, false);
-    log::info("[render_gpu] default viewport: %u", _default_vp);
+    // init UI
+    ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+    if(ui_mgr)
+    {
+        _d->has_ui = ui_mgr->ui_init();
+    }
+    else
+        log::warn("[render_gpu] could not init ui via ui_manager service");
+    if(_d->has_ui)
+    {
+        log::info("[render_gpu] ui init");
+        _d->imgui.init(_d->rwin);
+        ui_mgr->ui_init_finish(_d->rwin.ui_scale());
+        // connect textures registered in ui manager to our imgui backend
+        _d->imgui.set_texture_lookup_callback([ui_mgr](uint64_t id){
+            return ui_mgr->texture_get(id);
+        });
+    }
+    else
+    {
+        log::warn("[render_gpu] no ui, not initializing ImGui renderer");
+    }
 
     return true;
 }
 
-// ---- shader / pipeline helpers ----------------------------------------------------------------
-
-SDL_GPUShader* render_gpu::_compile_shader(const uint32_t* spirv, size_t spirv_size,
-                                            SDL_ShaderCross_ShaderStage stage,
-                                            const SDL_ShaderCross_GraphicsShaderResourceInfo& res_info)
+void render_gpu::shutdown()
 {
-    SDL_ShaderCross_SPIRV_Info info {};
-    info.bytecode      = reinterpret_cast<const Uint8*>(spirv);
-    info.bytecode_size = spirv_size;
-    info.entrypoint    = "main";
-    info.shader_stage  = stage;
-    info.props         = 0;
+    // release all of our own shared resource references
+    _d->batcher.clear();
+    _d->collector.clear();
+    _d->shaders2d.clear();
+    _d->targets.clear();
 
-    SDL_GPUShader* shader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(_device, &info, &res_info, 0);
-    if (!shader)
-        log::error("[render_gpu] shader compile failed: %s", SDL_GetError());
-    return shader;
+    // textures, shaders and buffers only hold gpu resources
+    // the resources themselves need to be destroyed for cleanup
 }
 
-bool render_gpu::_init_pipelines()
-{
-    // shared vertex layout: pos(f2), uv(f2), color(f4) — stride 32
-    SDL_GPUVertexBufferDescription vbd {};
-    vbd.slot              = 0;
-    vbd.pitch             = sizeof(sprite_vertex);
-    vbd.input_rate        = SDL_GPU_VERTEXINPUTRATE_VERTEX;
-    vbd.instance_step_rate = 0;
-
-    SDL_GPUVertexAttribute attrs[3] {};
-    attrs[0] = { 0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,  0  };
-    attrs[1] = { 1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,  8  };
-    attrs[2] = { 2, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, 16  };
-
-    SDL_GPUColorTargetDescription color_target {};
-    color_target.format = SDL_GetGPUSwapchainTextureFormat(_device, _win);
-    // standard alpha blend
-    color_target.blend_state.enable_blend        = true;
-    color_target.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
-    color_target.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    color_target.blend_state.color_blend_op       = SDL_GPU_BLENDOP_ADD;
-    color_target.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-    color_target.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    color_target.blend_state.alpha_blend_op       = SDL_GPU_BLENDOP_ADD;
-
-    // -- sprite pipeline (textured) -------------------------------------------------------------
-    SDL_ShaderCross_GraphicsShaderResourceInfo sprite_vert_res {};
-    sprite_vert_res.num_uniform_buffers = 1;
-    sprite_vert_res.num_samplers        = 0;
-    sprite_vert_res.num_storage_buffers = 0;
-    sprite_vert_res.num_storage_textures = 0;
-
-    SDL_ShaderCross_GraphicsShaderResourceInfo sprite_frag_res {};
-    sprite_frag_res.num_uniform_buffers = 0;
-    sprite_frag_res.num_samplers        = 1;
-    sprite_frag_res.num_storage_buffers = 0;
-    sprite_frag_res.num_storage_textures = 0;
-
-    SDL_GPUShader* sv = _compile_shader(k_sprite_vert_spv, k_sprite_vert_spv_size,
-                                        SDL_SHADERCROSS_SHADERSTAGE_VERTEX,   sprite_vert_res);
-    SDL_GPUShader* sf = _compile_shader(k_sprite_frag_spv, k_sprite_frag_spv_size,
-                                        SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT, sprite_frag_res);
-    if (!sv || !sf) return false;
-
-    SDL_GPUGraphicsPipelineCreateInfo pipe {};
-    pipe.vertex_shader   = sv;
-    pipe.fragment_shader = sf;
-    pipe.vertex_input_state.vertex_buffer_descriptions = &vbd;
-    pipe.vertex_input_state.num_vertex_buffers         = 1;
-    pipe.vertex_input_state.vertex_attributes          = attrs;
-    pipe.vertex_input_state.num_vertex_attributes      = 3;
-    pipe.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-    pipe.target_info.color_target_descriptions         = &color_target;
-    pipe.target_info.num_color_targets                 = 1;
-
-    _pipeline_sprite = SDL_CreateGPUGraphicsPipeline(_device, &pipe);
-    SDL_ReleaseGPUShader(_device, sv);
-    SDL_ReleaseGPUShader(_device, sf);
-    if (!_pipeline_sprite) { log::error("[render_gpu] sprite pipeline: %s", SDL_GetError()); return false; }
-
-    // -- mesh2d pipeline (vertex-colored) -------------------------------------------------------
-    SDL_ShaderCross_GraphicsShaderResourceInfo mesh_vert_res {};
-    mesh_vert_res.num_uniform_buffers = 1;
-
-    SDL_ShaderCross_GraphicsShaderResourceInfo mesh_frag_res {};
-    // no samplers
-
-    SDL_GPUShader* mv = _compile_shader(k_mesh2d_vert_spv, k_mesh2d_vert_spv_size,
-                                        SDL_SHADERCROSS_SHADERSTAGE_VERTEX,   mesh_vert_res);
-    SDL_GPUShader* mf = _compile_shader(k_mesh2d_frag_spv, k_mesh2d_frag_spv_size,
-                                        SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT, mesh_frag_res);
-    if (!mv || !mf) return false;
-
-    pipe.vertex_shader   = mv;
-    pipe.fragment_shader = mf;
-    _pipeline_mesh2d = SDL_CreateGPUGraphicsPipeline(_device, &pipe);
-    SDL_ReleaseGPUShader(_device, mv);
-    SDL_ReleaseGPUShader(_device, mf);
-    if (!_pipeline_mesh2d) { log::error("[render_gpu] mesh2d pipeline: %s", SDL_GetError()); return false; }
-
-    return true;
-}
-
-// ---- step -------------------------------------------------------------------------------------
 
 bool render_gpu::step(nb::step_phase phase)
 {
-    if (phase == step_phase::PRE_UPDATE)
+    if(phase == step_phase::PREPARE)
     {
-        ZoneScopedN("RenderPreUpdate");
-        ImGui_ImplSDLGPU3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        if (auto *ui_mgr = entt::locator<ui_manager*>::value())
-            ui_mgr->ui_new_frame(_safe.x, _safe.y, _safe.w, _safe.h);
-    }
-    else if (phase == step_phase::RENDER)
-    {
-        ZoneScopedN("Render");
-
-        // ImGui draw data must be ready before we call PrepareDrawData
-        if (auto *ui_mgr = entt::locator<ui_manager*>::value())
+        // Start UI frame
+        ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+        if(ui_mgr)
         {
+            _d->imgui.new_frame();
+            const auto safe = _d->rwin.safe_area();
+            ui_mgr->ui_new_frame(safe.x, safe.y, safe.w, safe.h);
+        }
+    }
+    else if(phase == step_phase::UI_RENDER)
+    {
+        if(_d->has_ui)
+        {
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
             ui_mgr->draw_tool_windows();
             ui_mgr->draw_perf();
         }
-        ImGui::Render();
-
-        SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(_device);
-        if (!cmd) return true;
-
-        // PrepareDrawData uploads ImGui vertex/index buffers — must happen before render pass
-        if (_has_ui)
-            ImGui_ImplSDLGPU3_PrepareDrawData(ImGui::GetDrawData(), cmd);
-
-        const auto &layers = engine::instance().render_layers();
-
-        // Determine clear color from first layer
-        float cr = 0.f, cg = 0.f, cb = 0.f;
-        if (!layers.empty() && layers.front().clear_bg)
-        {
-            cr = layers.front().clear_r;
-            cg = layers.front().clear_g;
-            cb = layers.front().clear_b;
-        }
-
-        // Collect sprite + mesh vertices across all layers for a single upload
-        std::vector<sprite_vertex> sprite_verts;
-        std::vector<mesh_vertex>   mesh_verts;
-        std::vector<uint32_t>      mesh_indices;
-
-        std::vector<draw_call> draw_calls;
-        draw_calls.reserve(128);
-
-        // Build vertex data + draw call list
-        if (layers.empty())
-        {
-            auto dvp_it = _viewports.find(_default_vp);
-            const viewport_entry &dvp = (dvp_it != _viewports.end())
-                ? dvp_it->second
-                : viewport_entry{ 0, 0, _wx, _wy, false, 0, 0, 0, 1 };
-            const float fb_zoom = _fallback_camera.zoom > 0.f ? _fallback_camera.zoom : 1.f;
-            // SDL_GPU NDC: y=-1 is bottom, y=+1 is top; world/viewport uses y-down → negate Y scale
-            const glm::mat4 vp_mat = glm::scale(glm::mat4{1.f}, {2.f * fb_zoom / dvp.w, -2.f * fb_zoom / dvp.h, 1.f}) *
-                                     glm::translate(glm::mat4{1.f}, {-_fallback_spatial.pos.x,
-                                                                      -_fallback_spatial.pos.y, 0.f});
-            auto &reg = engine::instance().default_scene().registry();
-            _draw_scene(reg, vp_mat, 0xFFFFFFFF, dvp, sprite_verts, mesh_verts, mesh_indices, draw_calls);
-        }
-        else
-        {
-            for (const auto &layer : layers)
-            {
-                auto *sc = engine::instance().find_scene(layer.scene_id);
-                if (!sc) continue;
-                auto it = _viewports.find(layer.viewport);
-                if (it == _viewports.end()) continue;
-                const auto &vp = it->second;
-
-                float cx = 0.f, cy = 0.f, zoom = 1.f;
-                auto &reg = sc->registry();
-                if (layer.camera != entt::null)
-                {
-                    if (auto *sp  = reg.try_get<cspatial>(layer.camera)) { cx = sp->pos.x; cy = sp->pos.y; }
-                    if (auto *cam = reg.try_get<ccamera> (layer.camera)) { zoom = cam->zoom; }
-                }
-                // SDL_GPU NDC: y=-1 is bottom, y=+1 is top; world/viewport uses y-down → negate Y scale
-                const glm::mat4 vp_mat =
-                    glm::scale(glm::mat4{1.f}, {2.f * zoom / vp.w, -2.f * zoom / vp.h, 1.f}) *
-                    glm::translate(glm::mat4{1.f}, {-cx, -cy, 0.f});
-
-                _draw_scene(reg, vp_mat, layer.layer_mask, vp,
-                            sprite_verts, mesh_verts, mesh_indices, draw_calls);
-            }
-        }
-
-        // Upload vertex + index data via copy pass
-        if (!sprite_verts.empty() || !mesh_verts.empty())
-        {
-            if (!sprite_verts.empty())
-            {
-                const uint32_t bytes = static_cast<uint32_t>(sprite_verts.size() * sizeof(sprite_vertex));
-                auto* dst = static_cast<sprite_vertex*>(
-                    SDL_MapGPUTransferBuffer(_device, _tbuf_sprite, true));
-                memcpy(dst, sprite_verts.data(), bytes);
-                SDL_UnmapGPUTransferBuffer(_device, _tbuf_sprite);
-            }
-            if (!mesh_verts.empty())
-            {
-                const uint32_t vbytes = static_cast<uint32_t>(mesh_verts.size() * sizeof(mesh_vertex));
-                const uint32_t ibytes = static_cast<uint32_t>(mesh_indices.size() * sizeof(uint32_t));
-                auto* vdst = static_cast<mesh_vertex*>(
-                    SDL_MapGPUTransferBuffer(_device, _tbuf_mesh, true));
-                memcpy(vdst, mesh_verts.data(), vbytes);
-                SDL_UnmapGPUTransferBuffer(_device, _tbuf_mesh);
-
-                auto* idst = static_cast<uint32_t*>(
-                    SDL_MapGPUTransferBuffer(_device, _titbuf_mesh, true));
-                memcpy(idst, mesh_indices.data(), ibytes);
-                SDL_UnmapGPUTransferBuffer(_device, _titbuf_mesh);
-            }
-
-            SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
-            if (!sprite_verts.empty())
-            {
-                SDL_GPUTransferBufferLocation src { _tbuf_sprite, 0 };
-                SDL_GPUBufferRegion dst { _vbuf_sprite, 0,
-                    static_cast<uint32_t>(sprite_verts.size() * sizeof(sprite_vertex)) };
-                SDL_UploadToGPUBuffer(cp, &src, &dst, true);
-            }
-            if (!mesh_verts.empty())
-            {
-                SDL_GPUTransferBufferLocation src { _tbuf_mesh, 0 };
-                SDL_GPUBufferRegion dst { _vbuf_mesh, 0,
-                    static_cast<uint32_t>(mesh_verts.size() * sizeof(mesh_vertex)) };
-                SDL_UploadToGPUBuffer(cp, &src, &dst, true);
-
-                SDL_GPUTransferBufferLocation isrc { _titbuf_mesh, 0 };
-                SDL_GPUBufferRegion idst { _ibuf_mesh, 0,
-                    static_cast<uint32_t>(mesh_indices.size() * sizeof(uint32_t)) };
-                SDL_UploadToGPUBuffer(cp, &isrc, &idst, true);
-            }
-            SDL_EndGPUCopyPass(cp);
-        }
-
-        // Upload any pending scene textures
-        {
-            SDL_GPUCopyPass* tcp = nullptr;
-            for (auto &[rtex, entry] : _tex_cache)
-            {
-                if (entry.ready || !rtex->surf) continue;
-                if (!tcp) tcp = SDL_BeginGPUCopyPass(cmd);
-                _upload_scene_tex(cmd, tcp, rtex, entry);
-            }
-            if (tcp) SDL_EndGPUCopyPass(tcp);
-        }
-
-        // Acquire swapchain + begin render pass
-        SDL_GPUTexture* swapchain = nullptr;
-        if (!SDL_AcquireGPUSwapchainTexture(cmd, _win, &swapchain, nullptr, nullptr) || !swapchain)
-        {
-            SDL_SubmitGPUCommandBuffer(cmd);
-            return true;
-        }
-
-        SDL_GPUColorTargetInfo ct {};
-        ct.texture      = swapchain;
-        ct.load_op      = SDL_GPU_LOADOP_CLEAR;
-        ct.store_op     = SDL_GPU_STOREOP_STORE;
-        ct.clear_color  = { cr, cg, cb, 1.f };
-
-        SDL_GPURenderPass* pass = SDL_BeginGPURenderPass(cmd, &ct, 1, nullptr);
-
-        // Draw
-        if (!draw_calls.empty())
-        {
-            SDL_GPUGraphicsPipeline* bound_pipe = nullptr;
-            SDL_GPUTexture*          bound_tex  = nullptr;
-
-            SDL_GPUBufferBinding vbind_sprite { _vbuf_sprite, 0 };
-            SDL_GPUBufferBinding vbind_mesh   { _vbuf_mesh,   0 };
-            SDL_GPUBufferBinding ibind_mesh   { _ibuf_mesh,   0 };
-
-            for (const auto &dc : draw_calls)
-            {
-                SDL_PushGPUVertexUniformData(cmd, 0, &dc.viewproj, sizeof(dc.viewproj));
-
-                if (dc.kind == draw_call::SPRITE)
-                {
-                    if (bound_pipe != _pipeline_sprite)
-                    {
-                        SDL_BindGPUGraphicsPipeline(pass, _pipeline_sprite);
-                        SDL_BindGPUVertexBuffers(pass, 0, &vbind_sprite, 1);
-                        bound_pipe = _pipeline_sprite;
-                        bound_tex  = nullptr;
-                    }
-                    if (dc.tex != bound_tex)
-                    {
-                        SDL_GPUTextureSamplerBinding tsb { dc.tex, _default_sampler };
-                        SDL_BindGPUFragmentSamplers(pass, 0, &tsb, 1);
-                        bound_tex = dc.tex;
-                    }
-                    SDL_DrawGPUPrimitives(pass, dc.vert_count, 1, dc.vert_offset, 0);
-                }
-                else if (dc.kind == draw_call::MESH)
-                {
-                    if (bound_pipe != _pipeline_mesh2d)
-                    {
-                        SDL_BindGPUGraphicsPipeline(pass, _pipeline_mesh2d);
-                        SDL_BindGPUVertexBuffers(pass, 0, &vbind_mesh, 1);
-                        SDL_BindGPUIndexBuffer(pass, &ibind_mesh, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-                        bound_pipe = _pipeline_mesh2d;
-                        bound_tex  = nullptr;
-                    }
-                    SDL_DrawGPUIndexedPrimitives(pass, dc.idx_count, 1, dc.idx_offset, dc.vert_offset, 0);
-                }
-                else // MESH_TEX — sprite pipeline + indexed draw
-                {
-                    if (bound_pipe != _pipeline_sprite)
-                    {
-                        SDL_BindGPUGraphicsPipeline(pass, _pipeline_sprite);
-                        bound_pipe = _pipeline_sprite;
-                        bound_tex  = nullptr;
-                    }
-                    SDL_BindGPUVertexBuffers(pass, 0, &vbind_mesh, 1);
-                    SDL_BindGPUIndexBuffer(pass, &ibind_mesh, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-                    if (dc.tex != bound_tex)
-                    {
-                        SDL_GPUTextureSamplerBinding tsb { dc.tex, _default_sampler };
-                        SDL_BindGPUFragmentSamplers(pass, 0, &tsb, 1);
-                        bound_tex = dc.tex;
-                    }
-                    SDL_DrawGPUIndexedPrimitives(pass, dc.idx_count, 1, dc.idx_offset, dc.vert_offset, 0);
-                }
-            }
-        }
-
-        // ImGui
-        if (_has_ui)
-            ImGui_ImplSDLGPU3_RenderDrawData(ImGui::GetDrawData(), cmd, pass, nullptr);
-
-        SDL_EndGPURenderPass(pass);
-        SDL_SubmitGPUCommandBuffer(cmd);
-        FrameMark;
     }
+    else if(phase == step_phase::PRE_UPDATE)
+    {
+        // ui (except overlays) is ready
+        // update targets and viewports geometry for accurate data in udpdate
+
+        if(_d->has_ui)
+        {
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            auto central = ui_mgr->update_viewports();
+            _d->ui_vp = {central.x, central.y, central.z, central.w};
+        }
+
+        _d->targets.update_sizes(_d->ui_vp);
+
+    }
+    else if(phase == step_phase::PRE_RENDER)
+    {
+        // free resources marked for deletion
+        _d->textures.cleanup(_d->gdev);
+        _d->shaders.cleanup(_d->gdev, _d->pipelines);
+        _d->buffers.cleanup(_d->gdev);
+
+        // clear 2d batcher aand collector for upcoming render ops
+        _d->batcher.clear();
+        _d->collector.clear();
+
+        // do another render target resize pass
+        // we could have new targets and viewport added during the update cycle
+        _d->targets.update_sizes(_d->ui_vp);
+
+        // batch 2D geometry for render layer
+        // opportunistically, we save the id of the empty sync point
+        // for ui rendering
+        _d->ui_sync = _d->collector.collect_all_layers(_d->batcher, _d->collector_results, render::collector2d::clear_quad_mode::CLEAR_QUAD_ALWAYS);
+        // TODO use regular clears for first layers of targets
+
+        // batch 2D ui geometry
+        // layer collection has already created a sync point
+        // overlays are drawn here after update, for accurate state representation
+        if(_d->has_ui)
+        {
+            ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->draw_overlays();
+            _d->imgui.render_flush(_d->batcher);
+        }
+
+        // 2d geometry is ready for upload
+
+        // TODO 3d render command collection
+    }
+    else if(phase == step_phase::RENDER)
+    {
+        _render();
+    }
+
     return true;
 }
 
-// ---- scene drawing ----------------------------------------------------------------------------
-
-void render_gpu::_upload_scene_tex(SDL_GPUCommandBuffer* cmd, SDL_GPUCopyPass* cp,
-                                   rtexture* rtex, scene_tex_entry& entry)
+bool render_gpu::event( SDL_Event * evt)
 {
-    SDL_Surface* surf = rtex->surf;
-    if (!surf) return;
-
-    // Convert to RGBA8 if needed
-    SDL_Surface* converted = nullptr;
-    if (surf->format != SDL_PIXELFORMAT_RGBA32)
+    if(_d->has_ui)
     {
-        converted = SDL_ConvertSurface(surf, SDL_PIXELFORMAT_RGBA32);
-        surf = converted;
+        _d->imgui.event(evt);
     }
 
-    SDL_GPUTextureCreateInfo tci {};
-    tci.type          = SDL_GPU_TEXTURETYPE_2D;
-    tci.format        = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    tci.usage         = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    tci.width         = static_cast<uint32_t>(surf->w);
-    tci.height        = static_cast<uint32_t>(surf->h);
-    tci.layer_count_or_depth = 1;
-    tci.num_levels    = 1;
-    tci.sample_count  = SDL_GPU_SAMPLECOUNT_1;
-    entry.tex = SDL_CreateGPUTexture(_device, &tci);
-    entry.w   = surf->w;
-    entry.h   = surf->h;
-
-    const uint32_t row_bytes  = static_cast<uint32_t>(surf->w * 4);
-    const uint32_t tex_bytes  = row_bytes * static_cast<uint32_t>(surf->h);
-    auto* tbuf = _create_transfer_buffer(_device, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, tex_bytes);
-    auto* dst  = static_cast<uint8_t*>(SDL_MapGPUTransferBuffer(_device, tbuf, false));
-    if (static_cast<int>(row_bytes) == surf->pitch)
+    if(_d->rwin.event(evt))
     {
-        memcpy(dst, surf->pixels, tex_bytes);
+        if(!_d->has_ui)
+        {
+            // if we have no UI, update viewport when window changes
+            // otherwise, this will get done in PRE_RENDER phase from ui info
+            _d->ui_vp = {0, 0, _d->rwin.width(), _d->rwin.height()};
+        }
+    }
+
+    return true;
+}
+
+
+// Rendering
+
+void render_gpu::_render()
+{
+    assert(_d->gdev);
+
+    SDL_Window *window = _d->rwin.get();
+    SDL_GPUDevice *device = _d->gdev;
+
+    // TEST - creates own commandd buffer and all
+    static bool cube_up = false;
+    if(!cube_up)
+    {
+        _d->m_cube_v = UploadStaticGPUBuffer(
+            _d->gdev,
+            SDL_GPU_BUFFERUSAGE_VERTEX,
+            CUBE_VERTICES,
+            sizeof(CUBE_VERTICES)
+        );
+        _d->m_cube_i = UploadStaticGPUBuffer(
+            _d->gdev,
+            SDL_GPU_BUFFERUSAGE_INDEX,
+            CUBE_INDICES,
+            sizeof(CUBE_INDICES)
+        );
+        _d->m_cube_vert = rman().load_sync<rshader>("_nb_core/slang/cube.vert.slang"_hs);
+        _d->m_cube_frag = rman().load_sync<rshader>("_nb_core/slang/cube.frag.slang"_hs);
+        _d->shaders.prepare(_d->gdev, _d->m_cube_vert.get());
+        _d->shaders.prepare(_d->gdev, _d->m_cube_frag.get());
+        cube_up = true;
+    }
+
+    // acquire command buffer
+    assert(!(_d->cmds) && "[render_gpu] leftover command buffer!");
+    _d->cmds = SDL_AcquireGPUCommandBuffer(device);
+    if (!_d->cmds) {
+        SDL_Log("Failed to acquire command buffer: %s", SDL_GetError());
+        return;
+    }
+
+    // copy necessary data
+    // upload batched 2d geometry and textures
+    {
+        gpu::copy_scope cpy {_d->cmds};
+        _d->buffers2d.upload(_d->gdev, _d->cmds, _d->batcher, cpy);
+        _d->textures.prepare_multiple(_d->gdev, _d->cmds, _d->batcher.data().tex.begin(), _d->batcher.data().tex.end(), cpy);
+
+        // TEST ensure buffer upload of all meshes in scene
+        //      also prepare material shaders and textures
+        entt::registry &reg = engine::instance().default_scene().registry();
+        auto mesh_view = reg.view<const cmesh>();
+        for (auto [id, mesh] : mesh_view.each())
+        {
+            if(mesh.mesh)
+            {
+                _d->buffers.prepare(_d->gdev, _d->cmds, mesh.mesh.get(), cpy);
+            }
+            auto &rmesh = *mesh.mesh.get();
+            for(int sub_i = 0; sub_i < rmesh.submeshes().size(); ++sub_i)
+            {
+                auto &subm = rmesh.submeshes()[sub_i];
+                auto &mat_ptr = mesh.materials[subm.material_idx];
+                if(!mat_ptr)
+                {
+                    log::warn("[render_gpu] scene prepare: NO MATERIAL!");
+                    continue;
+                }
+
+                auto &mat = *mat_ptr.get();
+
+                if(mat.dirty)
+                    mat.materialize();
+
+                auto mat_ctrl = mat.controller();
+                auto sh_vert = mat_ctrl->get_vertex_program(mat);
+                auto sh_frag = mat_ctrl->get_fragment_program(mat);
+
+                if(!sh_vert || !sh_frag)
+                {
+                    log::warn("[render_gpu] scene prepare: NO SHADERS!");
+                    continue;
+                }
+                _d->shaders.prepare(_d->gdev, sh_vert.get());
+                _d->shaders.prepare(_d->gdev, sh_frag.get());
+
+                render::material_controller::tex_bind_vec_t tex_binds {};
+                mat_ctrl->collect_texture_bindings(mat, tex_binds);
+                for (const auto &bind : tex_binds)
+                {
+                    _d->textures.prepare(_d->gdev, _d->cmds, bind.texture.get(), cpy);
+                }
+            }
+        }
+    }
+
+    // acquire the swapchain texture for this frame
+    SDL_GPUTexture *swapchain = NULL;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(_d->cmds, window, &swapchain, NULL, NULL)) {
+        log::warn("[render_gpu] failed to acquire swapchain texture: %s", SDL_GetError());
+        return;
+    }
+
+    if (swapchain == NULL)
+        return; // window must be hidden
+
+    auto swapchain_format = SDL_GetGPUSwapchainTextureFormat(_d->gdev, window);
+
+    // update target textures
+    _d->targets.update_default(swapchain, swapchain_format, _d->rwin.width(), _d->rwin.height());
+    _d->targets.commit_textures(_d->gdev);
+
+    auto proj_2d = gpu::make_ortho_2d(_d->rwin.width(), _d->rwin.height());
+
+    // go over layers and submit draw commands
+    for(const auto &layer : engine::instance().render_layers())
+    {
+        if(!_d->passes.bind_target(layer, _d->cmds))
+            continue;
+
+        auto sync_it = _d->collector_results.sync_mapping.find(layer.order);
+        if(sync_it == _d->collector_results.sync_mapping.end())
+            continue; // layer was not batched ?! not 2d?!
+
+        // setting 2D GPU viewport
+        SDL_GPUViewport viewport = { 0.0f, 0.0f, static_cast<float>(_d->rwin.width()), static_cast<float>(_d->rwin.height()), 0.0f, 1.0f };
+        SDL_SetGPUViewport(_d->passes.current(), &viewport);
+
+        // render batches
+        auto clip = render::clip_t { 0, 0, (float)_d->rwin.width(), (float)_d->rwin.height() };
+        _render_2d_batches(sync_it->second, proj_2d, clip);
+
+        // we might decide later that 2d rendering happens on top of 3d rendering
+        if(layer.three_dee)
+            _render_3d_layer(layer);
+
+    }
+
+    // render ui batched geometry
+    if(_d->has_ui)
+        _render_ui();
+
+    _d->passes.unbind();
+
+    // submit
+    SDL_SubmitGPUCommandBuffer(_d->cmds);
+    _d->cmds = nullptr;
+}
+
+void render_gpu::_render_ui()
+{
+    // bind main target if needed
+    const render_layer ui_l {
+        0,
+        0,
+        entt::null,
+        999999,
+        {0, 0, _d->rwin.width(), _d->rwin.height() },
+        true,
+        false,
+        render::TARGET_DEFAULT
+    };
+
+    // setting GPU viewport
+    SDL_GPUViewport viewport = { 0.0f, 0.0f, static_cast<float>(_d->rwin.width()), static_cast<float>(_d->rwin.height()), 0.0f, 1.0f };
+    SDL_SetGPUViewport(_d->passes.current(), &viewport);
+
+    auto clip = render::clip_t { 0, 0, (float)_d->rwin.width(), (float)_d->rwin.height() };
+    auto proj = gpu::make_ortho_2d(clip.w, clip.h);
+    _render_2d_batches(_d->ui_sync, proj, clip);
+}
+
+void render_gpu::_render_2d_batches(render::batcher2d::sync_id_t sync_point, const glm::mat4 &proj, render::clip_t clip)
+{
+    assert(clip != render::CLIP_NONE);
+    auto prev_clip = render::CLIP_NONE; // always set scissor rect on first draw
+
+    auto pass = _d->passes.current();
+
+    // push uniforms
+    SDL_PushGPUVertexUniformData(_d->cmds, 0, glm::value_ptr(proj), sizeof(glm::mat4));
+
+    // bind buffers
+    SDL_GPUBufferBinding vtx_binding = {
+        .buffer = _d->buffers2d.buf_gpu_v,
+        .offset = 0 // Offset where this frame's vertices start
+    };
+    SDL_BindGPUVertexBuffers(pass, 0, &vtx_binding, 1);
+    SDL_GPUBufferBinding idx_binding = {
+        .buffer = _d->buffers2d.buf_gpu_i,
+        .offset = 0 // Offset where this frame's indices start
+    };
+    SDL_BindGPUIndexBuffer(pass, &idx_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+    const auto &batcher = _d->batcher;
+    auto cmd_range = batcher.sync_point_get(sync_point);
+    for (size_t i = 0; i < cmd_range.cmd_count; i++)
+    {
+        const auto &cmd = batcher.commands()[cmd_range.cmd_offset + i];
+
+        auto intersect = render::clip_intersect(clip, cmd.clip);
+        if(intersect == render::CLIP_EMPTY)
+            continue; // skip altogether
+        if (intersect != prev_clip)
+        {
+            SDL_Rect scissor = { (int)intersect.x, (int)intersect.y, (int)intersect.w, (int)intersect.h };
+            SDL_SetGPUScissor(pass, &scissor);
+            prev_clip = intersect;
+        }
+
+        if(cmd.texture != -1)
+        {
+            auto &rtex = batcher.data().tex[cmd.texture];
+            if(!rtex->rptr)
+                continue;
+
+            gpu::texture_block *tb = (gpu::texture_block*) rtex->rptr;
+            SDL_GPUTextureSamplerBinding binding = {
+                .texture = tb->gtex,
+                .sampler = tb->gsamp
+            };
+
+            // slot 0 maps to set 2, binding 0 in SPIR-V
+            SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+        }
+
+        gpu::pipeline_desc pd {};
+        gpu::command2d_get_pipeline(cmd, pd, _d->shaders2d);
+        _d->passes.write_target_block(pd);
+        auto pipeline = _d->pipelines.find_or_create(_d->gdev, pd);
+
+        if(!pipeline->pipeline)
+            assert(false);
+
+        SDL_BindGPUGraphicsPipeline(pass, pipeline->pipeline);
+
+        SDL_DrawGPUIndexedPrimitives(pass, cmd.index_count, 1, cmd.index_start, cmd.base_vertex, 0);
+    }
+}
+
+
+
+void render_gpu::_render_3d_layer(const render_layer &l)
+{
+
+    static float rot = .0f;
+    rot += 1.f;
+
+    SDL_GPUViewport viewport = { (float)l.viewport.x, (float)l.viewport.y,
+                                 (float)l.viewport.w, (float)l.viewport.h,
+                                 0.0f, 1.0f };
+    float aspect = l.viewport.w/(float)l.viewport.h;
+
+    SDL_SetGPUViewport(_d->passes.current(), &viewport);
+
+
+    auto scn = engine::instance().find_scene(l.scene_id);
+    if(!scn)
+    {
+        log::warn("[render_gpu] _render_3d_layer: no scene: %u", (unsigned)l.scene_id);
+        return;
+    }
+
+    render::scene_uniform_std u_scn;
+
+    auto cam_eid = l.camera;
+    auto cam = scn->registry().try_get<ccamera>(cam_eid);
+    auto cam_sp = scn->registry().try_get<cspatial>(cam_eid);
+    if(false)//cam && cam_sp)
+    {
+        auto proj = glm::perspective(cam->cam3d.fov, aspect,
+                                     cam->cam3d.clip_near, cam->cam3d.clip_far);
+        auto view = glm::inverse(cam_sp->world);
+        u_scn.view = view;
+        u_scn.proj = proj;
+        u_scn.view_proj = proj*view;
+        u_scn.inv_view = glm::inverse(view);
+        u_scn.camera_pos = cam_sp->pos;
     }
     else
     {
-        const auto* src = static_cast<const uint8_t*>(surf->pixels);
-        for (int row = 0; row < surf->h; ++row)
-            memcpy(dst + row * row_bytes, src + row * surf->pitch, row_bytes);
+        // fallback
+        u_scn.camera_pos = {-0.5f,0.5f,3.5f};
+        glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f); // Origin
+        glm::vec3 upVector     = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::mat4 view = glm::lookAt(u_scn.camera_pos, cameraTarget, upVector);
+        float fovYRadians = glm::radians(45.0f);
+        float nearPlane   = 0.1f;
+        float farPlane    = 50.0f;
+        glm::mat4 proj = glm::perspective(fovYRadians, aspect, nearPlane, farPlane);
+        u_scn.view = view;
+        u_scn.proj = proj;
+        u_scn.view_proj = proj*view;
+        u_scn.inv_view = glm::inverse(view);
     }
-    SDL_UnmapGPUTransferBuffer(_device, tbuf);
+    u_scn.light_color = glm::vec3{1.8f, 1.8f, 1.5f};        // TODO
+    u_scn.light_dir = glm::vec3{0.0f, 1.0f, 0.5f}; // TODO
 
-    SDL_GPUTextureTransferInfo src {};
-    src.transfer_buffer = tbuf;
-    src.offset          = 0;
-    src.pixels_per_row  = static_cast<uint32_t>(surf->w);
-    src.rows_per_layer  = static_cast<uint32_t>(surf->h);
+    SDL_PushGPUVertexUniformData( _d->cmds, 0, &u_scn, sizeof(u_scn));
+    SDL_PushGPUFragmentUniformData( _d->cmds, 0, &u_scn, sizeof(u_scn));
 
-    SDL_GPUTextureRegion rgn {};
-    rgn.texture = entry.tex;
-    rgn.w = static_cast<uint32_t>(surf->w);
-    rgn.h = static_cast<uint32_t>(surf->h);
-    rgn.d = 1;
-
-    SDL_UploadToGPUTexture(cp, &src, &rgn, false);
-
-    // Transfer buffer will be released after submit — schedule via a fence or just release now
-    // (safe: upload is recorded into the command buffer, not executed yet, but the data was copied)
-    SDL_ReleaseGPUTransferBuffer(_device, tbuf);
-
-    if (converted) SDL_DestroySurface(converted);
-    SDL_DestroySurface(rtex->surf);
-    rtex->surf = nullptr;
-
-    entry.ready = true;
-}
-
-void render_gpu::_draw_scene(entt::registry& reg, const glm::mat4& viewproj,
-                              uint32_t layer_mask, const viewport_entry& /*vp*/,
-                              std::vector<sprite_vertex>& sv, std::vector<mesh_vertex>& mv,
-                              std::vector<uint32_t>& mi,
-                              std::vector<draw_call>& dcs)
-{
-    reg.sort<cspatial>([](const cspatial &a, const cspatial &b) { return a.pos[2] > b.pos[2]; });
-
-    for (auto [id, spatial] : reg.view<const cspatial>().each())
+    // iterate over scene mesh components
+    auto mesh_view = scn->registry().view<cmesh, cspatial>();
+    render::material_controller::tex_bind_vec_t tex_binds;
+    for(const auto &[eid, msh, spa]: mesh_view.each())
     {
-        const auto *lyr = reg.try_get<clayers>(id);
-        if (!((lyr ? lyr->mask : clayers::MASK_DEFAULT) & layer_mask)) continue;
-
-        if (auto *sprite = reg.try_get<const csprite>(id))
+        auto &mesh = *msh.mesh.get();
+        if(!mesh.submeshes().size() || !mesh.uploaded)
         {
-            if (!sprite->visible || !sprite->spr) continue;
-            auto *tex = sprite->spr->tex.get();
-            if (!tex) continue;
-
-            auto &entry = _tex_cache[tex];
-            if (!entry.ready && !tex->surf) continue;
-            if (!entry.ready) continue;
-
-            const glm::vec4 &csr = sprite->current_source_rect;
-            glm::vec2 dims = sprite->spr->dims;
-
-            const float tex_w = static_cast<float>(entry.w);
-            const float tex_h = static_cast<float>(entry.h);
-
-            if (dims == glm::vec2{-1.f, -1.f})
-                dims = csr.z > 0.f ? glm::vec2{csr.z, csr.w} : glm::vec2{tex_w, tex_h};
-
-            float u0 = 0.f, v0 = 0.f, u1 = 1.f, v1 = 1.f;
-            if (csr.z > 0.f && tex_w > 0.f && tex_h > 0.f)
-            {
-                u0 = csr.x / tex_w;           v0 = csr.y / tex_h;
-                u1 = (csr.x + csr.z) / tex_w; v1 = (csr.y + csr.w) / tex_h;
-            }
-
-            const float ql = -sprite->spr->anchor.x * dims.x;
-            const float qt = -sprite->spr->anchor.y * dims.y;
-
-            // Snap in local space before the world transform
-            const auto snap = [&](float v) { return sprite->pixel_snap ? std::roundf(v) : v; };
-            const float lx0 = snap(ql),         ly0 = snap(qt);
-            const float lx1 = snap(ql + dims.x), ly1 = snap(qt + dims.y);
-
-            // Transform to world space on the CPU; viewproj is applied in the shader
-            auto world_xform = [&](float lx, float ly) -> glm::vec2 {
-                const glm::vec4 w = spatial.world * glm::vec4{lx, ly, 0.f, 1.f};
-                return { w.x, w.y };
-            };
-            const glm::vec2 tl = world_xform(lx0, ly0);
-            const glm::vec2 tr = world_xform(lx1, ly0);
-            const glm::vec2 bl = world_xform(lx0, ly1);
-            const glm::vec2 br = world_xform(lx1, ly1);
-
-            const auto &c = sprite->color;
-            const uint32_t base = static_cast<uint32_t>(sv.size());
-            sv.push_back({ tl.x, tl.y, u0, v0, c.r, c.g, c.b, c.a });
-            sv.push_back({ tr.x, tr.y, u1, v0, c.r, c.g, c.b, c.a });
-            sv.push_back({ bl.x, bl.y, u0, v1, c.r, c.g, c.b, c.a });
-            sv.push_back({ tr.x, tr.y, u1, v0, c.r, c.g, c.b, c.a });
-            sv.push_back({ br.x, br.y, u1, v1, c.r, c.g, c.b, c.a });
-            sv.push_back({ bl.x, bl.y, u0, v1, c.r, c.g, c.b, c.a });
-
-            // Merge consecutive calls with same texture and same viewproj (same layer)
-            if (!dcs.empty() && dcs.back().kind == draw_call::SPRITE
-                && dcs.back().tex == entry.tex && dcs.back().viewproj == viewproj)
-            {
-                dcs.back().vert_count += 6;
-            }
-            else
-            {
-                dcs.push_back({ draw_call::SPRITE, entry.tex, viewproj, base, 6, 0, 0 });
-            }
+            log::warn("MESH PROBLEMS");
+            continue;
         }
-        else if (auto *mesh = reg.try_get<const cmesh2d>(id))
+
+        // bind mesh buffer
+        _d->buffers.bind(_d->passes.current(), &mesh);
+
+        render::model_uniforms_std u_model;
+        u_model.model = spa.world;
+        u_model.normal_matrix = glm::transpose(glm::inverse(u_model.model));
+        SDL_PushGPUVertexUniformData(_d->cmds, 1, &u_model, sizeof(u_model));
+
+        for(int sub_i = 0; sub_i < mesh.submeshes().size(); ++sub_i)
         {
-            if (!mesh->visible || !mesh->geom || mesh->geom->empty()) continue;
+            auto &subm = mesh.submeshes()[sub_i];
+            auto &mat_ptr = msh.materials[subm.material_idx];
+            if(!mat_ptr)
+                continue; // no material
 
-            // Resolve mesh texture if present
-            SDL_GPUTexture* mesh_gpu_tex = nullptr;
-            if (mesh->tex)
+            auto &mat = *mat_ptr.get();
+
+            auto mat_ctrl = mat.controller();
+            auto sh_vert = mat_ctrl->get_vertex_program(mat);
+            auto sh_frag = mat_ctrl->get_fragment_program(mat);
+
+            auto vt = mesh.vertex_type();
+            const auto &vt_desc = render::vertex_type_descriptor::descriptor_table().at(vt);
+            auto pd = gpu::pipeline_desc {};
+            pd.vert = (SDL_GPUShader*) sh_vert->rptr;
+            pd.frag = (SDL_GPUShader*) sh_frag->rptr;
+            pd.setup_vertex_input(vt_desc, sh_vert->meta);
+            _d->passes.write_target_block(pd);
+            pd.setup_material_pipeline_props(mat.pipeline_params);
+            auto pipeline = _d->pipelines.find_or_create(_d->gdev, pd);
+            if(!pipeline->valid())
+                log::warn("PIPELINE NOT VALID OMG");
+            SDL_BindGPUGraphicsPipeline(_d->passes.current(), pipeline->pipeline);
+
+            SDL_PushGPUFragmentUniformData(_d->cmds, 0u, &u_scn, sizeof(u_scn));
+            SDL_PushGPUFragmentUniformData(_d->cmds, 1u, mat.frag_uniforms.data(), mat.frag_uniforms.size());
+
+            mat_ctrl->collect_texture_bindings(mat, tex_binds);
+            for (const auto &bind : tex_binds)
             {
-                auto *rtex = mesh->tex.get();
-                auto &entry = _tex_cache[rtex];
-                if (!entry.ready && rtex->surf)
-                {
-                    // Will be uploaded in the pre-pass next frame; skip this frame
-                }
-                if (entry.ready) mesh_gpu_tex = entry.tex;
+                gpu::texture_block *tb = (gpu::texture_block*) bind.texture->rptr;
+                SDL_GPUTextureSamplerBinding gbind {
+                    .texture = tb->gtex,
+                    .sampler = tb->gsamp
+                };
+                SDL_BindGPUFragmentSamplers(_d->passes.current(), bind.slot, &gbind, 1);
             }
 
-            const auto &geom   = *mesh->geom;
-            const uint32_t vbase = static_cast<uint32_t>(mv.size());
-            const uint32_t ibase = static_cast<uint32_t>(mi.size());
+            SDL_DrawGPUIndexedPrimitives(_d->passes.current(), subm.index_count, 1, subm.index_offset, subm.vertex_offset, 0);
 
-            for (const auto &v : geom.vertices)
-            {
-                const float lx = mesh->pixel_snap ? std::roundf(v.pos.x) : v.pos.x;
-                const float ly = mesh->pixel_snap ? std::roundf(v.pos.y) : v.pos.y;
-                // Transform to world space; viewproj applied in shader
-                const glm::vec4 w = spatial.world * glm::vec4{lx, ly, 0.f, 1.f};
-                mv.push_back({ w.x, w.y, v.uv.x, v.uv.y, v.color.r, v.color.g, v.color.b, v.color.a });
-            }
-
-            uint32_t idx_count = 0;
-            if (!geom.indices.empty())
-            {
-                for (int i : geom.indices) mi.push_back(static_cast<uint32_t>(i));
-                idx_count = static_cast<uint32_t>(geom.indices.size());
-            }
-            else
-            {
-                const uint32_t vc = static_cast<uint32_t>(geom.vertices.size());
-                for (uint32_t i = 0; i < vc; ++i) mi.push_back(i);
-                idx_count = vc;
-            }
-
-            const auto kind = mesh_gpu_tex ? draw_call::MESH_TEX : draw_call::MESH;
-            dcs.push_back({ kind, mesh_gpu_tex, viewproj, vbase, 0, ibase, idx_count });
         }
     }
-}
 
-// ---- event ------------------------------------------------------------------------------------
 
-bool render_gpu::event(SDL_Event* evt)
-{
-    ImGui_ImplSDL3_ProcessEvent(evt);
+    return;
 
-    if (evt->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED &&
-        evt->window.windowID == SDL_GetWindowID(_win))
+    /// TEST CUBE HERE
+
+    TransformData transforms = {};
+
+    UpdateCubeTransforms(transforms, glm::vec3{3.f, 4.f, 5.f}, (float)l.viewport.w, (float)l.viewport.h, rot);
+
+    struct LightData {
+        glm::vec4 dirLightVector {0.2857f, 0.8571f, 0.4286f, 0.0f}; // xyz = direction towards light, w = unused
+        glm::vec4 dirLightColor {0.8f, 0.8f, 0.7f, 1.0f};  // rgb = color * intensity, a = unused
+        glm::vec4 ambientColor {0.15f, 0.1f, 0.05f, 1.0f};   // rgb = base ambient light
+    } lights = {
+    };
+
+    // NOTE it is ok for this to be sucky mess
+    //      we will be implementing abstracted batching and commands later
+    auto pass = _d->passes.current();
+
+    auto desc = create_cube_pipeline_desc((SDL_GPUShader*)_d->m_cube_vert->rptr,
+                                          (SDL_GPUShader*)_d->m_cube_frag->rptr,
+                                          _d->m_cube_vert->meta);
+    _d->passes.write_target_block(desc);
+    auto pipeline = _d->pipelines.find_or_create(_d->gdev, desc);
+    if(!pipeline)
     {
-        _wx = evt->window.data1;
-        _wy = evt->window.data2;
-        if (!_default_vp_owned && _default_vp != VIEWPORT_INVALID)
-            update_viewport(_default_vp, 0, 0, _wx, _wy);
-        log::info("[render_gpu] resized to %dx%d", _wx, _wy);
-    }
-    else if (evt->type == SDL_EVENT_WINDOW_RESIZED &&
-             evt->window.windowID == SDL_GetWindowID(_win))
-    {
-        SDL_GetWindowSafeArea(_win, &_safe);
+        log::error("INVALID DESCRIPTOR");
+        return;
     }
 
-    if (evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
-        SDL_SetWindowFullscreen(_win, !(SDL_GetWindowFlags(_win) & SDL_WINDOW_FULLSCREEN));
+    SDL_BindGPUGraphicsPipeline(pass, pipeline->pipeline);
 
-    return true;
+    SDL_GPUBufferBinding vbo_binding = { .buffer = _d->m_cube_v, .offset = 0 };
+    SDL_BindGPUVertexBuffers(pass, 0, &vbo_binding, 1);
+
+    SDL_GPUBufferBinding ibo_binding = { .buffer = _d->m_cube_i, .offset = 0 };
+    SDL_BindGPUIndexBuffer(pass, &ibo_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+    // C. Push Uniform Data
+    // Vertex Uniforms (Set 1 / space1, Slot 0)
+    SDL_PushGPUVertexUniformData(_d->cmds, 0, &transforms, sizeof(TransformData));
+
+    // Fragment Uniforms (Set 3 / space3, Slot 0)
+    SDL_PushGPUFragmentUniformData(_d->cmds, 0, &lights, sizeof(LightData));
+
+    // D. Execute Indexed Draw Call
+    // Arguments: pass, index_count, instance_count, first_index, vertex_offset, first_instance
+    SDL_DrawGPUIndexedPrimitives(pass, 36, 1, 0, 0, 0);
 }
 
-// ---- renderer_service -------------------------------------------------------------------------
 
-bool render_gpu::get_2d_extents(renderer_service::extents_2d &extents)
+// RTT interface
+
+render::target_id_t render_gpu::target_create(const render::target_desc& desc)
 {
-    const auto &layers = engine::instance().render_layers();
-    if (!layers.empty())
-    {
-        const auto &layer = layers.front();
-        auto *sc = engine::instance().find_scene(layer.scene_id);
-        auto it  = _viewports.find(layer.viewport);
-        if (sc && it != _viewports.end())
-        {
-            auto &reg = sc->registry();
-            auto &vp  = it->second;
-            float cx = 0.f, cy = 0.f, zoom = 1.f;
-            if (layer.camera != entt::null)
-            {
-                if (auto *sp  = reg.try_get<cspatial>(layer.camera)) { cx = sp->pos.x; cy = sp->pos.y; }
-                if (auto *cam = reg.try_get<ccamera> (layer.camera)) { zoom = cam->zoom; }
-            }
-            float span_x = vp.w / zoom, span_y = vp.h / zoom;
-            extents = { vp.w, vp.h, span_x, span_y,
-                cx - span_x * 0.5f, cy - span_y * 0.5f,
-                cx + span_x * 0.5f, cy + span_y * 0.5f,
-                _scale, vp.x, vp.y };
-            return true;
-        }
-    }
-    auto dvp_it = _viewports.find(_default_vp);
-    int dvp_w = (dvp_it != _viewports.end()) ? dvp_it->second.w : _wx;
-    int dvp_h = (dvp_it != _viewports.end()) ? dvp_it->second.h : _wy;
-    int dvp_x = (dvp_it != _viewports.end()) ? dvp_it->second.x : 0;
-    int dvp_y = (dvp_it != _viewports.end()) ? dvp_it->second.y : 0;
-    float zoom = _fallback_camera.zoom > 0.f ? _fallback_camera.zoom : 1.f;
-    float cx = _fallback_spatial.pos.x, cy = _fallback_spatial.pos.y;
-    float span_x = dvp_w / zoom, span_y = dvp_h / zoom;
-    extents = { dvp_w, dvp_h, span_x, span_y,
-        cx - span_x * 0.5f, cy - span_y * 0.5f,
-        cx + span_x * 0.5f, cy + span_y * 0.5f,
-        _scale, dvp_x, dvp_y };
-    return true;
+    return _d->targets.target_create(desc);
 }
 
-viewport_handle render_gpu::create_viewport(int x, int y, int w, int h,
-                                             bool clear, float r, float g, float b, float a)
+bool render_gpu::target_destroy(render::target_id_t id)
 {
-    viewport_handle h_ = _next_vp_handle++;
-    _viewports[h_] = { x, y, w, h, clear, r, g, b, a };
-    return h_;
+    return _d->targets.target_destroy(id);
 }
 
-void render_gpu::update_viewport(viewport_handle vp, int x, int y, int w, int h)
+std::shared_ptr<rtexture> render_gpu::target_get_color_texture(render::target_id_t id) const
 {
-    auto it = _viewports.find(vp);
-    if (it == _viewports.end()) return;
-    it->second.x = x; it->second.y = y;
-    it->second.w = w; it->second.h = h;
-    if (vp == _default_vp) _default_vp_owned = true;
+    auto block = _d->targets.target_get(id);
+    return block? (block->color_texture_count > 0? block->color_textures[0] : nullptr) : nullptr;
 }
 
-void render_gpu::destroy_viewport(viewport_handle vp)
+std::shared_ptr<rtexture> render_gpu::target_get_depth_texture(render::target_id_t id) const
 {
-    _viewports.erase(vp);
+    auto block = _d->targets.target_get(id);
+    return block? block->depth_texture : nullptr;
 }
 
-void render_gpu::reset_default_viewport()
+glm::ivec2 render_gpu::target_get_size(render::target_id_t id) const
 {
-    _default_vp_owned = false;
-    if (_default_vp != VIEWPORT_INVALID)
-        update_viewport(_default_vp, 0, 0, _wx, _wy);
+    auto block = _d->targets.target_get(id);
+    return block? glm::vec2{ block->req_w, block->req_h } : glm::vec2{-1.f, -1.f};
 }
 
-// ---- texture service --------------------------------------------------------------------------
-
-renderer_service::texture_handle render_gpu::create_texture(int w, int h)
+bool render_gpu::target_has_depth(render::target_id_t id) const
 {
-    SDL_GPUTextureCreateInfo tci {};
-    tci.type   = SDL_GPU_TEXTURETYPE_2D;
-    tci.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    tci.usage  = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    tci.width  = static_cast<uint32_t>(w);
-    tci.height = static_cast<uint32_t>(h);
-    tci.layer_count_or_depth = 1;
-    tci.num_levels   = 1;
-    tci.sample_count = SDL_GPU_SAMPLECOUNT_1;
-
-    SDL_GPUTexture* tex = SDL_CreateGPUTexture(_device, &tci);
-    if (!tex) return nullptr;
-
-    const uint32_t bytes = static_cast<uint32_t>(w * h * 4);
-    SDL_GPUTransferBuffer* tbuf = _create_transfer_buffer(_device, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, bytes);
-    _service_textures[tex] = { tex, tbuf, w, h };
-    return tex;
+    auto block = _d->targets.target_get(id);
+    return block? block->depth_texture.get()!=nullptr : false;
 }
 
-void render_gpu::update_texture(texture_handle handle, const void* pixels, int pitch)
-{
-    auto it = _service_textures.find(handle);
-    if (it == _service_textures.end()) return;
-    auto &e = it->second;
 
-    auto* dst = SDL_MapGPUTransferBuffer(_device, e.transfer_buf, true);
-    const uint8_t* src = static_cast<const uint8_t*>(pixels);
-    for (int row = 0; row < e.h; ++row)
-        memcpy(static_cast<uint8_t*>(dst) + row * e.w * 4, src + row * pitch, e.w * 4);
-    SDL_UnmapGPUTransferBuffer(_device, e.transfer_buf);
+// basic getters
 
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(_device);
-    SDL_GPUCopyPass* cp = SDL_BeginGPUCopyPass(cmd);
+int   render_gpu::window_width()  const { return _d->rwin.width(); }
+int   render_gpu::window_height() const { return _d->rwin.height(); }
+float render_gpu::display_scale() const { return _d->rwin.ui_scale(); }
 
-    SDL_GPUTextureTransferInfo tsrc { e.transfer_buf, 0,
-        static_cast<uint32_t>(e.w), static_cast<uint32_t>(e.h) };
-    SDL_GPUTextureRegion rgn {};
-    rgn.texture = e.tex;
-    rgn.w = static_cast<uint32_t>(e.w);
-    rgn.h = static_cast<uint32_t>(e.h);
-    rgn.d = 1;
-    SDL_UploadToGPUTexture(cp, &tsrc, &rgn, true);
 
-    SDL_EndGPUCopyPass(cp);
-    SDL_SubmitGPUCommandBuffer(cmd);
-}
-
-void render_gpu::destroy_texture(texture_handle handle)
-{
-    auto it = _service_textures.find(handle);
-    if (it == _service_textures.end()) return;
-    SDL_WaitForGPUIdle(_device);
-    SDL_ReleaseGPUTexture(_device, it->second.tex);
-    SDL_ReleaseGPUTransferBuffer(_device, it->second.transfer_buf);
-    _service_textures.erase(it);
-}
-
-// ---- picker (identical logic to render_simple) ------------------------------------------------
+// Picker service
 
 entt::entity render_gpu::pick(const render_layer &layer, float vp_x, float vp_y)
 {
-    auto *sc = engine::instance().find_scene(layer.scene_id);
-    if (!sc) return entt::null;
-    auto it = _viewports.find(layer.viewport);
-    if (it == _viewports.end()) return entt::null;
-    const auto &vp = it->second;
-
-    const float win_x = vp_x + vp.x;
-    const float win_y = vp_y + vp.y;
-    const float vp_cx = vp.x + vp.w * 0.5f;
-    const float vp_cy = vp.y + vp.h * 0.5f;
-
-    float cam_cx = 0.f, cam_cy = 0.f, zoom = 1.f;
-    auto &reg = sc->registry();
-    if (layer.camera != entt::null)
-    {
-        if (auto *sp  = reg.try_get<cspatial>(layer.camera)) { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
-        if (auto *cam = reg.try_get<ccamera> (layer.camera)) { zoom = cam->zoom; }
-    }
-
-    const float wx = (win_x - vp_cx) / zoom + cam_cx;
-    const float wy = (win_y - vp_cy) / zoom + cam_cy;
-
-    entt::entity best = entt::null;
-    float best_z = std::numeric_limits<float>::max();
-
-    for (auto [id, spatial] : reg.view<const cspatial>().each())
-    {
-        const auto *lyr_comp = reg.try_get<clayers>(id);
-        if (!((lyr_comp ? lyr_comp->mask : clayers::MASK_DEFAULT) & layer.layer_mask)) continue;
-
-        if (auto *sprite = reg.try_get<const csprite>(id))
-        {
-            if (!sprite->visible || !sprite->spr) continue;
-            glm::vec2 dims = sprite->spr->dims;
-            if (dims == glm::vec2{-1.f, -1.f})
-            {
-                const glm::vec4 &csr = sprite->current_source_rect;
-                if (csr.z > 0.f) dims = { csr.z, csr.w };
-                else { auto &e = _tex_cache[sprite->spr->tex.get()]; if (e.ready) dims = {(float)e.w, (float)e.h}; else continue; }
-            }
-            const glm::vec4 local = glm::inverse(spatial.world) * glm::vec4{wx, wy, 0.f, 1.f};
-            const float ql = -sprite->spr->anchor.x * dims.x, qt = -sprite->spr->anchor.y * dims.y;
-            if (local.x >= ql && local.x <= ql + dims.x && local.y >= qt && local.y <= qt + dims.y)
-                if (spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
-        }
-        else if (auto *mesh = reg.try_get<const cmesh2d>(id))
-        {
-            if (!mesh->visible || !mesh->geom || mesh->geom->empty()) continue;
-            const glm::vec4 local4 = glm::inverse(spatial.world) * glm::vec4{wx, wy, 0.f, 1.f};
-            const glm::vec2 lp { local4.x, local4.y };
-            const auto &geom = *mesh->geom;
-            const auto &verts = geom.vertices;
-            auto tri_hit = [&](int i0, int i1, int i2) {
-                const glm::vec2 a{verts[i0].pos}, b{verts[i1].pos}, c{verts[i2].pos};
-                const float d1 = (lp.x-b.x)*(a.y-b.y) - (a.x-b.x)*(lp.y-b.y);
-                const float d2 = (lp.x-c.x)*(b.y-c.y) - (b.x-c.x)*(lp.y-c.y);
-                const float d3 = (lp.x-a.x)*(c.y-a.y) - (c.x-a.x)*(lp.y-a.y);
-                return !((d1<0||d2<0||d3<0) && (d1>0||d2>0||d3>0));
-            };
-            bool hit = false;
-            if (!geom.indices.empty())
-                for (size_t i = 0; i+2 < geom.indices.size() && !hit; i += 3)
-                    hit = tri_hit(geom.indices[i], geom.indices[i+1], geom.indices[i+2]);
-            else
-                for (size_t i = 0; i+2 < verts.size() && !hit; i += 3)
-                    hit = tri_hit((int)i, (int)i+1, (int)i+2);
-            if (hit && spatial.pos.z < best_z) { best_z = spatial.pos.z; best = id; }
-        }
-        else if (auto *emit = reg.try_get<const cparticle_emitter>(id))
-        {
-            float radius = 24.f;
-            if (emit->res) radius = std::max(24.f, glm::length(emit->res->emitter.pos_variance));
-            const float dx = wx - spatial.pos.x, dy = wy - spatial.pos.y;
-            if (dx*dx + dy*dy <= radius*radius && spatial.pos.z < best_z)
-                { best_z = spatial.pos.z; best = id; }
-        }
-        else
-        {
-            constexpr float HR = 8.f;
-            const float dx = wx - spatial.pos.x, dy = wy - spatial.pos.y;
-            if (dx*dx + dy*dy <= HR*HR && spatial.pos.z < best_z)
-                { best_z = spatial.pos.z; best = id; }
-        }
-    }
-    return best;
+    // TODO 3D
+    // just forward to default 2D cpu picker
+    return _d->picker.pick(layer, vp_x, vp_y);
 }
 
-// ---- misc -------------------------------------------------------------------------------------
-
-void render_gpu::on_scene_change() {}
-
-void render_gpu::cam_2d_setup(float cx, float cy, float wmax, float hmax)
-{
-    _fallback_spatial.pos = { cx, cy, 0.f };
-    _fallback_camera.wmax = wmax;
-    _fallback_camera.hmax = hmax;
-    float scale_x = _wx / wmax;
-    float scale_y = _wy / hmax;
-    _fallback_camera.zoom = std::min(scale_x, scale_y);
-}
-
-void render_gpu::set_clear_color(float r, float g, float b)
-{
-    auto it = _viewports.find(_default_vp);
-    if (it != _viewports.end())
-    {
-        it->second.r = r;
-        it->second.g = g;
-        it->second.b = b;
-    }
-}
-
-// ---- RTTI -------------------------------------------------------------------------------------
-
-extern "C" void _rtti_init_render_gpu()
-{
-    entt::meta_factory<nb::render_gpu>{}
-        .type("render_gpu"_hs)
-        .custom<rtti::type_info>(rtti::type_info{"render_gpu", rtti::TYPE_CLASS_SYSTEM})
-        .base<nb::system>()
-        .func<&nb::render_gpu::window_width> ("window_width"_hs) .custom<rtti::func_info>(rtti::func_info{"window_width"})
-        .func<&nb::render_gpu::window_height>("window_height"_hs).custom<rtti::func_info>(rtti::func_info{"window_height"})
-        .func<&nb::render_gpu::display_scale>("display_scale"_hs).custom<rtti::func_info>(rtti::func_info{"display_scale"})
-        .func<&nb::render_gpu::default_viewport>("default_viewport"_hs).custom<rtti::func_info>(rtti::func_info{"default_viewport"});
-    entt::meta_factory<std::shared_ptr<nb::render_gpu>>{rtti::ctx_systems()}
-        .type("render_gpu_shared"_hs)
-        .ctor<&rtti::shared_ptr_builder<nb::render_gpu>>()
-        .conv<std::shared_ptr<nb::system>>();
-
-    cspatial::_ensure_rtti();
-    cstructure::_ensure_rtti();
-    csprite::_ensure_rtti();
-    cmesh2d::_ensure_rtti();
-    cparticle_emitter::_ensure_rtti();
-    ccamera::_ensure_rtti();
-    clayers::_ensure_rtti();
-}

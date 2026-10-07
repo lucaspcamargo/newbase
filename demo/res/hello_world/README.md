@@ -8,5 +8,5 @@ You can also bring out the console with the **tilde (`)** key, which will show l
 
 ### Assets
 
-- **Sprite:** Engine icon — original artwork, part of the newbase project
-- **Music:** "Navinhas Loka" by Tiago Pires Camargo — all rights reserved. Thanks bro!
+- **Sprite:** Engine icon. Original artwork, part of the newbase.
+- **Music:** "Navinhas Loka" by Tiago Pires Camargo. All rights reserved. Thanks bro!

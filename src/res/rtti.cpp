@@ -1,15 +1,20 @@
 #include <newbase/res/rtti.hpp>
 #include <newbase/reflection/data.hpp>
+#include <newbase/reflection/resources.hpp>
 #include <newbase/res/writers.hpp>
 #include <newbase/res/etree.hpp>
+#include <newbase/res/gltf.hpp>
+#include <newbase/res/graphplan.hpp>
+#include <newbase/res/material.hpp>
+#include <newbase/res/mesh.hpp>
+#include <newbase/res/script.hpp>
+#include <newbase/res/shader.hpp>
 #include <newbase/res/sprite.hpp>
 #include <newbase/res/texture.hpp>
-#include <newbase/res/script.hpp>
+#include <newbase/res/tilemap.hpp>
 #include <newbase/res/vorbis.hpp>
 #include <newbase/res/wav.hpp>
 #include <newbase/res/yaml.hpp>
-#include <newbase/res/tilemap.hpp>
-#include <newbase/res/graphplan.hpp>
 #include <newbase/log.hpp>
 #include <entt/meta/factory.hpp>
 #include "IconsForkAwesome.h"
@@ -49,6 +54,21 @@ namespace nb::rtti {
             })
         .data<&rtexture::nearest, entt::as_ref_t>("nearest"_hs)
         .custom<rtti::data_info>(rtti::data_info{"nearest"});
+
+
+        entt::meta_factory<rshader>{}
+        .type("rshader"_hs)
+        .base<resource>()
+        .custom<type_info>(type_info{
+            .identifier = "shader",
+            .type_class = TYPE_CLASS_RESOURCE,
+            .data = {.resource = {.editor_icon = ICON_FK_MAGIC, .extensions = "slang hlsl spv nbs",
+                .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
+                    return std::make_shared<rshader>(id);
+                }
+            }}
+        });
+
 
         entt::meta_factory<rsprite>{}
         .type("rsprite"_hs)
@@ -150,42 +170,22 @@ namespace nb::rtti {
             });
 
         // shared_ptr<T> registrations — used by meta_any_editor to display resource fields
-#define NB_REG_RES_PTR(T, name_str) \
-    entt::meta_factory<std::shared_ptr<T>>{} \
-        .type(entt::hashed_string{name_str "_ptr"}.value()) \
-        .ctor<>() \
-        .custom<type_info>(type_info{ \
-        .identifier = name_str "_ptr", \
-        .type_class = TYPE_CLASS_RESOURCE_PTR, \
-        .data = {.resource_ptr = { \
-            .resource_type_id = entt::hashed_string{name_str}.value(), \
-            .get_ptr = +[](const entt::meta_any& a) -> std::shared_ptr<nb::resource> { \
-            auto* p = a.try_cast<std::shared_ptr<T>>(); \
-            return p ? *p : nullptr; \
-            }, \
-            .set_ptr = +[](entt::meta_any& a, std::shared_ptr<nb::resource> p) { \
-            if(!a.assign(std::static_pointer_cast<T>(p))) { \
-                auto target_type = a.type().info().name(); /*not sure if this is correct btw*/\
-                auto source_type = typeid(T).name(); \
-                log::warn("[res] resource pointer assignment failed: target='%s' source='%s' resource_type_id='%s'", \
-                      target_type.length() ? std::string{target_type}.c_str() : "<unknown>", \
-                      source_type ? source_type : "<unknown>", \
-                      name_str); \
-            } \
-            } \
-        }} \
-        });
+        res_ptr_registration<retree>("retree");
+        res_ptr_registration<rgraphplan>("rgraphplan");
+        res_ptr_registration<rtilemap>("rtilemap");
+        res_ptr_registration<rtexture>("rtexture");
+        res_ptr_registration<rshader>("rshader");
+        res_ptr_registration<rsprite>("rsprite");
+        res_ptr_registration<rscript>("rscript");
+        res_ptr_registration<rvorbis>("rvorbis");
+        res_ptr_registration<rwav>("rwav");
+        res_ptr_registration<ryaml>("ryaml");
 
-        NB_REG_RES_PTR(rtexture,          "rtexture")
-        NB_REG_RES_PTR(rsprite,           "rsprite")
-        NB_REG_RES_PTR(rscript,           "rscript")
-        NB_REG_RES_PTR(rvorbis,           "rvorbis")
-        NB_REG_RES_PTR(rwav,              "rwav")
-        NB_REG_RES_PTR(ryaml,             "ryaml")
-        NB_REG_RES_PTR(retree,            "retree")
-        NB_REG_RES_PTR(rtilemap,          "rtilemap")
-        NB_REG_RES_PTR(rgraphplan,        "rgraphplan")
-#undef NB_REG_RES_PTR
+
+        // in-type rtti registrations
+        rgltf::_init_rtti();
+        rmaterial::_init_rtti();
+        rmesh::_init_rtti();
     }
 
 }

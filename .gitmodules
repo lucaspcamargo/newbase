@@ -44,9 +44,6 @@
 [submodule "vendored/ImGuizmo"]
 	path = vendored/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
-[submodule "vendored/SDL_shadercross"]
-	path = vendored/SDL_shadercross
-	url = https://github.com/libsdl-org/SDL_shadercross.git
 [submodule "vendored/cpp-httplib"]
 	path = vendored/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
@@ -62,3 +59,12 @@
 [submodule "vendored/ImGuiColorTextEdit"]
 	path = vendored/ImGuiColorTextEdit
 	url = https://github.com/goossens/ImGuiColorTextEdit.git
+[submodule "vendored/slang"]
+	path = vendored/slang
+	url = https://github.com/shader-slang/slang.git
+[submodule "vendored/tinygltf"]
+	path = vendored/tinygltf
+	url = https://github.com/syoyo/tinygltf.git
+[submodule "vendored/MikkTSpace"]
+	path = vendored/MikkTSpace
+	url = https://github.com/mmikk/MikkTSpace.git

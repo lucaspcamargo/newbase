@@ -1,0 +1,22 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/hello_3d/scene.lua"
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      3d: {}
+
+- name: mesh
+  comps:
+    mesh:
+      mesh: "res/hello_3d/DamagedHelmet.glb?msh=0"
+    spatial:
+      pos: [0, 0, 0]
+      rot: [90, 0, 0]
+      scale: [1, 1, 1]

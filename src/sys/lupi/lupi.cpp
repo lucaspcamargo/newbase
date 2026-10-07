@@ -445,7 +445,7 @@ bool nb::lupi::lupi::step(step_phase phase)
         _d->fps_ema = _d->fps_ema * 0.9 + std::min(fps, 60.0) * 0.1;
     }
 
-    if (phase == PRE_RENDER)
+    if (phase == POST_UPDATE)
     {
         // Palette index 0 always renders fully transparent, regardless of
         // whatever color ui.palset(0, ...) has set it to — confirmed against

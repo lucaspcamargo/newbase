@@ -83,7 +83,7 @@ namespace nb
         return success;
     }
 
-    void resource::wait_until_loaded_or_reset()
+    void resource::wait_until_loaded()
     {
         if (is_loaded() || is_failed()) {
             return;
@@ -93,6 +93,20 @@ namespace nb
         m_cv.wait(lock, [this]() {
             resource_state s = m_state.load(std::memory_order_relaxed);
             return s == resource_state::LOADED || s == resource_state::FAILED;
+        });
+    }
+
+    void resource::wait_until_preloaded()
+    {
+        if (is_preloaded() || is_failed()) {
+            return;
+        }
+
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        m_cv.wait(lock, [this]() {
+            resource_state s = m_state.load(std::memory_order_relaxed);
+            return s == resource_state::PRELOADED || s == resource_state::LOADED
+                                                  || s == resource_state::FAILED;
         });
     }
 
@@ -107,7 +121,23 @@ namespace nb
             if (!step_load())
             {
                 // Sleep until the active thread finishes, fails, or resets.
-                wait_until_loaded_or_reset();
+                wait_until_loaded();
+            }
+        }
+    }
+
+    void resource::force_preload_sync()
+    {
+        // loop ensures that if the resource is reset while we are waiting,
+        // we try to load it again.
+        while (!is_preloaded() && !is_failed())
+        {
+            // Try to load it ourselves. If someone else is loading it,
+            // or it has been reset, this returns false.
+            if (!step_preload())
+            {
+                // Sleep until the active thread finishes, fails, or resets.
+                wait_until_preloaded();
             }
         }
     }
@@ -128,7 +158,7 @@ namespace nb
                 return true;
             }
 
-            // deletage clearing to subclass
+            // delegate clearing to subclass
             do_unload();
 
             // commit state transition
@@ -139,6 +169,12 @@ namespace nb
         m_cv.notify_all();
 
         return true;
+    }
+
+    void resource::force_state(resource_state st)
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        m_state.store(st, std::memory_order::release);
     }
 
 } // namespace nb

@@ -1,6 +1,10 @@
 #include <newbase/render/window.hpp>
 #include <newbase/log.hpp>
 
+// for window icon
+#include <newbase/res/manager.hpp>
+#include <newbase/res/texture.hpp>
+
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_video.h"
@@ -98,6 +102,10 @@ bool render::window::event(SDL_Event * evt)
 
     if(evt->window.windowID != SDL_GetWindowID(m_win))
         return false; // still need to match event type to be sure!
+
+    // HACK-ish fullscreen toggle
+    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
+        SDL_SetWindowFullscreen(m_win, !(SDL_GetWindowFlags(m_win)&SDL_WINDOW_FULLSCREEN));
 
     if(evt->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
     {
@@ -294,6 +302,15 @@ SDL_Event render::window::event_to_ui_coordinates(const SDL_Event* evt) const
     return ret;
 }
 
+
+void render::window::set_icon(uint32_t res_id)
+{
+    auto icon_tex = rman().load_sync<rtexture>(res_id);
+    if(icon_tex && icon_tex->surf)
+    {
+        SDL_SetWindowIcon(m_win, icon_tex->surf);
+    }
+}
 
 render::window* render::window::from_sdl_window(SDL_Window *w)
 {

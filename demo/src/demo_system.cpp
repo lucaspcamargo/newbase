@@ -1,10 +1,14 @@
 #include "demo_system.hpp"
+#include "newbase/log.hpp"
 #include <newbase/engine.hpp>
 #include <newbase/services/ui_manager.hpp>
+#include <newbase/services/renderer_service.hpp>
 #include <newbase/sys/audio/audio.hpp>
 #include <newbase/res/manager.hpp>
+#include <newbase/res/async_load.hpp>
 #include <newbase/ui/markdown.hpp>
 #include <entt/locator/locator.hpp>
+#include <newbase/nb_config.h>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <memory>
@@ -14,18 +18,22 @@
 
 using entt::operator""_hs;
 
+static constexpr auto spinner_scene = "_nb_core/std_scene/spinner.et.yaml"_hs;
+
 struct demo_entry {
     const char*   name;
     entt::id_type scene_id;
     entt::id_type readme_id;
-    bool          hidden { false }; // hidden from combo; still reachable via --demo <index>
+    bool          needs_3d {false};
+    bool          hidden {false}; // hidden from combo; still reachable via --demo <index>
 };
 
 static const demo_entry s_demos[] = {
+    { "Hello 3D",    "res/hello_3d/scene.et.yaml"_hs,      "res/hello_3d/README.md"_hs, true},
     { "Asteroids",   "res/asteroids/title.et.yaml"_hs,     "res/asteroids/README.md"_hs     },
     { "Physics 2D",  "res/physics2d_demo/scene.et.yaml"_hs,"res/physics2d_demo/README.md"_hs},
     { "Platformer",  "res/platformer/scene.et.yaml"_hs,    "res/platformer/README.md"_hs    },
-    { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,   "res/fast_rodent/README.md"_hs,  true },
+    { "Fast Rodent", "res/fast_rodent/scene.et.yaml"_hs,   "res/fast_rodent/README.md"_hs,  false, true },
     { "Lupi",        "res/lupi_demo/scene.et.yaml"_hs,     "res/lupi_demo/README.md"_hs     },
     { "RTT",         "res/rtt/scene.et.yaml"_hs,           "res/rtt/README.md"_hs           },
     { "Hello World", "res/hello_world/scene.et.yaml"_hs,   "res/hello_world/README.md"_hs   },
@@ -33,6 +41,9 @@ static const demo_entry s_demos[] = {
 static constexpr int s_demo_count = static_cast<int>(sizeof(s_demos) / sizeof(s_demos[0]));
 
 static int s_current = 0;
+static bool s_has_3d = true;
+static auto load_hnd {nb::res::load::TASK_INVALID};
+static nb::res::load::task_results load_results_hold {}; // hold results for one frame since scene loader only takes id, TODO remove
 
 static void load_demo(int idx)
 {
@@ -45,11 +56,23 @@ static void load_demo(int idx)
         audio->bgm_stop();  // TODO stop sfx and reset audio graph state as well
     }
     nb::engine::instance().clear_render_layers();
-    nb::engine::instance().request_scene_change(s_demos[idx].scene_id);
+    nb::engine::instance().request_scene_change(spinner_scene);
+
+    if(load_hnd != nb::res::load::TASK_INVALID)
+    {
+        nb::rman().async_cancel(load_hnd);
+        load_hnd = nb::res::load::TASK_INVALID;
+    }
+
+    load_hnd = nb::rman().load_async("retree"_hs, s_demos[s_current].scene_id);
+    load_results_hold = {};
 }
 
 bool demo_system::init(ryml::ConstNodeRef)
 {
+
+    s_has_3d = entt::locator<nb::renderer_service*>::value()->supports_3d();
+
     // Parse --demo <index> from command line
     int initial_demo = 0;
     bool demo_specified = false;
@@ -88,7 +111,7 @@ bool demo_system::init(ryml::ConstNodeRef)
         int visible_count = 0;
         for (int i = 0; i < s_demo_count; ++i)
         {
-            if (!s_demos[i].hidden)
+            if (!s_demos[i].hidden && (s_has_3d || !s_demos[i].needs_3d))
             {
                 visible_to_real[visible_count] = i;
                 visible_names[visible_count]   = s_demos[i].name;
@@ -137,6 +160,42 @@ bool demo_system::init(ryml::ConstNodeRef)
     });
 
     load_demo(initial_demo);
+
+    return true;
+}
+
+
+bool demo_system::step(nb::step_phase phase)
+{
+    if(phase != nb::step_phase::GENERAL_UPDATE)
+        return true;
+
+    if(load_hnd != nb::res::load::TASK_INVALID)
+    {
+        if(nb::rman().async_status(load_hnd).done)
+        {
+            nb::rman().async_complete(load_hnd, load_results_hold);
+            // TODO check
+            if(load_results_hold.root.size())
+            {
+                if(load_results_hold.root[0]->is_loaded())
+                {
+
+                    nb::log::info("[demo] load complete, switching...");
+                    nb::engine::instance().request_scene_change(load_results_hold.root[0]->id());
+                }
+                else
+                    nb::log::error("[demo] load failed!");
+            }
+            else
+            {
+                nb::log::error("[demo] empty load results");
+            }
+        }
+        load_hnd = nb::res::load::TASK_INVALID;
+    }
+    else if(load_results_hold.root.size())
+        load_results_hold = {};
 
     return true;
 }

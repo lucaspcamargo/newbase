@@ -1,3 +1,6 @@
+#include "entt/core/fwd.hpp"
+#include "entt/entity/entity.hpp"
+#include <cstdint>
 #include <newbase/res/manager.hpp>
 #include <newbase/res/async_load.hpp>
 #include <newbase/res/vfs.hpp>
@@ -343,6 +346,28 @@ std::shared_ptr<nb::resource> rmanager::load_nocache(entt::id_type type_id, entt
     return res;
 }
 
+res::load::task_handle rmanager::load_async(entt::id_type type_id, entt::id_type asset_id)
+{
+    res::load::task_descriptor desc {};
+    desc.entries.push_back(res::load::task_descriptor::entry {type_id, asset_id});
+    return _d->async_worker.start(desc);
+}
+
+res::load::task_status rmanager::async_status(res::load::task_handle hnd)
+{
+    return _d->async_worker.status(hnd);
+}
+
+bool rmanager::async_cancel(res::load::task_handle hnd)
+{
+    return _d->async_worker.cancel(hnd);
+}
+
+bool rmanager::async_complete(res::load::task_handle hnd, res::load::task_results &results)
+{
+    results = _d->async_worker.complete(hnd);
+    return results.final_status.done;
+}
 
 vfs_tree rmanager::build_vfs_tree() const
 {
@@ -390,6 +415,95 @@ vfs_tree rmanager::build_vfs_tree() const
     }
 
     return tree;
+}
+
+
+const entt::id_type rmanager::note_subresource(std::string_view uri)
+{
+    const auto sz = uri.length();
+    if(!sz)
+    {
+        log::warn("[res] manager: vfs_note_subresource: empty path!");
+        return entt::null_t{};
+    }
+
+    // check if already known
+    entt::id_type full_hash = entt::hashed_string{uri.data(), sz}.value();
+    if(auto hnd_it = _d->asset_handles.find(full_hash); hnd_it != _d->asset_handles.end())
+    {
+        return hnd_it->second.parent_id? full_hash : entt::null_t{};
+    }
+
+    const auto query_marker_idx = uri.find("?");
+    if(query_marker_idx == uri.npos)
+        return entt::null_t{}; // not a subresource
+
+
+    if(query_marker_idx == 0)
+    {
+        log::error("[res] manager: vfs_note_subresource: subresource with no parent: '%.*s'", (int)sz, uri.data());
+        return entt::null_t{};
+    }
+    if(query_marker_idx == sz - 1)
+    {
+        log::warn("[res] manager: vfs_note_subresource: subresource with empty query. Technically valid but weird: '%.*s'", (int)sz, uri.data());
+    }
+
+    std::string parent_path {uri.substr(0, query_marker_idx)};
+    entt::id_type parent_hash = entt::hashed_string{parent_path.c_str()}.value();
+    if(!known(parent_hash))
+    {
+        log::error("[res] manager: vfs_note_subresource: uknown parent: '%.*s'", (int)sz, uri.data());
+        return entt::null_t{};
+    }
+
+    std::string query {uri.substr(query_marker_idx+1)};
+
+    _d->asset_handles.emplace( full_hash, asset_handle {
+        .id = full_hash,
+        .name = query,
+        .path = std::string{uri},
+        .parent_id = parent_hash
+    });
+
+    log::info("[res] manager: vfs_note_subresource: registered 0x%08x: '%s' (0x%08x) ? '%s'",
+              full_hash, parent_path.c_str(), parent_hash, query.c_str());
+    // now the subresource, with parent reference, is known to the resource system
+
+    return full_hash;
+}
+
+void rmanager::leak_check()
+{
+    for (auto& [type_id, type_cache] : _d->caches)
+    {
+        for (auto &[id, w_res] : type_cache)
+        {
+            auto res = w_res.lock();
+            if(!res)
+                continue;
+
+            std::string type_name {res->meta_type().info().name()};
+            std::string res_name {};
+
+            auto vfs_entry = handles().find(res->id());
+            if(vfs_entry!=handles().end())
+            {
+                auto &hnd = vfs_entry->second;
+                res_name = hnd.path;
+            }
+            else
+            {
+                char buffer[20];
+                buffer[0] = '0';
+                buffer[1] = 'x';
+                auto [p, ec] = std::to_chars(buffer + 2, buffer + sizeof(buffer), (uintptr_t)res.get(), 16);
+                res_name = {buffer, (size_t)(p-buffer)};
+            }
+
+            log::warn("[rmanager] leak_check: resource still alive: '%s' (0x%08x), type '%s' (0x%08x)", res_name.c_str(), res->id(), type_name.c_str(), res->type_id());
+        }
+    }
 }
 
 }

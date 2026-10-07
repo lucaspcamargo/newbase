@@ -19,6 +19,7 @@ public:
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(step_phase) override;
     bool event(SDL_Event*) override;
+    void shutdown() override;
 
     int update_add(meta_callback cb)
     {

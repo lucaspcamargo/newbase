@@ -1,0 +1,24 @@
+- name: scene_script
+  comps:
+    script:
+      lua: "_nb_core/std_scene/spinner.lua"
+
+- name: spinner
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    sprite:
+      res: "_nb_core/std_scene/spinner.sprite"
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+    camera:
+      2d:
+        fit_mode: 1
+        fit_dims: [1080, 1080]

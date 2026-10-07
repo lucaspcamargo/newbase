@@ -1,13 +1,14 @@
 #include <newbase/components/builders.hpp>
+#include <newbase/components/body2d.hpp>
+#include <newbase/components/camera.hpp>
+#include <newbase/components/character2d.hpp>
+#include <newbase/components/mesh.hpp>
+#include <newbase/components/particle_emitter.hpp>
+#include <newbase/components/script.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/sprite.hpp>
-#include <newbase/components/script.hpp>
-#include <newbase/components/body2d.hpp>
-#include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/textext.hpp>
 #include <newbase/components/tilemap.hpp>
-#include <newbase/components/character2d.hpp>
-#include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
 #include <newbase/sys/textext/rtexfont.hpp>  // TODO remove once we have component building via RTTI
 #include <newbase/res/tilemap.hpp>
@@ -183,6 +184,13 @@ bool nb::build_camera(ryml::ConstNodeRef def, ccamera &dst)
         if (def2d.has_child("fit_dims"))    try_load_vec2(def2d["fit_dims"], dst.cam2d.fit_world_dims);
         if (def2d.has_child("fit_anchor"))    try_load_vec2(def2d["fit_anchor"], dst.cam2d.fit_anchor);
     }
+    if (def.has_child("3d"))
+    {
+        const auto &def3d = def["3d"];
+        if (def3d.has_child("clip_near"))   def3d["clip_near"]   >> dst.cam3d.clip_near;
+        if (def3d.has_child("clip_far"))   def3d["clip_far"]   >> dst.cam3d.clip_far;
+        if (def3d.has_child("fov"))   def3d["fov"]   >> dst.cam3d.fov;
+    }
     return true;
 }
 
@@ -210,5 +218,25 @@ bool nb::build_layers(ryml::ConstNodeRef def, clayers &dst)
 {
     if (def.has_child("mask"))
         def["mask"] >> dst.mask;
+    return true;
+}
+
+
+bool nb::build_mesh(ryml::ConstNodeRef def, cmesh &dst)
+{
+    std::string respath;
+    c4::from_chars(def["mesh"].val(), &respath);
+    rman().note_subresource(respath);
+    auto hash = entt::hashed_string(respath.c_str());
+    dst.mesh = rman().load_sync<rmesh>(hash.value());
+    if(dst.mesh)
+    {
+        const auto &mat_slots = dst.mesh->material_slots();
+        for(uint i = 0; i < mat_slots.size() && i < cmesh::MAX_MATERIALS; i++)
+        {
+            if(mat_slots[i] != entt::null_t{})
+                dst.materials[i] = rman().load_sync<rmaterial>(mat_slots[i]);
+        }
+    }
     return true;
 }

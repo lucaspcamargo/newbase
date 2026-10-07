@@ -1,3 +1,3 @@
-ttf: _nb_core/ttf/iosevka/IosevkaFixed-Light.ttf
+ttf: _nb_core/ttf/iosevka/iosevka-fixed-light-culled.ttf
 size: 48
 charset: ascii

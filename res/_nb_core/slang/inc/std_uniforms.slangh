@@ -1,0 +1,22 @@
+// standard per-scene-pass and per-model uniform structs
+
+
+struct SceneUniforms
+{
+    column_major float4x4 view;
+    column_major float4x4 proj;
+    column_major float4x4 view_proj;
+    column_major float4x4 inv_view;
+    float3   camera_pos;
+    float    _pad0;
+    float3   light_dir;      // Normalized direction towards light source
+    float    _pad1;
+    float3   light_color;    // Light radiance (color * intensity)
+    float    _pad2;
+};
+
+struct ModelUniforms
+{
+    column_major float4x4 model;
+    column_major float4x4 normal_matrix;  // Transpose(Inverse(Model)) to scale normals correctly
+};

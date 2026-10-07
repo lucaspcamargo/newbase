@@ -29,7 +29,7 @@ constexpr task_handle TASK_INVALID = 0;
 struct task_descriptor
 {
     /// A resource to load in this task.
-    /// A pair containing the resource id and desired resource type.
+    /// A pair containing the desired resource type and resource id.
     using entry = std::pair<entt::id_type, entt::id_type>;
 
     /// List of entries to load for this task
@@ -51,9 +51,6 @@ struct task_status
     /// Count of all resources discovered for this task so far.
     /// Includes the root resources plus the dependecy tree.
     uint64_t total_count {0};
-
-    /// Count of all resources preloaded
-    uint64_t preloaded_count {0};
 
     /// Count of all resources fully loaded
     uint64_t loaded_count {0};

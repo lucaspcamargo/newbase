@@ -49,13 +49,7 @@ namespace nb
          * Also collects texture update data
          * NOTE: This DOES invoke ImGui::Render()
          */
-        void render_flush();
-
-        /**
-         * Getter for 2d batches prepared by render_flush()
-         */
-        render::batcher2d& render_data();
-
+        void render_flush(render::batcher2d &batcher);
 
         /**
          * Function type for texture lookup callback

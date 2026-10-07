@@ -1,6 +1,7 @@
 #pragma once
 
 #include <newbase/render/types.hpp>
+#include <newbase/render/vertex.hpp>
 #include <newbase/utility/glm.hpp>
 #include <newbase/res/fwd.hpp>
 #include <unordered_map>
@@ -23,24 +24,8 @@
 */
 
 
-namespace nb::render {
-
-    /**
-     * This is the data for a single vertex to be rendered.
-     * Even with glm's alignment requirements, it should be
-     * 1:1 memory-compatible with SDL_Vertex.
-     *
-     * Using uint32_t for color was considered, but since we
-     * would need to convert back to float for SDL_Renderer
-     * all the same, it is what it is.
-     */
-    struct vertex2d
-    {
-        glm::vec2 pos;
-        glm::vec4 color;
-        glm::vec2 uv;
-    };
-
+namespace nb::render
+{
     /**
      * These are the flat memory buffers we'll use (and reuse)
      * for our batching operations. We also keep references to
@@ -66,6 +51,16 @@ namespace nb::render {
         // while also keeping an unordered map for quick index lookup by value
         std::vector<std::shared_ptr<rtexture>> tex;
         std::unordered_map<rtexture*, size_t> tex_set;
+
+        // TODO consider whether taking raw rtexture* pointers is fine (would be faster)
+        //      right now it would be almost fine since we run at render time
+        //      EXCEPT that IF background resource loading can destroy resources
+        //      it would actually be catastrophic :)
+        //      right now it doesn't, though
+        //      if ti does we pause background loading ops for rendering (stutters?),
+        //      or we devise a plan for resources to never be deleted during background
+        //      loading (complex? implement main-thread resource swapping on reload/reset?)
+        //      may not be worth it rght now tbh
 
         inline void clear()
         {
@@ -101,20 +96,37 @@ namespace nb::render {
      * This is our batcher class. We use a final implementation with no virtual
      * dispatch for best performance. We also use rule-of-zero for simplicity.
      *
+     * The sync point mechanism allows you to slice the drawing commands later,
+     * when equired. This makes it possible to use the same batcher2d for
+     * multiple batching operations that cannot or must not be merged.
+     * This API is targeted at the renderer.
+     *
      * TODO as a future optimization, we may add a mechanism to allow for direct
      *      data writes by the users. This should follow a API protocol that gives
      *      the users references to the buffers, and whether indices
      *      have to be written with an offset.
      *
-     *      This would avoid the need for the extra copy.
+     *      This could avoid the need for the extra copy.
      */
     class batcher2d final
     {
     public:
+        /// The data type of a sync point identifier
+        using sync_id_t = uint32_t;
+
+        /// The data associated with the sync point
+        /// Provides a range of corresponding commands
+        struct sync_point_t
+        {
+            uint32_t cmd_offset;
+            uint32_t cmd_count;
+        };
+
         /**
-         * Clears the internal data buffers.
+         * Clears the internal data buffers, and starts a new sync point.
+         * @returns the id for the newly-created sync point
          */
-        void clear();
+        sync_id_t clear();
 
         /**
          * Adds geometry to the data buffers, and a drawing command with the given texture and blendmode.
@@ -128,10 +140,18 @@ namespace nb::render {
         const data2d & data() const { return m_data; }
 
         /// const ref getter for draw commands
-        const std::vector<command2d>& commands()const { return m_comms; }
+        const std::vector<command2d>& commands() const { return m_comms; }
+
+        /// gets sync point data for the given identifier
+        const sync_point_t & sync_point_get(sync_id_t id) const { return m_sync_points[id]; }
+
+        /// create a new synchonization point, and returns its identifier
+        sync_id_t sync_point_new();
 
     private:
         data2d m_data {};
         std::vector<command2d> m_comms {};
+        bool m_sync_new {true};
+        std::vector<sync_point_t> m_sync_points;
     };
 }

@@ -4,17 +4,27 @@
 
 
 using namespace nb;
+using namespace nb::render;
 
 
+// helper to texture registration in data block
 static int32_t texture_add(render::data2d &data, std::shared_ptr<rtexture> tex);
 
-void render::batcher2d::clear()
+
+batcher2d::sync_id_t batcher2d::clear()
 {
     // clear should retain capacity
     // so we avoid reallocation every frame
     m_comms.clear();
     m_data.clear();
+    m_sync_new = true;
+    m_sync_points.clear();
+    m_sync_points.emplace_back(sync_point_t{
+        0, 0
+    });
+    return 0;
 }
+
 
 void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const uint16_t *inds, uint32_t icount,
               std::shared_ptr<rtexture> tex, blendmode blend, clip_t clip)
@@ -25,10 +35,10 @@ void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const u
 
     assert(verts && inds); // cannot pass nullptr
 
-    const int32_t tidx = texture_add(m_data, tex);
+    const int32_t tidx = tex? texture_add(m_data, tex) : -1;
 
     bool append = false;
-    if(m_comms.size())
+    if(m_comms.size() && !m_sync_new)
     {
         auto &lastcmd = m_comms.back();
         if(lastcmd.texture == tidx && lastcmd.blend == blend && lastcmd.clip == clip)
@@ -79,7 +89,22 @@ void render::batcher2d::add_geom(const vertex2d *verts, uint32_t vcount, const u
                 clip
             }
         );
+
+        // count new command towards current sync point
+        auto &curr_sync = m_sync_points[m_sync_points.size()-1];
+        curr_sync.cmd_count++;
     }
+
+    m_sync_new = false;
+}
+
+
+batcher2d::sync_id_t batcher2d::sync_point_new()
+{
+    m_sync_points.push_back(sync_point_t{
+        static_cast<uint32_t>(m_comms.size()), 0 });
+    m_sync_new = true;
+    return static_cast<uint32_t>(m_sync_points.size() - 1);
 }
 
 

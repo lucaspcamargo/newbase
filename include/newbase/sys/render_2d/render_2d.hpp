@@ -20,16 +20,19 @@ public:
     render_2d();
     ~render_2d();
 
+    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
+    entt::id_type metatype_id() override { return entt::hashed_string{"render_2d"}.value(); }
+
     bool init(ryml::ConstNodeRef cfg) override;
     bool step(nb::step_phase) override;
     bool event(SDL_Event * ) override;
 
-    SDL_InitFlags sdl_subsystems(ryml::ConstNodeRef cfg) override;
-    entt::id_type metatype_id() override { return entt::hashed_string{"render_2d"}.value(); }
-
     int   window_width()  const override;
     int   window_height() const override;
     float display_scale() const override;
+
+    bool  supports_3d() const override { return false; }
+
 
     // RTT target management interface
     // prefer to use these via render::target_ref
@@ -39,12 +42,6 @@ public:
     std::shared_ptr<rtexture> target_get_depth_texture(render::target_id_t id) const override;
     bool           target_has_depth(render::target_id_t id) const override;
     glm::ivec2     target_get_size(render::target_id_t id) const override;
-    // NOTE for target_get_size: you may not be able to query calculated sizes for
-    // newly-created render targets immediately. Timing for this calculation is
-    // at the discretion of the renderer. You may have to wait a frame. It is
-    // expected that at render time, and after window reizes and ui rendering,
-    // the sizes will be updated correctly, by the beginning of the next general
-    // update cycle.
 
     // picker_service interface
     entt::entity pick(const render_layer &layer, float vp_x, float vp_y) override;
@@ -55,16 +52,15 @@ private:
     // return whether the texture changed (created, recreated, destroyed)
     bool _prepare_texture(rtexture *tex);
 
-    // draws a scene using the given layer's masking, and the given VP matrix
+    // prepares scene geometry using the given layer's masking, and the given VP matrix
     // uses batcher2d and collect2d to do it
     // SDL_Renderer does not use NDC, so viewproj must map to target pixel coords
-    // will draw batches with viewport as the main clip
-    void _draw_scene(scene &scn, const glm::mat4x4 &viewproj, const render_layer &l);
+    void _batch_scene(scene &scn, const glm::mat4x4 &viewproj, const render_layer &l);
 
-    // draws the current contents of the geometry batcher
+    // draws the current contents of the internal geometry batcher
     // to the current render target
     // clip is intersected with the command's clip if not NONE
-    void _draw_batches(render::batcher2d& batcher, render::clip_t clip = render::CLIP_NONE);
+    void _draw_batches(render::batcher2d::sync_id_t range, render::clip_t clip = render::CLIP_NONE);
 
     // Updates the render target resize order
     void _targets_sizing_reorder();

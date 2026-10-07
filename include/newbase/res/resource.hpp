@@ -15,13 +15,13 @@
 //  It has an atomic mechanism for controlling state transitions.
 //  This lets resources be safely loaded from both the main thread and the async worker.
 //  If a load attempt is made, but the load is already ongoing in another thread:
-//   - If on the main thread, it blocks on the cv and waits for the load complletion;
+//   - If on the main thread, it blocks on the cv and waits for the load completion;
 //   - If on a worker thread, it must yield (and work on other actionable resources).
 //     The load will eventually be completed (or fail) somewhere else.
 //  There are two standard load levels, PRELOADED amd LOADED.
-//  A PRELOADED resource must be able its dependencies, but does not need to be fully ready.
+//  A PRELOADED resource must be able to list its dependencies, but does not need to be fully ready.
 //  A LOADED resource must be fully ready for usage, specific system interactions non-withstandding.
-//  A FAILED resource could not read or parse its contents correctly, but must still remalin
+//  A FAILED resource could not read or parse its contents correctly, but must still remain
 //   internally consistent.
 //
 
@@ -95,7 +95,7 @@ public:
     /// Convenience: resolve the entt meta type for this resource
     entt::meta_type meta_type() const { return entt::resolve(_type_id); }
 
-    /// A resource dependency. A pair of (resource id, resource type id).
+    /// A resource dependency. A pair of (resource type id, resource id).
     /// We need to specify the resource type because loading requires
     /// knowing the desired resource type beforehand.
     using dependency_t = std::pair<entt::id_type, entt::id_type>;
@@ -104,7 +104,11 @@ public:
     /// For usage when resource state is PRELOADED or LOADED.
     /// The resource system may use this information to structure loading
     /// of multiple resources in a single loading job.
-    virtual std::span<dependency_t> dependencies() const { return {}; }
+    virtual const std::vector<dependency_t>* dependencies() const { return nullptr; } // TODO C++20: return a span
+
+    /// Writes the data for a subresource into the given destination vector
+    /// @returns Whether the subresource was found and if there's data for it
+    virtual bool get_subresource_data(entt::id_type sub, std::vector<uint8_t>&) { return false; }
 
     /// Lock-free state query
     [[nodiscard]] resource_state state() const noexcept
@@ -146,17 +150,19 @@ public:
 
     // --- Synchronous Execution & Waiting (for main thread loading) ---
 
-    /// Blocks the caller thread until state reaches 'loaded', 'failed',
-    /// or 'created', in case it was reset mid-operation.
-    void wait_until_loaded_or_reset();
+    /// Blocks the caller thread until state reaches 'loaded' or 'failed'.
+    void wait_until_loaded();
+
+    /// Blocks the caller thread until state reaches 'preloaded', 'loaded', or 'failed'.
+    void wait_until_preloaded();
 
     /// Forces immediate execution on caller thread if not already being processed,
     /// or blocks waiting for the worker to finish if already in progress.
     void force_load_sync();
 
-    // NOTE There may be a need to implement synchronous preloading too
-    //      instead of just loading, but for main thread purposes this should
-    //      be good enough
+    /// Forces immediate execution on caller thread if not already being processed,
+    /// or blocks waiting for the worker to finish if already in progress.
+    void force_preload_sync();
 
     // Releases a loaded resources' internal data, and puts it back into the CREATED state.
     // For usage on the main thread.
@@ -180,6 +186,11 @@ protected:
     /// TODO consider making this pure virtual, thus mandatory to be possible to reset
     ///      worth it IF and WHEN we are actually doing such a thing
     virtual void do_unload() { }
+
+    /// Force-sets this resource state
+    /// For usage with anonymous resources that are loaded in-line (e.g. rtexture::load_from)
+    void force_state(resource_state state);
+
 
 private:
     entt::id_type _id      {0};

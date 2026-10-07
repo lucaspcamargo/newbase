@@ -13,6 +13,7 @@ class text_editor_widget
 {
 public:
     text_editor_widget() = default;
+    virtual ~text_editor_widget();
 
     void open(const char* text, size_t len, const char* language = nullptr);
     void draw();

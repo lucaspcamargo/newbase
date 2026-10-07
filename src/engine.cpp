@@ -1,3 +1,4 @@
+#include "SDL3/SDL_error.h"
 #include "entt/meta/resolve.hpp"
 #include <newbase/engine.hpp>
 #include <newbase/system.hpp>
@@ -10,6 +11,7 @@
 #include <newbase/reflection/lib_glm.hpp>
 #include <newbase/components/rtti.hpp>
 #include <newbase/render/rtti.hpp>
+#include <newbase/render/material.hpp>
 #include <newbase/res/rtti.hpp>
 #include <newbase/i18n/i18n.hpp>
 #include <newbase/log.hpp>
@@ -233,10 +235,15 @@ bool engine::teardown()
     _d->default_scene.clear();
     log::info("[engine] scenes cleared");
 
+    log::info("[engine] releasing material controllers");
+    render::material_controller::release_all_controllers();
 
     log::info("[engine] systems shutdown");
     for(auto &s: _d->_systems)
         s->shutdown();
+#ifndef NDEBUG
+    ::nb::rman().leak_check();
+#endif
     log::info("[engine] systems shutdown completed");
 
     log::info("[engine] system refcounts:");

@@ -6,12 +6,18 @@
 
 namespace nb {
 
+text_editor_widget::~text_editor_widget()
+{
+    // nothing so far
+}
+
 void text_editor_widget::open(const char* text, size_t len, const char* language)
 {
     _editor = std::make_shared<TextEditor>();
+    _editor->SetCompletePairedGlyphs(true);
     _language = language;
     if(!strcmp(_language, "Lua"))
-    {
+    {;
         _editor->SetLanguage(TextEditor::Language::Lua());
     }
     _text.assign(text, len);

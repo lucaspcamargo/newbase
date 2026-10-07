@@ -18,7 +18,10 @@ option(NEWBASE_FDO_FILES "Install freedesktop.org files for the project executab
 option(NEWBASE_USE_XDG_DATA_DIRS "Use $XDG_DATA_DIRS to locate resources during runtime" OFF)
 option(NEWBASE_STEAM "Enable Steamworks subsystem (SDK at vendored/steamworks-sdk)" OFF)
 option(NEWBASE_DEMO "Build demo application" ON)
-option(NEWBASE_ENABLE_DXC "Compile in DirectXShaderCompiler (DXC) support for SDL_shadercross, needed for D3D12/DXIL shaders" ${WIN32})
+# shadercross's DXC is too heavy and does not compile for the web
+# A better path forward could be Slang -> SPIRV-Cross for converting to GLSL ES 300 via SPIRV
+option(NEWBASE_SLANG "Use Slang" ON)
+option(NEWBASE_SLANG_RUNTIME "Use Slang during runtime" ${NEWBASE_SLANG})
 option(NEWBASE_ENABLE_MCP "Enable the embedded MCP (Model Context Protocol) server system, exposing engine introspection/control over HTTP" OFF)
 set(NEWBASE_LUA_ROOT "" CACHE STRING "Where to locate lua if downloaded externally (e.g. Flatpak)")
 set(NEWBASE_ANDROID_MAIN "" CACHE STRING "Which bin target will be compiled into the main.so for Android")
@@ -34,6 +37,7 @@ include(cmake/NewbasePythonInterp.cmake)
 # dependencies
 include(cmake/NewbaseImGui.cmake)
 include(cmake/NewbaseLua.cmake)
+include(cmake/NewbaseSlang.cmake)
 include(cmake/NewbaseTracy.cmake)
 include(cmake/NewbaseSGDK.cmake)
 
@@ -70,14 +74,6 @@ add_subdirectory(vendored/box2d EXCLUDE_FROM_ALL)
 if(NOT WIN32 AND NOT NEWBASE_EMSCRIPTEN)
     target_compile_options(box2d PRIVATE -Wno-maybe-uninitialized) # allow warning in b2ShapeDistance
 endif()
-message("[newbase] adding SDL_shadercross")
-set(SDLSHADERCROSS_SHARED              OFF CACHE BOOL "" FORCE)
-set(SDLSHADERCROSS_STATIC              ON  CACHE BOOL "" FORCE)
-set(SDLSHADERCROSS_DXC                 ${NEWBASE_ENABLE_DXC} CACHE BOOL "" FORCE)
-set(SDLSHADERCROSS_CLI                 OFF CACHE BOOL "" FORCE)
-set(SDLSHADERCROSS_VENDORED            ON  CACHE BOOL "" FORCE)
-set(SDLSHADERCROSS_SPIRVCROSS_SHARED   OFF CACHE BOOL "" FORCE)
-add_subdirectory(vendored/SDL_shadercross EXCLUDE_FROM_ALL)
 message("[newbase] adding tinygettext")
 file(GLOB TINYGETTEXT_SOURCES vendored/tinygettext/src/*.cpp)
 add_library(tinygettext STATIC ${TINYGETTEXT_SOURCES})
@@ -139,8 +135,11 @@ add_library(newbase STATIC
     src/render/batcher2d.cpp
     src/render/camera.cpp
     src/render/collector2d.cpp
-    src/render/window.cpp
+    src/render/material.cpp
     src/render/rtti.cpp
+    src/render/vertex.cpp
+    src/render/window.cpp
+    src/render/mat/pbr.cpp
 
     # resource system
     src/res/manager.cpp
@@ -151,8 +150,12 @@ add_library(newbase STATIC
     src/res/rtti.cpp
     src/res/writers.cpp
     src/res/impl/etree.cpp
+    src/res/impl/gltf.cpp
     src/res/impl/graphplan.cpp
+    src/res/impl/mesh.cpp
+    src/res/impl/material.cpp
     src/res/impl/script.cpp
+    src/res/impl/shader.cpp
     src/res/impl/sprite.cpp
     src/res/impl/texture.cpp
     src/res/impl/vorbis.cpp
@@ -183,6 +186,8 @@ add_library(newbase STATIC
     src/stb_impl.c
     ${IMGUI_SOURCES}
     ${TRACY_SOURCES}
+    vendored/tinygltf/tiny_gltf_v3.c
+    vendored/MikkTSpace/mikktspace.c
 )
 
 if(NEWBASE_USE_XDG_DATA_DIRS)
@@ -203,7 +208,7 @@ add_subdirectory(src/sys/input)
 add_subdirectory(src/sys/particle_system)
 add_subdirectory(src/sys/physics2d)
 add_subdirectory(src/sys/render_2d)
-# add_subdirectory(src/sys/render_gpu)  -- disabled until layer/vp rework is done
+add_subdirectory(src/sys/render_gpu)
 add_subdirectory(src/sys/script_lua)
 add_subdirectory(src/sys/sensors)
 add_subdirectory(src/sys/sgdk)
@@ -242,10 +247,23 @@ endif()
 
 
 set_property(TARGET newbase PROPERTY CXX_STANDARD 17)
-target_include_directories(newbase PUBLIC include vendored/stb vendored/icon-font-cpp-headers vendored/imgui-markdown ${IMGUI_INCLUDES} ${LUA_INCLUDES} ${TRACY_INCLUDES})
+target_include_directories(newbase PUBLIC
+    include
+    vendored/stb
+    vendored/icon-font-cpp-headers
+    vendored/imgui-markdown
+    vendored/tinygltf
+    vendored/MikkTSpace
+    ${IMGUI_INCLUDES}
+    ${LUA_INCLUDES}
+    ${TRACY_INCLUDES}
+    )
 target_compile_definitions(newbase PUBLIC -DGLM_ENABLE_EXPERIMENTAL ${TRACY_DEFINES})
 target_compile_options(newbase PUBLIC -fno-exceptions )
 target_link_libraries(newbase PUBLIC SDL3::SDL3 ryml::ryml glm::glm EnTT::EnTT lua box2d::box2d tinygettext -lm)
+if(NEWBASE_SLANG_RUNTIME)
+target_link_libraries(newbase PUBLIC slang)
+endif(NEWBASE_SLANG_RUNTIME)
 if(NEWBASE_WII)
     target_compile_definitions(newbase PUBLIC NEWBASE_WII IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
 endif()
@@ -287,6 +305,9 @@ if(NOT NEWBASE_WII) # -- may be needed in the future, but we can leave it for no
 export(EXPORT glm NAMESPACE nb:: FILE newbase-glm-export.cmake) # glm has no export itself, this needs to be done here
 export(EXPORT box2dConfig NAMESPACE nb:: FILE newbase-box2d-export.cmake) # same for box2d
 export(TARGETS tinygettext NAMESPACE nb:: FILE newbase-tinygettext-export.cmake) # same for tinygettext
+if(NEWBASE_SLANG)
+    export(TARGETS slang NAMESPACE nb:: FILE newbase-slang-export.cmake) # same for slang?
+endif()
 if(NEWBASE_ENABLE_MCP)
     export(TARGETS httplib NAMESPACE nb:: FILE newbase-httplib-export.cmake) # same for cpp-httplib, needed by the mcp system
 endif()

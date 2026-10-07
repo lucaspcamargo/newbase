@@ -7,14 +7,16 @@
 #cmakedefine NEWBASE_VERSION "@NEWBASE_VERSION@"
 #define NEWBASE_ID_STRING "br.eng.camargo.newbase"
 #define NEWBASE_URL "https://camargo.eng.br/"
-#define NEWBASE_COPYRIGHT "Copyright (c) Lucas Camargo"
+#define NEWBASE_COPYRIGHT "Copyright (C) Lucas Camargo"
 #define NEWBASE_AUTHORS "Lucas Camargo"
 
 // static configuration
-#cmakedefine NEWBASE_TRACING
 #cmakedefine NEWBASE_SGDK
-#cmakedefine NEWBASE_USE_XDG_DATA_DIRS
+#cmakedefine NEWBASE_SLANG
+#cmakedefine NEWBASE_SLANG_RUNTIME
 #cmakedefine NEWBASE_STEAM
+#cmakedefine NEWBASE_TRACING
+#cmakedefine NEWBASE_USE_XDG_DATA_DIRS
 #ifndef NEWBASE_WII
 #cmakedefine NEWBASE_WII
 #endif

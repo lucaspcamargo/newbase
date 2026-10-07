@@ -67,8 +67,11 @@ struct nb::render_2d_p
     bool has_ui {false};
     imgui_nb imgui;
 
+    // 2d geometry (all dynamic)
     render::batcher2d batcher;
     render::collector2d collector;
+    std::unordered_map<int, render::batcher2d::sync_id_t> layer_sync;
+    render::batcher2d::sync_id_t ui_sync;
 
     std::unordered_map<render::target_id_t, render_2d_target> targets;
     util::topological_sorter rt_resize_sorter;
@@ -88,10 +91,6 @@ struct nb::render_2d_p
 // destructor callback registered in rtexture instances
 static void _texture_cleanup(rtexture &tex, void*);
 
-// HACK: temporary editor grid — to be replaced with a proper grid layer/component
-static void _draw_editor_grid_hack(SDL_Renderer *render,
-    float cam_cx, float cam_cy, float zoom,
-    int vp_x, int vp_y, int vp_w, int vp_h);
 
 #ifdef TRACY_ENABLE
 static SDL_Surface *_tracyCopy {nullptr};
@@ -100,13 +99,12 @@ static SDL_Surface *_tracyCopy {nullptr};
 
 render_2d::render_2d()
 {
-    log::info("[render_2d] constructed");
-    
     _d = std::make_unique<render_2d_p>();
 
     // register services
     entt::locator<renderer_service*>::emplace(this);
     entt::locator<picker_service*>::emplace(this);
+    log::info("[render_2d] constructed");
 }
 
 render_2d::~render_2d()
@@ -157,10 +155,9 @@ SDL_InitFlags render_2d::sdl_subsystems(ryml::ConstNodeRef cfg)
 bool render_2d::init(ryml::ConstNodeRef cfg)
 {
     log::info("[render_2d] init");
-    const auto num_drivers = SDL_GetNumRenderDrivers();
 
     log::info("[render_2d] current driver: %s", SDL_GetCurrentVideoDriver());
-    
+
 
     if (cfg.has_child("dump_backends"))
     {
@@ -168,18 +165,19 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
         cfg["dump_backends"] >> dump;
         if (dump)
         {
+            const auto num_drivers = SDL_GetNumRenderDrivers();
             // we dont do this by default because it is slow
             std::vector<std::string> drivers;
-             std::string driver_names;
-             for(int i = 0; i < num_drivers; i++)
-             {
-             const auto driver = SDL_GetRenderDriver(i);
-             drivers.push_back(driver);
-             driver_names += driver;
-             driver_names += " ";
-        }
+            std::string driver_names;
+            for(int i = 0; i < num_drivers; i++)
+            {
+                const auto driver = SDL_GetRenderDriver(i);
+                drivers.push_back(driver);
+                driver_names += driver;
+                driver_names += " ";
+            }
 
-        log::info("[render_2d] available drivers: %s", driver_names.c_str());
+            log::info("[render_2d] available drivers: %s", driver_names.c_str());
         }
     }
 
@@ -224,12 +222,7 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
     _d->safe_area = _d->rwin.safe_area();
 
     // attempt to load and set window icon
-    // TODO move to render::window
-    auto icon_tex = rman().load_sync<rtexture>("_nb_core/icons/icon_192.png"_hs);
-    if(icon_tex && icon_tex->surf)
-    {
-        SDL_SetWindowIcon(_d->rwin.get(), icon_tex->surf);
-    }
+    _d->rwin.set_icon("_nb_core/icons/icon_192.png"_hs);
 
     // init gui via ui manager
     ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
@@ -242,7 +235,7 @@ bool render_2d::init(ryml::ConstNodeRef cfg)
     
     if(_d->has_ui)
     {
-        log::warn("[render_2d] ui init");
+        log::info("[render_2d] ui init");
         _d->imgui.init(_d->rwin);
         ui_mgr->ui_init_finish(_d->ui_scale);
         // connect textures registered in ui manager to our imgui backend
@@ -271,7 +264,8 @@ bool render_2d::step(nb::step_phase phase)
         if(ui_mgr)
         {
             _d->imgui.new_frame();
-            ui_mgr->ui_new_frame(_d->safe_area.x, _d->safe_area.y, _d->safe_area.w, _d->safe_area.h);
+            const auto safe = _d->rwin.safe_area();
+            ui_mgr->ui_new_frame(safe.x, safe.y, safe.w, safe.h);
         }
     }
     else if(phase == step_phase::UI_RENDER)
@@ -304,12 +298,76 @@ bool render_2d::step(nb::step_phase phase)
     }
     else if(phase == step_phase::PRE_RENDER)
     {
+        // prepare geometry
+        // we use sync points in the batcher to separate commands into ranges
+
+        // first, we update render target and dependant viewport sizes
+        if(_d->rt_sizes_dirty)
+            _targets_resize();
+
+        // clear batcher, leave first sync point blank
+        _d->batcher.clear();
+
+        // now prepare geometry layer by layer
+        _d->layer_sync.clear();
+        auto &layers = engine::instance().render_layers();
+        for(auto &layer : engine::instance().render_layers())
+        {
+            auto sync = _d->batcher.sync_point_new();
+            _d->layer_sync[layer.order] = sync;
+
+            const auto &vp = layer.viewport;
+
+            if(layer.custom_2d_draw)
+            {
+                layer.custom_2d_draw(layer, _d->batcher);
+                continue;
+            }
+
+            // regular scene batching
+
+            auto *sc = engine::instance().find_scene(layer.scene_id);
+            if(!sc)
+                continue;   // layer has no scene, skip
+
+            // Find camera and determine world bounds
+            auto &reg = sc->registry();
+            glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
+            if(layer.camera != entt::null)
+            {
+                float cam_cx = 0.0f, cam_cy = 0.0f;
+                auto *sp  = reg.try_get<cspatial>(layer.camera);
+                auto *cam = reg.try_get<ccamera>(layer.camera);
+                if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
+                if(cam) { world_bounds = cam->cam2d.calc_world_bounds(cam_cx, cam_cy, vp); }
+                //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
+            }
+
+            // Build projection matrix from bounds (NDC)
+            glm::mat4 proj = glm::ortho(world_bounds.x, world_bounds.x + world_bounds.z,
+                                        world_bounds.y, world_bounds.y + world_bounds.w,
+                                        -1.0f, 1.0f);
+
+            // Viewport Matrix: Maps NDC [-1, 1] to Pixel Space [0, vp.w] x [0, vp.h]
+            glm::mat4 view = glm::mat4(1.0f);
+            view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
+            view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
+
+            // calculated view projection
+            glm::mat4 viewproj = view * proj;
+
+            _batch_scene(*sc, viewproj, layer); // takes care of clipping
+        }
+
+        // finally,  batch UI
         if(_d->has_ui)
         {
+            _d->ui_sync = _d->batcher.sync_point_new();
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
             ui_mgr->draw_overlays();
-            _d->imgui.render_flush();
+            _d->imgui.render_flush(_d->batcher);
         }
+
     }
     else if(phase == step_phase::RENDER)
     {
@@ -325,25 +383,6 @@ bool render_2d::step(nb::step_phase phase)
             auto sdltex = static_cast<SDL_Texture*>(_d->smpte->rptr);
             SDL_SetTextureScaleMode(sdltex, SDL_SCALEMODE_LINEAR);
             SDL_RenderTexture(_d->render, static_cast<SDL_Texture*>(_d->smpte->rptr), NULL, NULL);
-        }
-
-        // update render target sizing calculations if needed, again
-        // some may have been added during the update phases
-        if(_d->rt_sizes_dirty)
-            _targets_resize();
-
-        // adjust layer viewports that follow targets
-        for(auto &layer : layers)
-        {
-            if(layer.follow_target)
-            {
-                auto it = _d->targets.find(layer.target_id);
-                if(it!=_d->targets.end())
-                {
-                    auto &tgt = it->second;
-                    layer.viewport = {0, 0, tgt.curr_w, tgt.curr_h};
-                }
-            }
         }
 
         //now render all layers
@@ -397,6 +436,8 @@ bool render_2d::step(nb::step_phase phase)
                 }
             }
 
+            render::clip_t clip { (float) vp.x, (float) vp.y, (float) vp.w, (float) vp.h };
+
             // Clear viewport region if requested
             if(layer.clear)
             {
@@ -406,55 +447,11 @@ bool render_2d::step(nb::step_phase phase)
                     static_cast<Uint8>(layer.clear_r * 255), static_cast<Uint8>(layer.clear_g * 255),
                                        static_cast<Uint8>(layer.clear_b * 255), 255);
                 SDL_SetRenderDrawBlendMode(_d->render, SDL_BLENDMODE_NONE);
-                SDL_FRect clip { static_cast<float>(vp.x), static_cast<float>(vp.y),
-                                    static_cast<float>(vp.w), static_cast<float>(vp.h) };
-                SDL_RenderFillRect(_d->render, &clip);
+                SDL_FRect clip_f { *(SDL_FRect*)&clip };
+                SDL_RenderFillRect(_d->render, &clip_f);
             }
 
-            if(layer.custom_2d_draw)
-            {
-                // this layer has a custom 2d drawing callback
-                // batch and render that instead
-                _d->batcher.clear();
-                render::clip_t clip_rect { (float) vp.x, (float) vp.y, (float) vp.w, (float) vp.h };
-                layer.custom_2d_draw(layer, _d->batcher);
-                _draw_batches(_d->batcher, clip_rect);
-            }
-            else
-            {
-                // regular scene draw
-                auto *sc = engine::instance().find_scene(layer.scene_id);
-                if(!sc)
-                    continue;   // layer has no scene, skip
-
-                // Find camera and determine world bounds
-                auto &reg = sc->registry();
-                glm::vec4 world_bounds {vp.x, vp.y, vp.w, vp.h};
-                if(layer.camera != entt::null)
-                {
-                    float cam_cx = 0.0f, cam_cy = 0.0f;
-                    auto *sp  = reg.try_get<cspatial>(layer.camera);
-                    auto *cam = reg.try_get<ccamera>(layer.camera);
-                    if(sp)  { cam_cx = sp->pos.x; cam_cy = sp->pos.y; }
-                    if(cam) { world_bounds = cam->cam2d.calc_world_bounds(cam_cx, cam_cy, vp); }
-                    //log::info("CAM bounds %fx%f @ %f,%f MODE %d", world_bounds.z, world_bounds.w, world_bounds.x, world_bounds.y, cam?(int)cam->cam2d.fit_mode:-1);
-                }
-
-                // Build projection matrix from bounds (NDC)
-                glm::mat4 proj = glm::ortho(world_bounds.x, world_bounds.x + world_bounds.z,
-                                            world_bounds.y, world_bounds.y + world_bounds.w,
-                                            -1.0f, 1.0f);
-
-                // Viewport Matrix: Maps NDC [-1, 1] to Pixel Space [0, vp.w] x [0, vp.h]
-                glm::mat4 view = glm::mat4(1.0f);
-                view = glm::translate(view, glm::vec3(vp.x + vp.w * 0.5f, vp.y + vp.h * 0.5f, 0.0f));
-                view = glm::scale(view, glm::vec3(vp.w * 0.5f, vp.h * 0.5f, 1.0f));
-
-                // calculated view projection
-                glm::mat4 viewproj = view * proj;
-
-                _draw_scene(*sc, viewproj, layer); // takes care of clipping
-            }
+            _draw_batches(_d->layer_sync[layer.order], clip);
         }
 
         // reset any render target association
@@ -463,7 +460,7 @@ bool render_2d::step(nb::step_phase phase)
         // GUI
         if(_d->has_ui)
         {
-            _draw_batches(_d->imgui.render_data());
+            _draw_batches(_d->ui_sync);
         }
 
 #ifdef TRACY_ENABLED
@@ -501,17 +498,12 @@ bool render_2d::event( SDL_Event * evt)
         }
     }
 
-    // TODO move somewhere else?
-    if(evt->type == SDL_EVENT_KEY_DOWN && evt->key.scancode == SDL_SCANCODE_F11)
-        SDL_SetWindowFullscreen(_d->rwin.get(), !(SDL_GetWindowFlags(_d->rwin.get())&SDL_WINDOW_FULLSCREEN));
-
     return true;
 }
 
 
-void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
+void render_2d::_batch_scene(scene &scene, const glm::mat4x4 &viewproj, const render_layer &l)
 {
-    _d->batcher.clear();
     _d->collector.clear();
 
     auto clip = render::clip_t{
@@ -524,14 +516,12 @@ void render_2d::_draw_scene(scene &scene, const glm::mat4x4 &viewproj, const ren
     // use the standard 2d collector to go over scene and
     // batch geometry data
     _d->collector.collect(_d->batcher, scene, l, viewproj);
-
-    // now go over batches and render them
-    _draw_batches(_d->batcher, clip);
 }
 
 
-void render_2d::_draw_batches(render::batcher2d& batcher, render::clip_t clip)
+void render_2d::_draw_batches(render::batcher2d::sync_id_t range, render::clip_t clip)
 {
+    const auto &batcher = _d->batcher;
     const auto &data = batcher.data();
 
     // first, ensure textures are ready
@@ -551,8 +541,10 @@ void render_2d::_draw_batches(render::batcher2d& batcher, render::clip_t clip)
         SDL_SetRenderClipRect(_d->render, nullptr);
 
     // now we draw
-    for (const auto &cmd: batcher.commands())
+    auto cmd_range = batcher.sync_point_get(range);
+    for (size_t i = 0; i < cmd_range.cmd_count; i++)
     {
+        const auto &cmd = batcher.commands()[cmd_range.cmd_offset + i];
         assert(cmd.index_count);
         assert(cmd.index_start + cmd.index_count <= data.inds.size());
         assert(cmd.base_vertex < data.verts.size());
@@ -753,6 +745,42 @@ float render_2d::display_scale() const { return _d->ui_scale; }
 
 void _texture_cleanup(rtexture &tex, void*)
 {
+    // NOTE TODO VERY IMPORTANT
+    //
+    // If we have background resource reloading,
+    // this must be changed to a thread-safe
+    // version. Especially if we can have rtexture
+    // instances being dropped on the background thread!
+    //
+    // Say a sprite is reloaded and starts referring to
+    // another texture. What if the previous texture's
+    // refcount drops to zero?
+    //
+    // The first instinct is to add this to a mutex-protected
+    // deletion list that is handled at the beginning of
+    // the rendering phase... see how render_gpu mnages textures.
+    //
+    // We rely on the fact that only we touch rptr,
+    // so if we need a texture for rendering, we hold on to it
+    // via shared_ptr in our rendering commands and scene.
+    // An rtexture reset() essentially should not call this
+    // method and leave rptr untouched, maybe raise a flag
+    // so we can properly handle it.
+    //
+    // If a texture can be reloaded, when the background load
+    // process loads new data, there must be an atomic
+    // mechanism to swap this new internal data with the
+    // previous data.
+    //
+    // In essence, changing internal resource data in
+    // another thread is another issue we must tackle
+    // before actually implementing res reset() functionality,
+    // not just for rtexture but all other resources...
+    //
+    // OR we add some sort of synchronization point on the
+    // main thread to do the swap. See the comments on top of
+    // resource.hpp
+
     if(tex.rptr)
     {
         SDL_DestroyTexture(static_cast<SDL_Texture*>(tex.rptr));
@@ -935,7 +963,6 @@ void render_2d::_targets_sizing_reorder()
     for(auto vtx: _d->rt_resize_sorter.execution_order())
     {
         auto tid = invmap[vtx];
-        log::warn("VTX %d TID %d", (int) vtx, (int) tid);
         _d->rt_resize_order.push_back(tid);
     }
 
@@ -1008,8 +1035,21 @@ void render_2d::_targets_resize()
         target.color_tex->height = target.curr_h;
     }
 
-    // TODO with render targets having correct sizes, we can update
-    //      any viewports that depend on those
+
+    // with render targets ready, we can adjust layer viewports that follow targets
+    auto &layers = engine::instance().render_layers();
+    for(auto &layer : layers)
+    {
+        if(layer.follow_target)
+        {
+            auto it = _d->targets.find(layer.target_id);
+            if(it!=_d->targets.end())
+            {
+                auto &tgt = it->second;
+                layer.viewport = {0, 0, tgt.curr_w, tgt.curr_h};
+            }
+        }
+    }
 
     // finally, clear the dirty flag
     _d->rt_sizes_dirty = false;

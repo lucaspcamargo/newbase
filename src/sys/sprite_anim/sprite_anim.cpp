@@ -44,7 +44,7 @@ bool sprite_anim::step(step_phase phase)
 {
     auto& reg = engine::instance().default_scene().registry();
 
-    if (phase == step_phase::PRE_RENDER)
+    if (phase == step_phase::POST_UPDATE)
     {
         sync_source_rects(reg);
         return true;

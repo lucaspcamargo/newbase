@@ -58,6 +58,14 @@ bool clock::event(SDL_Event*)
     return true;
 }
 
+void clock::shutdown()
+{
+    // release any callback handles me might be holding on to
+    m_update.clear();
+    m_update_monotonic.clear();
+    m_update_counter = 0;
+}
+
 
 // RTTI metadata
 extern "C" void _rtti_init_clock()

@@ -19,6 +19,7 @@ This is a living document.
     + [ ] Ad-hoc event scaling is out of control. Uniformize behavior in render::window.
           It's our fault for having two different 2D coordinate systems, UI and pixel.
           But it's also SDL's fault for providing events in logical or real pixels depending on the platform.
+    + [ ] Implement and actually use internationalization
 - Editor
     + [ ] Use render::window conversion for all pointer events
     + [ ] Pre-docked windows
@@ -53,20 +54,30 @@ This is a living document.
     * [X] Basic render-to-texture with render layers
     + [X] Don't leak SDL_Texture on resource cleanup.
     + [X] Impove UI overlay interface and semantics - see below
-    + [ ] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
-    + [ ] Elementary 3D rendering with render_gpu
-        * [ ] Do some research and come up with MVP requirements
-    + [ ] Shader system
+    + [X] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
+    + [X] Elementary 3D rendering with render_gpu
+        * [X] Below scope: "render_gpu and 3D - beginnings"
+    + [~] 3D render command collection and batching
+    + [~] Shader system
+        * [X] Core shader structures, compilation, and introspection
         * [ ] Optional shader support in render_2d depending on backend
         * [ ] Shader support in render_gpu for 2d too
-    + [ ] Materials system + shader derivation
+    + [~] Materials system + shader derivation
+        * [ ] Core material definitions (controllers and types, shaders, texure bindins, uniform buffers)
     + [ ] "Classic" fixed-function-like materials system
-    + [ ] PBR material system
-    + [ ] GLTF import and rendering
+    + [~] PBR material system
+        * [+] Basic Metal-Roughness with fallback textures
+        + [+] Render helmet correctly
+        * [ ] Direct light loops
+    + [ ] Matcap material controller
+    + [ ] Shader improvements
+        * [ ] include support
+        * [ ] combinatorics mechanism (At least for vertex formats. Look into slang facilities for that.)
+    + [X] GLTF import and rendering
     + [ ] Fancier techniques
         * [ ] Create render_pass system, distinct from render layers (but similar)
-        * [ ] Shadow mapping
         * [ ] HDR and Tonemapping
+        * [ ] Shadow mapping
         * [ ] SSAO, SSR 
 - Audio
     + [ ] Take audio resources instead of handles in playback functions (don't force load anything ever)
@@ -113,13 +124,18 @@ This is a living document.
     + [ ] Some sort of collision callback system. Update Asteroids demo with that.
 - Demo
     + [ ] Proper in-game UI
-    + [ ] API for UI paramters
+    + [ ] API for demo parameters in UI
     + [ ] Asteroids: add proper game loop and dynamic object spawning in waves
     + [ ] Platformer: A bit more polish, no need to go overboard though
     + [ ] Fast-rodent: Get it working with some cool resources from the web
     + [ ] Physics 2D: Fix picking on web and Android, audio and more stuff
     + [X] Move hello-world to the end
-    
+- Emscripten
+    + [ ] Build a single-threaded and a multithreaded version on the CI, have
+          the HTML shell fallback to loading the single-threaded version when
+          threads are unsupported by the browser.
+    + [ ] Probe `SharedArrayBuffer` support in shell and launch correct version.
+    + [ ] Evaluate a move to WASMFS, replacing IDBFS with something else.
     
     
 ## Scope: Viewports, Layers, and 2D Camera refactor
@@ -165,8 +181,8 @@ This is a living document.
 
 ## Scope: render_gpu and 3D
 
-- [ ] Rewrite render_gpu on a clean slate, based off of the 2D work we did before
-- [ ] Define primitives for shaders, wrap the base 2D shaders on those for validation
-- [ ] Pipeline state cache types and machinery
-- [ ] 3D camera math
-- [ ] Materials system and resources
+- [X] Rewrite render_gpu on a clean slate, based off of the 2D work we did before
+- [X] Define primitives for shaders, wrap the base 2D shaders on those for validation
+- [X] Pipeline state cache types and machinery
+- [X] 3D camera math
+- [X] Materials system and resources

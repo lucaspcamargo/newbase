@@ -12,6 +12,11 @@ public:
     explicit rtexture(entt::id_type id = 0) : resource(id, entt::hashed_string{"rtexture"}.value()) {}
     ~rtexture() override;
 
+    // takes a surface and owns it
+    // transitions to loaded state immediately
+    // for usage with ANONYMOUS RESOURCES ONLY
+    void load_from(SDL_Surface* surf);
+
     bool uploaded {false};
     SDL_Surface *surf {nullptr};
 
@@ -28,9 +33,15 @@ public:
     // if you are not the renderer, consider this RO
     bool rtarget {false};
 
-    // use neares neighbor scaling when rendering
+    // use nearest neighbor scaling when rendering
     // TODO replace by real enum when we get 3D?
     bool nearest {false};
+
+    // whether to setup the gpu texture format
+    // to convert the texture data to linear
+    // space when sampling
+    // ignored for 2D rendering
+    bool srgb_conversion {false};
 
     // optional callback: reload the CPU surface from the resource manager (set by the loader).
     // Returns a freshly allocated SDL_Surface* that the caller owns, or nullptr on failure.

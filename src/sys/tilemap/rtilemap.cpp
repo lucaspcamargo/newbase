@@ -81,6 +81,8 @@ static bool load_tileset_data(ryml::ConstNodeRef ts_node, tilemap_tileset &ts,
                  full.c_str());
       return false;
     }
+    // HACK avoid tile bleeding by using nearest neighbor filtering
+    ts.tex->nearest = true;
   }
 
   // Per-tile data: custom properties and collision shapes.

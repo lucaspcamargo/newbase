@@ -61,7 +61,9 @@ void nb::render::_rtti_init_render()
     .data<&nb::render_layer::clear_g>("clear_g"_hs)
     .custom<rtti::data_info>(rtti::data_info{"clear_g"})
     .data<&nb::render_layer::clear_b>("clear_b"_hs)
-    .custom<rtti::data_info>(rtti::data_info{"clear_b"});
+    .custom<rtti::data_info>(rtti::data_info{"clear_b"})
+    .data<&nb::render_layer::three_dee>("three_dee"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"three_dee"});
 
     entt::meta_factory<target_desc>{}
     .type("render_target_desc"_hs)
@@ -93,7 +95,9 @@ void nb::render::_rtti_init_render()
     .func<&target_ref::color_texture>("color_texture"_hs)
     .custom<rtti::func_info>(rtti::func_info{"color_texture"})
     .func<&target_ref::depth_texture>("depth_texture"_hs)
-    .custom<rtti::func_info>(rtti::func_info{"depth_texture"});
+    .custom<rtti::func_info>(rtti::func_info{"depth_texture"})
+    .func<&target_ref::reset>("reset"_hs)
+    .custom<rtti::func_info>(rtti::func_info{"reset"});
 
     entt::meta_factory<camera_2d>{}
     .type("render_camera_2d"_hs)

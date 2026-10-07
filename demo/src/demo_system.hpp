@@ -8,6 +8,7 @@ public:
     entt::id_type metatype_id() override { return entt::hashed_string{"demo"}.value(); }
 
     bool init(ryml::ConstNodeRef cfg) override;
-    bool step(nb::step_phase) override { return true; }
+    bool step(nb::step_phase) override;
     bool event(SDL_Event*) override { return true; }
+
 };

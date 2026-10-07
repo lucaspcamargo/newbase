@@ -28,7 +28,6 @@ struct nb::imgui_nb_p
     render::window &win;
     uint64_t time {0};
 
-    render::batcher2d batcher {};
     std::shared_ptr<rtexture> font_tex;
 
     std::vector<render::vertex2d> cvt_buf;
@@ -110,8 +109,6 @@ void imgui_nb::new_frame(float delta)
         io.DeltaTime = _d->time > 0 ? (float)((double)(current_time - _d->time) / (double)frequency) : (float)(1.0f / 60.0f);
         _d->time = current_time;
     }
-
-    _d->batcher.clear();
 }
 
 
@@ -216,7 +213,7 @@ bool imgui_nb::event(SDL_Event *orig_event)
     return false;
 }
 
-void imgui_nb::render_flush()
+void imgui_nb::render_flush(render::batcher2d &batcher)
 {
     // ask ImGui to prepare all geometry for rendering
     ImGui::Render();
@@ -296,7 +293,7 @@ void imgui_nb::render_flush()
                     : nullptr
                 );
 
-            _d->batcher.add_geom(_d->cvt_buf.data() + cmd.VtxOffset, vtx_count,
+            batcher.add_geom(_d->cvt_buf.data() + cmd.VtxOffset, vtx_count,
                                  cmd_idx_base, cmd.ElemCount,
                                  rtex, render::blendmode::BLEND, clip);
         }
@@ -305,13 +302,6 @@ void imgui_nb::render_flush()
     // as the last rendering step, we will always update the atlaas texture's upload data if needed
     // the render system will take care of doing the upload
     _rebuild_font_atlas();
-}
-
-// getter for 2d batcher used to collet ImGui drawing data
-render::batcher2d& imgui_nb::render_data()
-{
-    assert(_d);
-    return _d->batcher;
 }
 
 render::window& imgui_nb::window() const

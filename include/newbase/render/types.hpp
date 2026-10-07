@@ -156,5 +156,34 @@ namespace nb::render
         bool init_clear {false};
     };
 
+
+
+    // Texture sampling types
+
+    enum class sampler_filter : uint8_t
+    {
+        NEAREST,
+        LINEAR
+    };
+
+    enum class sampler_addressing : uint8_t
+    {
+        REPEAT,
+        REPEAT_MIRRORED,
+        CLAMP_TO_EDGE
+    };
+
+    struct sampler_config
+    {
+        sampler_filter min_filter {sampler_filter::NEAREST};
+        sampler_filter mag_filter {sampler_filter::NEAREST};
+        sampler_filter mip_filter {sampler_filter::NEAREST};
+        sampler_addressing addr_mode_u {sampler_addressing::REPEAT};
+        sampler_addressing addr_mode_v {sampler_addressing::REPEAT};
+        sampler_addressing addr_mode_w {sampler_addressing::REPEAT};
+        float max_aniso {1.0f};
+        float max_lod {1000.0f}; // set to 0 to disable mipmapping
+    };
+
 };
 

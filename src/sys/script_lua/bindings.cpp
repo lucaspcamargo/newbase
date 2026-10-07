@@ -221,6 +221,7 @@ entt::meta_any nb::lua::lua_to_meta_any(lua_State *L, int idx)
 static int box_gc(lua_State *L)
 {
     auto *box = static_cast<lua_nb_box*>(lua_touserdata(L, 1));
+    // TEST log::critical("LUA GC ON %s", std::string(box->value.type().info().name()).c_str());
     box->~lua_nb_box();
     return 0;
 }
@@ -260,10 +261,11 @@ static int box_index(lua_State *L)
         }
     }
 
-    // method access — push a closure capturing the userdata (not a raw pointer,
+    // method access:  push a closure capturing the box userdata (not a raw pointer,
     // so the GC cannot collect the box while the closure is alive)
     if(auto f = type.func(hash); f)
     {
+        //log::critical("FUNC INDEX %s on %s", key, std::string(type.info().name()).c_str());
         lua_pushvalue(L, 1);                          // upvalue 1: the box userdata
         lua_pushinteger(L, (lua_Integer)hash);         // upvalue 2: function hash
         lua_pushcclosure(L, box_func_call, 2);
@@ -402,9 +404,17 @@ static int box_func_call(lua_State *L)
     auto *box = static_cast<lua_nb_box*>(lua_touserdata(L, lua_upvalueindex(1)));
     auto hash = (entt::id_type)lua_tointeger(L, lua_upvalueindex(2));
 
-    auto func = box->value.type().func(hash);
+    const auto &orig_type = box->value.type();
+    auto target_instance = box->value.type().is_pointer_like()
+        ? (*box->value).as_ref()
+        : box->value.as_ref();
+    auto target_type = target_instance.type();
+
+    auto func = target_type.func(hash);
     if(!func)
-        return 0;
+    {
+        return luaL_error(L, "[lua] box_func_call: no function with hash %d in type: '%s' (%d)", hash, std::string(target_type.info().name()).c_str(), target_type.id());
+    }
 
     // When called with method syntax (obj:method(a, b)), Lua passes obj as
     // stack[1]. Detect this and skip it so we don't double-pass the instance.
@@ -413,6 +423,7 @@ static int box_func_call(lua_State *L)
     {
         if(static_cast<lua_nb_box*>(lua_touserdata(L, 1)) == box)
             arg_start = 2;
+        //log::critical("[lua] box_func_call: skip arg 1 for %d in type: '%s' (%d)", hash, std::string(target_type.info().name()).c_str(), target_type.id());
     }
 
     int argc = lua_gettop(L) - (arg_start - 1);
@@ -421,7 +432,9 @@ static int box_func_call(lua_State *L)
     for(int i = arg_start; i <= lua_gettop(L); ++i)
         args.push_back(lua_to_meta_any(L, i));
 
-    auto result = func.invoke(box->value, args.empty() ? nullptr : args.data(), args.size());
+    //log::critical("[lua] box_func_call: %d args", (int) args.size());
+
+    auto result = func.invoke(target_instance, args.empty() ? nullptr : args.data(), args.size());
     if(result)
     {
         push_meta_any(L, std::move(result));

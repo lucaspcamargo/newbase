@@ -14,6 +14,7 @@
 #include <newbase/components/camera.hpp>
 #include <newbase/components/layers.hpp>
 #include <newbase/components/structure.hpp>
+#include <newbase/components/mesh.hpp>
 #include <newbase/log.hpp>
 
 #include <entt/entt.hpp>
@@ -130,6 +131,11 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
             {
                 auto &s = reg.emplace<nb::clayers>(eid);
                 nb::build_layers(comp, s);
+            }
+            else if(compname == "mesh")
+            {
+                auto &s = reg.emplace<nb::cmesh>(eid);
+                nb::build_mesh(comp, s);
             }
             else
             {

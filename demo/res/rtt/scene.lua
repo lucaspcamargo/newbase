@@ -69,3 +69,11 @@ engine:add_render_layer(rl_present)
 
 -- TODO allow changing texture scale interactively (update_scale method in target_handle and service?)
 --      allow changing effect strength interactively (interactive controls could use some new demo system API for UI params)
+
+
+-- ensure targets are destroyed when script component dies
+-- otherwise the handles will be stuck on lua gc, wasting VRAM
+script_on_destroy(function()
+    target0:reset()
+    target1:reset()
+end)

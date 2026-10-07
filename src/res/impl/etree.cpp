@@ -15,15 +15,24 @@ using namespace nb;
 // perhaps we replace this approach with a new "rscene" type altogether
 
 
-bool retree::do_load()
+bool retree::do_preload()
 {
-    log::info("[retree] loading: 0x%08x", id());
-
     if(!ryaml::do_load())
     {
         log::info("[retree] base yaml loading failed: 0x%08x", id());
         return false;
     }
+
+    // TODO determine scene dependencies
+
+    return true;
+}
+
+bool retree::do_load()
+{
+    log::info("[retree] loading: 0x%08x", id());
+
+
 
     // TODO parse to specific etree data here
     etree_valid = yaml_valid;
