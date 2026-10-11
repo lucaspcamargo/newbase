@@ -1,4 +1,7 @@
 #include "entt/core/fwd.hpp"
+#include "newbase/render/pass.hpp"
+#include "newbase/render/pipeline.hpp"
+#include "newbase/render/texture.hpp"
 #include <newbase/sys/render_gpu/targets.hpp>
 #include <newbase/render/types.hpp>
 #include <newbase/res/texture.hpp>
@@ -9,6 +12,9 @@
 
 using namespace nb;
 using namespace nb::gpu;
+
+
+static render::pass_target_info target_desc_to_pass_info(const render::target_desc &td);
 
 
 void target_manager::clear()
@@ -36,6 +42,7 @@ void target_manager::init( int w, int h, bool depth, bool depth_sampling )
     {
         block.depth_texture = std::make_shared<rtexture>(0);
         block.depth_sampling = depth_sampling;
+        block.pt_info.depth_target = render::texture_format::DEPTH_16;
     }
     block.desc = render::target_desc
     {
@@ -44,6 +51,9 @@ void target_manager::init( int w, int h, bool depth, bool depth_sampling )
         .abs_height = (unsigned) h,
         .has_depth = depth
     };
+    block.pt_info.samples = render::texture_sample_count::SAMPLES_1;
+    // native color format in pt_info is filled in update_default,
+    // after we obtain the swapchain texture and format
 }
 
 void target_manager::update_sizes(render::viewport_t ui_vp)
@@ -138,14 +148,15 @@ void target_manager::update_default(SDL_GPUTexture *color, SDL_GPUTextureFormat 
     }
 
     target_block &blk = it->second;
-
-    blk.color_texture_count = 1;
-    blk.color_textures[0] = std::make_shared<rtexture>(0);
     blk.req_w = w;
     blk.req_h = h;
+    blk.pt_info.color_targets[0] = m_texman.get_native_format(gfmt);
+    for(int i = 1; i < render::PASS_MAX_COLOR_TARGETS; ++i)
+        blk.pt_info.color_targets[i] = render::texture_format::INVALID;
 
-    // internal texture resource now points to
-    m_texman.set_non_owning(blk.color_textures[0].get(), color, gfmt, w, h);
+    if(color)
+        m_texman.set_non_owning(blk.color_textures[0].get(), color, gfmt, w, h);
+    // if we are called without the swapchain, don't touch the target texture'
 }
 
 
@@ -156,10 +167,11 @@ void target_manager::commit_textures(SDL_GPUDevice *gdev)
         if(id != render::TARGET_DEFAULT)
             for(int i = 0; i < block.color_texture_count; i++)
                 m_texman.color_target_setup(gdev, block.color_textures[i].get(),
-                                            block.req_w, block.req_h);
+                                            block.pt_info.color_targets[i], block.req_w, block.req_h);
 
         if(block.depth_texture)
             m_texman.depth_target_setup(gdev, block.depth_texture.get(),
+                                        block.pt_info.depth_target,
                                         block.req_w, block.req_h,
                                         block.depth_sampling);
     }
@@ -175,6 +187,7 @@ render::target_id_t target_manager::target_create(const render::target_desc& des
     auto block = target_block {
         .color_texture_count = 1, // TODO make configurable?
         .desc = desc,
+        .pt_info = target_desc_to_pass_info(desc), // TODO test?
         .req_w = desc.abs_width,
         .req_h = desc.abs_height,
         .depth_sampling = true  // TODO add to desc?
@@ -278,4 +291,57 @@ void target_manager::_size_reorder()
     }
 
     m_resize_order_dirty = false;
+}
+
+
+bool target_manager::target_info_get(render::target_id_t id, render::pass_target_info &dst_info)
+{
+    auto *block = target_get(id);
+    if(!block)
+        return false;
+
+    dst_info = block->pt_info;
+    return true;
+}
+
+
+bool target_manager::prepare_gpu_pipeline_target_info(SDL_GPUGraphicsPipelineTargetInfo &pti,
+                                      SDL_GPUColorTargetDescription *color_targets,
+                                      render::pass_target_info native)
+{
+    int num_color_targets = 0;
+    if(native.color_targets[0] == render::texture_format::INVALID)
+        return false;
+    for(int i = 0; i < render::PASS_MAX_COLOR_TARGETS; ++i)
+        if(native.color_targets[i] != render::texture_format::INVALID)
+        {
+            color_targets[i].format = m_texman.get_gpu_format(native.color_targets[i]); // all targt
+            color_targets[i].blend_state = {};
+            color_targets[i].blend_state.enable_blend = false;
+            color_targets[i].blend_state.enable_color_write_mask = false;
+            num_color_targets++;
+        }
+    pti.num_color_targets = num_color_targets;
+
+    if(native.depth_target != render::texture_format::INVALID)
+    {
+        pti.depth_stencil_format = m_texman.get_gpu_format(native.depth_target);
+        pti.has_depth_stencil_target = true;
+    }
+    else
+        pti.has_depth_stencil_target = false;
+
+    return pti.has_depth_stencil_target || num_color_targets > 0;
+}
+
+
+// helpers
+
+static render::pass_target_info target_desc_to_pass_info(const render::target_desc &td)
+{
+    render::pass_target_info ret;
+    ret.color_targets[0] = render::texture_format::COLOR_RGBA_8888;
+    if(td.has_depth)
+        ret.depth_target = render::texture_format::DEPTH_16;
+    return ret;
 }

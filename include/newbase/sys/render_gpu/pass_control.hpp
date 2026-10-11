@@ -1,6 +1,7 @@
 #pragma once
 
 #include "newbase/layer.hpp"
+#include "newbase/render/pipeline.hpp"
 #include "newbase/render/types.hpp"
 #include <newbase/sys/render_gpu/targets.hpp>
 #include <newbase/sys/render_gpu/pipelines.hpp>
@@ -128,24 +129,13 @@ namespace nb::gpu
             m_curr_target = render::TARGET_INVALID;
         }
 
-        /// Fills the target blocks of a pipeline descriptor
-        /// in accordance to the currently-bound render pass.
-        /// If no render pass is currently bound, returns false.
-        bool write_target_block(pipeline_desc &pipeline)
+        /// Gets the target data block for the currently bound target
+        /// @returns the block, or nullptr if no target is bound
+        const target_block * current_target_block () const
         {
-            if(!m_curr_block)
-                return false;
-
-            for(int i = 0; i < m_curr_block->color_texture_count; i++)
-                pipeline.color_formats[i] = ((texture_block*) m_curr_block->color_textures[i]->rptr)->gfmt;
-
-            if(m_curr_block->desc.has_depth && m_curr_block->depth_texture)
-                pipeline.depth_format = ((texture_block*) m_curr_block->depth_texture->rptr)->gfmt;
-
-            pipeline.sample_count = SDL_GPU_SAMPLECOUNT_1;  // TODO MSAA :)
-
-            return true;
+            return m_curr_block;
         }
+
 
         /// Gets the current render pass.
         /// If no target is currently bound, returns nullptr.

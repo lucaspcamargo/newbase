@@ -1,5 +1,8 @@
 #pragma once
 
+#include <newbase/render/pass.hpp>
+#include <newbase/render/pipeline.hpp>
+#include <newbase/render/vertex.hpp>
 #include <newbase/render/types.hpp>
 #include <newbase/utility/glm.hpp>
 #include <vector>
@@ -16,33 +19,24 @@ namespace nb  // fwd decls
 
 namespace nb::render
 {
-    /// These are the parameters that are part of a material,
-    /// but are intrinsic the the fixed function pipeline,
-    /// so they are present for every material type.
-    /// Mostly rasterization control parameters.
-    struct pipeline_params
-    {
-        blendmode blend {blendmode::NONE};
-        bool cull_back {true};
-        bool depth_test {true};
-        bool depth_write {true};
-    };
 
     struct material_texture_binding {
+        rtexture* texture {nullptr};
         uint32_t slot {0};
-        std::shared_ptr<rtexture> texture {nullptr};
         render::sampler_config sampler {};
         bool vertex {false}; // <-- if we have vertex texture access (e.g. for displacement)
-        // TODO? optional per-slot sampler override parameters?
-        //       do that when we use a sampler cache, like for pipelines
+        uint8_t _pad[3];
+
+        bool operator == (const material_texture_binding &other) const
+        {
+            return texture == other.texture
+                && slot == other.slot
+                && sampler == other.sampler
+                && vertex == other.vertex;
+        }
     };
 
-    enum class material_type : uint8_t
-    {
-        INVALID,
-        STANDARD_PBR,
-        DYNAMIC  // TODO for custom/scriptable material types in the future
-    };
+    struct pipeline_descriptor; //fwd
 
     /// A material controller is an interface that handles
     /// the logic for a material type. Mostly (?) stateless.
@@ -50,33 +44,49 @@ namespace nb::render
     class material_controller
     {
     public:
-        using tex_bind_vec_t = std::vector<material_texture_binding>;
 
         virtual ~material_controller() = default;
 
-        /// returns the vertex program associated with this material type
-        virtual std::shared_ptr<rshader> get_vertex_program(const rmaterial& mat) const = 0;
+        /// prepares an engine pipeline descriptor for the material
+        /// it has to setup shader_variant according to shader selection for the material
+        /// may take pipeline configuration (blend, depth test/write) from material,
+        /// or optionally filter it or replace it entirely
+        /// TODO pass also some global scene rendering settings (when they become necessary)
+        /// NOTE: DOES NOT touch pass_target_info
+        virtual void make_pipeline_desc(const rmaterial& mat, pass_type pt, vertex_type vt,
+                                        pipeline_descriptor &dst_desc) const = 0;
 
-        /// returns the fragment program associated with this material type
-        virtual std::shared_ptr<rshader> get_fragment_program(const rmaterial& mat) const = 0;
+        // TODO for uniforms and tex bind generation: pass structure with local environment info
+        //      this will be crucial for IBL probe switch, SH-ambient coefficients, what have you
+
+        /// returns the vertex program associated with this pipeline
+        virtual std::shared_ptr<rshader> get_vertex_program(const pipeline_descriptor &desc) const = 0;
+
+        /// returns the fragment program associated with this pipeline
+        virtual std::shared_ptr<rshader> get_fragment_program(const pipeline_descriptor &desc) const = 0;
 
         /// returns the raw structure size for the vertex shader ubo
-        virtual size_t get_vertex_ubo_size(const rmaterial& mat) const = 0;
+        virtual size_t get_vertex_ubo_size(const pipeline_descriptor &desc) const = 0;
 
         /// returns the raw structure size for the fragment shader ubo
-        virtual size_t get_fragment_ubo_size(const rmaterial& mat) const = 0;
+        virtual size_t get_fragment_ubo_size(const pipeline_descriptor &desc) const = 0;
 
         /// generates the fragment uniform buffer for this material
-        virtual void pack_vertex_uniforms( const rmaterial& mat,
+        virtual void pack_vertex_uniforms( const rmaterial& mat, const pipeline_descriptor &desc,
                                            uint8_t* out_buffer, size_t out_len) const = 0;
 
         /// generates the fragment uniform buffer for this material
-        virtual void pack_fragment_uniforms(const rmaterial& mat,
+        virtual void pack_fragment_uniforms(const rmaterial& mat, const pipeline_descriptor &desc,
                                             uint8_t* out_buffer, size_t out_len) const = 0;
 
-        /// returns all the textures required for the shader
-        virtual void collect_texture_bindings( const rmaterial& mat,
-                                               tex_bind_vec_t& out_bindings) const = 0;
+
+        /// returns the number of textures bindings for the shader
+        virtual size_t get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest) const = 0;
+
+        /// writes all the texture binds required for the shader into the given buffer
+        /// the amount to be witten is given by get_num_texture_bindings()
+        virtual void collect_texture_bindings( const rmaterial& mat, const pipeline_descriptor &desc,
+                                               material_texture_binding* out_bindings_buf) const = 0;
 
         /// material controller accessor
         /// controllers are global and static

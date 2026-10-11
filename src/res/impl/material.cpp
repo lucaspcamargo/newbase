@@ -67,75 +67,14 @@ bool rmaterial::do_load()
         return false;
     }
 
-    // now that we have our params in place, we can materialize (wink wink) render data
-    if(!materialize())
-    {
-        log::warn("[rmaterial] failed to materialize");
-        // a material that does not materialize does not fail loading
-    }
-
-    // finally, try to load all textures that the material controller gives out for us
-    if(m_controller)
-    {
-        render::material_controller::tex_bind_vec_t tex_binds;
-        m_controller->collect_texture_bindings(*this, tex_binds);
-        for(auto &bind: tex_binds)
-        {
-            if(!bind.texture)
-                log::warn("[rmaterial] no texture for bind slot: %d", bind.slot);
-            else if(!bind.texture->step_load())
-            {
-                log::warn("[rmaterial] bound texture in transition, loading skipped load");
-            }
-        }
-    }
+    // TODO handle texture loading here instead of in _resolve_texture?
 
     return true;
 }
-
-
-bool rmaterial::materialize()
-{
-    m_controller = render::material_controller::get_controller(mat_type);
-    if(!m_controller)
-    {
-        log::warn("[rmaterial] no controller for type: %d", (int) mat_type);
-        return false;
-    }
-
-    if(!mat_params)
-    {
-        log::warn("[rmaterial] empty params!");
-        return false;
-    }
-
-    auto v_ubo_sz = m_controller->get_vertex_ubo_size(*this);
-    if(v_ubo_sz)
-    {
-        vert_uniforms.resize(v_ubo_sz);
-        m_controller->pack_vertex_uniforms(*this, vert_uniforms.data(), v_ubo_sz);
-    }
-    else
-        vert_uniforms.clear();
-
-    auto f_ubo_sz = m_controller->get_fragment_ubo_size(*this);
-    if(f_ubo_sz)
-    {
-        frag_uniforms.resize(f_ubo_sz);
-        m_controller->pack_fragment_uniforms(*this, frag_uniforms.data(), f_ubo_sz);
-    }
-    else
-        vert_uniforms.clear();
-
-    dirty = false;
-    return true;
-}
-
 
 bool rmaterial::_load_gltf_model_material(const tg3_model *model, const tg3_material *mat, const std::string &parent_path)
 {
-    // TODO for now, we olny support core metallic-roughtness PBR
-    //      at least support unlit in the future, when we have the material type
+    // NOTE that gltf 2.0 is basically just PBR (with optional extensios that we don't support right now)
 
     mat_type = render::material_type::STANDARD_PBR;
     auto pbr_params = render::pbr_mat_params {};
@@ -165,7 +104,8 @@ bool rmaterial::_load_gltf_model_material(const tg3_model *model, const tg3_mate
     mat_params = pbr_params;  // set internal meta_any parameter block
 
     // pipeline params
-    pipeline_params.cull_back = !mat->double_sided;
+    pipeline_params.cull = mat->double_sided? render::cull_mode::NONE
+                                            : render::cull_mode::BACK;
 
     const std::string_view alpha_mode {mat->alpha_mode.data, mat->alpha_mode.len};
     if(alpha_mode == "BLEND")
@@ -192,7 +132,9 @@ std::shared_ptr<rtexture> rmaterial::_resolve_texture(const tg3_model *model, in
 
     log::warn("RESOLVE TEX name='%s' source=%d", std::string{std::string_view{tex_block.name.data, tex_block.name.len}}.c_str(), tex_block.source);
 
-    return std::static_pointer_cast<rtexture>(rman().create("rtexture"_hs, entt::hashed_string{tex_path.c_str()}.value()));
+    // NOTE that we load textures together with the material, synchronously
+    // we may want to have an explicit and/or deferred mechanism for this
+    return std::static_pointer_cast<rtexture>(rman().load_sync("rtexture"_hs, entt::hashed_string{tex_path.c_str()}.value()));
 }
 
 void rmaterial::_setup_sampler(const tg3_model *model, const tg3_texture_info &tex_info, render::sampler_config &sc)

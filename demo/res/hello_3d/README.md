@@ -1,9 +1,9 @@
-This is our first 3D rendering test.
+This is our first 3D rendering testbed.
 
-Will be used to validate the basics. 
+A PBR-shaded glTF 2.0 model 
 
-Off we go!
+You can use the arrow keys, or joystick analog, to rotate the model.
 
 ## Assets
-
+ - "Damaged Helmet" by theblueturtle_. Concept by Oscar Cafaro. Licensed under the Creative Commons Attribution-NonCommercial (CC BY-NC) license.
  - "Wind Chimes - Day Ambiance" by Eric Matyas. In the public domain.

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "newbase/render/pass.hpp"
+#include "newbase/render/texture.hpp"
 #include <newbase/res/texture.hpp>
+#include <newbase/render/target.hpp>
 #include <newbase/sys/render_gpu/copy_scope.hpp>
 #include <SDL3/SDL_gpu.h>
 #include <mutex>
@@ -62,11 +65,23 @@ namespace nb::gpu
         /// releases the existing texture and creates a new texture if needed
         /// assumes the target must be sampleable
         /// format for now is fixed at 8-bit RGBA
-        bool color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, int w, int h);
+        bool color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, render::texture_format native_fmt, int w, int h);
 
         /// ensures the depth target texture has the correct dimensions
         /// releases the existing texture and creates a new texture if needed
-        bool depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, int w, int h, bool sampleable);
+        bool depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, render::texture_format native_fmt, int w, int h, bool sampleable);
+
+        /// converts an engine texture format into a gpu one
+        /// engine formats may map to different underlying GPU formats if they
+        /// express that they need to be sampleable or targetable
+        /// @returns INVALID if no applicable format could be found
+        SDL_GPUTextureFormat get_gpu_format(render::texture_format fmt);
+
+        /// converts a gpu texture format into an engine-native format
+        /// if a GPU format maps to different native formats with sampling
+        /// or targeting hints, the hints may be dropped
+        /// @returns INVALID if no applicable format could be found
+        render::texture_format get_native_format(SDL_GPUTextureFormat fmt);
 
         /// get gpu texture format name
         static const char * texture_format_to_str(SDL_GPUTextureFormat fmt);

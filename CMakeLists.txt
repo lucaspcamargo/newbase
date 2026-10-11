@@ -135,11 +135,14 @@ add_library(newbase STATIC
     src/render/batcher2d.cpp
     src/render/camera.cpp
     src/render/collector2d.cpp
+    src/render/collector3d.cpp
     src/render/material.cpp
     src/render/rtti.cpp
     src/render/vertex.cpp
     src/render/window.cpp
     src/render/mat/pbr.cpp
+    src/render/mat/std_2d.cpp
+    src/render/mat/matcap.cpp
 
     # resource system
     src/res/manager.cpp

@@ -1,4 +1,5 @@
 #include "SDL3/SDL_gpu.h"
+#include "newbase/render/texture.hpp"
 #include <newbase/sys/render_gpu/textures.hpp>
 #include <newbase/log.hpp>
 #include <cstring>
@@ -10,6 +11,7 @@ using namespace nb::gpu;
 static SDL_GPUTextureFormat  get_srgb_sampling_equivalent(SDL_GPUTextureFormat fmt);
 
 // TODO transfer buffer pool?
+// TODO conversions from engine texture formats to gpu texture formats
 
 void texture_manager::init(SDL_GPUDevice *device, bool dump_formats)
 {
@@ -27,8 +29,6 @@ void texture_manager::init(SDL_GPUDevice *device, bool dump_formats)
             m_support.depth_stencil_targets.push_back(format);
         }
     }
-
-    //m_depth_float = m_support.depth_stencil_targets.
 
     if(dump_formats)
     {
@@ -49,6 +49,8 @@ void texture_manager::init(SDL_GPUDevice *device, bool dump_formats)
         log::info("[render_gpu] textures: supported depth/stencil target formats: %s",
                   join(m_support.depth_stencil_targets).c_str());
     }
+
+    // TODO evaluate and store mappings for "dynamic" formats based on support
 }
 
 bool texture_manager::prepare(SDL_GPUDevice * device, SDL_GPUCommandBuffer *cmd, rtexture *tex, SDL_GPUCopyPass *cpy)
@@ -200,7 +202,9 @@ void texture_manager::set_non_owning(rtexture *rtex, SDL_GPUTexture *gtex, SDL_G
 }
 
 
-bool texture_manager::color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, int w, int h)
+bool texture_manager::color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex,
+                                         render::texture_format native_fmt,
+                                         int w, int h)
 {
     if(!rtex || !w || !h)
     {
@@ -220,7 +224,8 @@ bool texture_manager::color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, in
         _texture_destroy(*rtex, this);
     }
 
-    auto gfmt = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    auto gfmt = get_gpu_format(native_fmt);
+
     SDL_GPUTextureCreateInfo info {
         .type = SDL_GPU_TEXTURETYPE_2D,
         .format = gfmt,
@@ -269,7 +274,8 @@ bool texture_manager::color_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, in
 }
 
 
-bool texture_manager::depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, int w, int h, bool needs_sampling)
+bool texture_manager::depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex,
+            render::texture_format native_fmt, int w, int h, bool needs_sampling)
 {
     if(!rtex || !w || !h)
     {
@@ -289,9 +295,7 @@ bool texture_manager::depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, in
         _texture_destroy(*rtex, this);
     }
 
-    // TODO 16-bit depth may be too basic but it is a start
-    //      using this now because it is guaranteed to always be sampleable
-    auto gfmt = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    auto gfmt = get_gpu_format(native_fmt);
 
     SDL_GPUTextureCreateInfo info {
         .type = SDL_GPU_TEXTURETYPE_2D,
@@ -342,6 +346,38 @@ bool texture_manager::depth_target_setup(SDL_GPUDevice *gdev, rtexture *rtex, in
 
 }
 
+
+SDL_GPUTextureFormat texture_manager::get_gpu_format(render::texture_format fmt)
+{
+    // these formats are fixed
+    if(fmt == render::texture_format::COLOR_RGBA_8888)
+        return SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    if(fmt == render::texture_format::COLOR_BGRA_8888)
+        return SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
+    if(fmt == render::texture_format::DEPTH_16)
+        return SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+
+    // TODO try to match texture format according to support
+
+    return SDL_GPU_TEXTUREFORMAT_INVALID;
+}
+
+
+render::texture_format texture_manager::get_native_format(SDL_GPUTextureFormat fmt)
+{
+    // these format mappings are fixed
+    if(fmt == SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM)
+        return render::texture_format::COLOR_RGBA_8888;
+    if(fmt == SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM)
+        return render::texture_format::COLOR_BGRA_8888;
+    if(fmt == SDL_GPU_TEXTUREFORMAT_D16_UNORM)
+        return render::texture_format::DEPTH_16;
+
+    // TODO try to match texture format according to support
+
+    return render::texture_format::INVALID;
+
+}
 
 void texture_manager::_texture_destroy(rtexture& tex, void *uptr)
 {

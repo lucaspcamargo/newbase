@@ -25,7 +25,7 @@ namespace nb::gpu
         /// Prepares multiple shaders from an iterator type.
         /// @returns Whether all shaders can be used by the renderer.
         template<class It>
-        bool prepare_multiple(SDL_GPUDevice * dev, It begin, It end, SDL_GPUCopyPass *cpy = nullptr)
+        bool prepare_multiple(SDL_GPUDevice * dev, It begin, It end)
         {
             bool ret = true;
             for(auto it = begin; it!= end; it++)

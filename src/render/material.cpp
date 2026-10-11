@@ -1,5 +1,6 @@
 #include <newbase/render/material.hpp>
 #include <newbase/render/mat/pbr.hpp>
+#include <newbase/render/mat/std_2d.hpp>
 #include <unordered_map>
 
 namespace nb::render
@@ -10,6 +11,7 @@ static auto& _mat_ctrl_map()
     static auto map = []() -> auto {
         std::unordered_map<material_type, std::unique_ptr<material_controller>> map;
         map.emplace(material_type::STANDARD_PBR, std::make_unique<pbr_mat_controller>());
+        map.emplace(material_type::STANDARD_2D, std::make_unique<mat_std_2d>());
         return map;
     }();
     return map;

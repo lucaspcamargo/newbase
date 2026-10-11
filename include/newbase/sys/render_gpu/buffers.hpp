@@ -121,8 +121,6 @@ namespace nb::gpu
             mesh->rptr = gbuf;
             mesh->uploaded = true;
 
-            log::critical("UPLOADED :)");
-
             return true;
         }
 

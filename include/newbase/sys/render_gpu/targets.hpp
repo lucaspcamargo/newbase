@@ -1,5 +1,6 @@
 #pragma once
 
+#include "newbase/render/pass.hpp"
 #include "newbase/render/types.hpp"
 #include <newbase/sys/render_gpu/textures.hpp>
 #include <newbase/res/texture.hpp>
@@ -18,6 +19,7 @@ namespace nb::gpu
         std::array<std::shared_ptr<rtexture>, 4> color_textures {};
         std::shared_ptr<rtexture> depth_texture {nullptr};
         render::target_desc desc;
+        render::pass_target_info pt_info;
         unsigned int req_w {0};
         unsigned int req_h {0};
         bool depth_sampling {false};
@@ -59,6 +61,17 @@ namespace nb::gpu
         /// gets a RO pointer for the target's data block,
         /// or nullptr if target is not found
         const target_block* target_get(render::target_id_t id);
+
+        /// gets target info for a render target, storing it in dst
+        bool target_info_get(render::target_id_t id, render::pass_target_info &dst_info);
+
+        /// builds the gpu pipeline target description data from a native pass_target_info
+        /// `color_targets` msut be able to fit render::PASS_MAX_COLOR_TARGETS entries
+        /// NOTE that we set all blend states to none
+        ///      blend states must be handled separately afterwards
+        bool prepare_gpu_pipeline_target_info(SDL_GPUGraphicsPipelineTargetInfo &pti,
+                                              SDL_GPUColorTargetDescription *color_targets,
+                                              render::pass_target_info native);
 
     private:
         void _size_reorder();

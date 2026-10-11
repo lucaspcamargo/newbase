@@ -63,7 +63,7 @@ private:
 
     // Where whe currently do 3D rendering in a simple, naive fashion
     // Needs rework when we introduce the 3d versions of collector and batcher
-    void _render_3d_layer(const render_layer &l);
+    void _render_3d_layer(const render_layer &l, int layer_mark_index);
 
     std::unique_ptr<render_gpu_p> _d;
 };

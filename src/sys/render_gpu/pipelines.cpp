@@ -1,18 +1,17 @@
+#include "newbase/render/material.hpp"
+#include "newbase/render/pass.hpp"
+#include "newbase/render/pipeline.hpp"
+#include "newbase/render/types.hpp"
 #include "newbase/render/vertex.hpp"
+#include <newbase/res/shader.hpp>
 #include <newbase/sys/render_gpu/pipelines.hpp>
 #include <newbase/log.hpp>
 #include <SDL3/SDL_gpu.h>
-#include <cstring>
 #include <cassert>
 
 
 namespace nb::gpu
 {
-
-    // Discount the sizes of the normalized flag and hash cache
-    // NOTE We can only do this because the structure is packed!
-    static constexpr auto DESC_DATA_SIZE = sizeof(pipeline_desc) - sizeof(bool) - sizeof(pipeline_key);
-
     inline SDL_GPUVertexElementFormat to_sdl_format(render::vertex_data_type type)
     {
         using namespace render;
@@ -25,20 +24,22 @@ namespace nb::gpu
     }
 
 
-    bool pipeline_desc::setup_vertex_input(
+    bool setup_vertex_input(SDL_GPUVertexInputState &input_state,
+                        SDL_GPUVertexBufferDescription *buf_descs,
+                        SDL_GPUVertexAttribute *attr_descs,
                         const render::vertex_type_descriptor& cpu_vertex_desc,
                         const render::shader_reflection& vert_shader_reflection)
     {
-        // start by clearing out all data
-        vert_attr_count = 0;
-        vert_buf_count = 0;
-
-        SDL_GPUVertexBufferDescription& buf0 = vert_bufs[vert_buf_count++];
+        // setup buffers
+        // now fixed at one buffer
+        SDL_GPUVertexBufferDescription& buf0 = buf_descs[0];
         buf0.slot = 0;
         buf0.pitch = cpu_vertex_desc.size;
         buf0.input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
         buf0.instance_step_rate = 0;
+        input_state.num_vertex_buffers = 1;
 
+        int vert_attr_count = 0;
         for (const auto& shader_attr : vert_shader_reflection.attributes)
         {
             if (vert_attr_count >= MAX_VERTEX_ATTRIBUTES) {
@@ -53,7 +54,7 @@ namespace nb::gpu
             {
                 if (cpu_attr.attr == semantic)
                 {
-                    SDL_GPUVertexAttribute& attr = vert_attrs[vert_attr_count++];
+                    SDL_GPUVertexAttribute& attr = attr_descs[vert_attr_count++];
                     attr.location = shader_attr.location;
                     attr.buffer_slot = 0;
                     attr.format = to_sdl_format(cpu_attr.format);
@@ -71,122 +72,55 @@ namespace nb::gpu
                 log::warn("[render_gpu] pipeline_desc: setup_vertex_input: vertex shader input attr '%s' (semantic %d) has no source!", shader_attr.name.c_str(), (int)semantic);
             }
         }
+        input_state.num_vertex_attributes = vert_attr_count;
 
         return true;
     }
 
 
-    void pipeline_desc::setup_material_pipeline_props(const render::pipeline_params &pp)
+    void setup_material_pipeline_props(SDL_GPURasterizerState &state, const render::pipeline_params &pp)
     {
-        cull_mode = pp.cull_back? SDL_GPU_CULLMODE_BACK : SDL_GPU_CULLMODE_NONE;
-        blend = pp.blend;
-        depth_test = pp.depth_test;
-        depth_write = pp.depth_write;
-    }
-
-    bool pipeline_desc::valid() const
-    {
-        // a nomalized descriptor is always valid
-        if(normalized())
-            return true;
-
-        if(!vert || !frag)
-            return false;  // need shaders
-
-        if(!vert_buf_count || !vert_attr_count)
-            return false; // needs vertices with attributes
-
-        if(vert_buf_count > MAX_VERTEX_BUFFERS || vert_attr_count > MAX_VERTEX_ATTRIBUTES)
-            return false; // needs vertices with attributes
-
-        // need at least one valid target to write to
-        if(color_formats[0] == SDL_GPU_TEXTUREFORMAT_INVALID && depth_format == SDL_GPU_TEXTUREFORMAT_INVALID)
-            return false;
-
-        return true;
-    }
-
-    void pipeline_desc::normalize()
-    {
-        // control block to prevent normalizing over and over
-        if(normalized())
-            return;
-
-        if(!valid())
-            return;
-
-        _normalized_flag = true;
-
-        // clear unused vertex buffer and attribute slots
-        memset(vert_bufs + vert_buf_count, 0, sizeof(SDL_GPUVertexBufferDescription)*(MAX_VERTEX_BUFFERS-vert_buf_count));
-        memset(vert_attrs + vert_attr_count, 0, sizeof(SDL_GPUVertexAttribute)*(MAX_VERTEX_ATTRIBUTES-vert_attr_count));
-
-        if (depth_format == SDL_GPU_TEXTUREFORMAT_INVALID) {
-            depth_test = false;
-            depth_write = false;
-            depth_compare_op = (SDL_GPUCompareOp)0;
-        }
-        else if (!depth_test && !depth_write) {
-            // If testing and writing are both off, compare_op doesn't affect rendering
-            depth_compare_op = (SDL_GPUCompareOp)0;
+        switch (pp.cull)
+        {
+            case render::cull_mode::BACK:
+                state.cull_mode = SDL_GPU_CULLMODE_BACK;
+                break;
+            case render::cull_mode::FRONT:
+                state.cull_mode = SDL_GPU_CULLMODE_FRONT;
+                break;
+            case render::cull_mode::INVALID:
+                [[fallthrough]];
+            case render::cull_mode::NONE:
+                [[fallthrough]];
+            default:
+                state.cull_mode = SDL_GPU_CULLMODE_NONE;
+                break;
         }
 
-        if (!depth_bias || depth_format == SDL_GPU_TEXTUREFORMAT_INVALID) {
-            depth_bias = false;
-            depth_bias_constant = 0.0f;
-            depth_bias_slope = 0.0f;
-            depth_bias_clamp = 0.0f;
-        }
-
+        state.fill_mode = SDL_GPU_FILLMODE_FILL;
+        state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
+        state.enable_depth_bias = false;
+        state.depth_bias_constant_factor = 0.0f;
+        state.depth_bias_clamp = 0.0f;
+        state.depth_bias_slope_factor = 0.0f,
+        state.enable_depth_clip = true;
     }
 
-    pipeline_key pipeline_desc::hash()
+
+    pipeline_object* pipeline_cache::find_or_create_prehashed(SDL_GPUDevice *gdev,
+                const render::pipeline_descriptor& descriptor, hash_t hash)
     {
-        if(_hash != 0)
-            return _hash;
-
-        normalize();
-
-        // in case the descriptor is invalid,
-        // normalization fails
-        if(!normalized())
-            return 0;
-
-        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(this);
-        // 64-bit FNV
-        pipeline_key hash = 14695981039346656037ULL;
-        for (size_t i = 0; i < DESC_DATA_SIZE; ++i) {
-            hash ^= bytes[i];
-            hash *= 1099511628211ULL; // prime
-        }
-        _hash = hash;
-        return hash;
-    }
-
-    // collision detector
-    bool operator==(const pipeline_desc& a, const pipeline_desc& b) {
-        return std::memcmp(&a, &b, DESC_DATA_SIZE) == 0;
-    }
-
-    pipeline_object* pipeline_cache::find_or_create(SDL_GPUDevice *gdev, pipeline_desc& descriptor)
-    {
-        assert(gdev && "[pipeline_cache] no GPU device!");
-
-        auto hash = descriptor.hash();
-        if(!hash)
-            return nullptr; // invalid descriptor!
-
         auto it = m_cache.find(hash);
         if (it != m_cache.end()) {
-#ifndef NDEBUG
+            #ifndef NDEBUG
             if (it->second.descriptor != descriptor) {
                 assert(!"CRITICAL: 64-bit pipeline hash collision detected!");
             }
-#endif
+            #endif
             return &it->second;
         }
 
-        auto gpu_pipeline = _create_pipeline(gdev, descriptor);
+        auto gpu_pipeline = _create_pipeline(gdev, descriptor, hash);
         if(!gpu_pipeline)
         {
             log::error("[render_gpu] pipelines: failed to create pipeline 0x%016x: %s", hash, SDL_GetError());
@@ -197,16 +131,24 @@ namespace nb::gpu
         auto new_it = m_cache.emplace(hash, pipeline_object{
             hash,
             gpu_pipeline
-#ifndef NDEBUG
+            #ifndef NDEBUG
             , descriptor
-#endif
+            #endif
         });
-
-        _register_shader_mapping(descriptor.vert, hash);
-        _register_shader_mapping(descriptor.frag, hash);
 
         // return address of newly-created pipeline object
         return &(new_it.first->second);
+    }
+
+    pipeline_object* pipeline_cache::find_or_create(SDL_GPUDevice *gdev, const render::pipeline_descriptor& descriptor)
+    {
+        assert(gdev && "[pipeline_cache] no GPU device!");
+
+        auto hash = descriptor.hash();
+        if(!hash)
+            return nullptr; // invalid descriptor!
+
+        return find_or_create_prehashed(gdev, descriptor, hash);
     }
 
     void pipeline_cache::clear(SDL_GPUDevice *gdev)
@@ -260,77 +202,91 @@ namespace nb::gpu
     static SDL_GPUColorTargetBlendState convert_blend_mode(render::blendmode mode);
 
 
-    SDL_GPUGraphicsPipeline* pipeline_cache::_create_pipeline(SDL_GPUDevice *gdev, const pipeline_desc &desc)
+    SDL_GPUGraphicsPipeline* pipeline_cache::_create_pipeline(SDL_GPUDevice *gdev, const render::pipeline_descriptor &desc, hash_t hash)
     {
-        // color targets prep
-        SDL_GPUColorTargetDescription color_targets[4]{};
-        uint32_t active_color_targets = 0;
-        for (uint32_t i = 0; i < 4; ++i) {
-            if (desc.color_formats[i] != SDL_GPU_TEXTUREFORMAT_INVALID) {
-                color_targets[i].format = desc.color_formats[i];
+        auto *mat_ctrl = render::material_controller::get_controller(desc.mat_type);
+        auto *res_vert = mat_ctrl->get_vertex_program(desc).get();
+        auto *res_frag = mat_ctrl->get_fragment_program(desc).get();
 
-                // Configure blend state if enabled
-                if (desc.blend != render::blendmode::NONE) {
-                    color_targets[i].blend_state = convert_blend_mode(desc.blend);
-                }
-                active_color_targets++;
-            }
+        SDL_GPUShader *vert = res_vert? (SDL_GPUShader*)res_vert->rptr : nullptr;
+        SDL_GPUShader *frag = res_frag? (SDL_GPUShader*)res_frag->rptr : nullptr;
+
+        if(!vert || !frag)
+        {
+            log::warn("[render_gpu] pipeline_cache: _create_pipeline: shaders are not ready!");
+            return nullptr;
         }
 
-        // render target info
+        // render target and blend info
+        SDL_GPUColorTargetDescription color_targets[render::PASS_MAX_COLOR_TARGETS]{};
         SDL_GPUGraphicsPipelineTargetInfo target_info = {
-            .color_target_descriptions = color_targets,  // NOTE pointer
-            .num_color_targets = active_color_targets,
-            .depth_stencil_format = desc.depth_format,
-            .has_depth_stencil_target = (desc.depth_format != SDL_GPU_TEXTUREFORMAT_INVALID)
+            .color_target_descriptions = color_targets
         };
+        auto ret_targets = m_targets.prepare_gpu_pipeline_target_info(target_info, color_targets, desc.targets);
+        if(desc.params.blend != render::blendmode::NONE && target_info.num_color_targets)
+            color_targets[0].blend_state = convert_blend_mode(desc.params.blend);
+        if(!ret_targets)
+        {
+            log::warn("[render_gpu] pipeline_cache: _create_pipeline: failed to setup target info!");
+            return nullptr;
+        }
 
-        // vertex input, taken verbatim
+
+        // vertex input
+        SDL_GPUVertexBufferDescription buf_desc[MAX_VERTEX_BUFFERS];
+        SDL_GPUVertexAttribute attr_desc[MAX_VERTEX_ATTRIBUTES];
         SDL_GPUVertexInputState vertex_input_state = {
-            .vertex_buffer_descriptions = desc.vert_bufs, // NOTE pointer
-            .num_vertex_buffers = desc.vert_buf_count,
-            .vertex_attributes = desc.vert_attrs,   // NOTE pointer
-            .num_vertex_attributes = desc.vert_attr_count
+            .vertex_buffer_descriptions = buf_desc,
+            .num_vertex_buffers = 0,
+            .vertex_attributes = attr_desc,   // NOTE pointer
+            .num_vertex_attributes = 0
         };
+        auto ret_vtx_input = setup_vertex_input(vertex_input_state, buf_desc, attr_desc,
+                           render::vertex_type_descriptor::descriptor_table().at(desc.vertex_fmt),
+                           res_vert->meta);
+        if(!ret_vtx_input)
+        {
+            log::warn("[render_gpu] pipeline_cache: _create_pipeline: failed to setup vertex input state!");
+            return nullptr;
+        }
+
 
         // rasteriztion controls
-        SDL_GPURasterizerState rasterizer_state = {
-            .fill_mode = SDL_GPU_FILLMODE_FILL,
-            .cull_mode = desc.cull_mode,
-            .front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
-            .depth_bias_constant_factor = desc.depth_bias_constant,
-            .depth_bias_clamp = desc.depth_bias_clamp,
-            .depth_bias_slope_factor = desc.depth_bias_slope,
-            .enable_depth_bias = desc.depth_bias,
-            .enable_depth_clip = desc.depth_clip
-        };
+        SDL_GPURasterizerState rasterizer_state {};
+        setup_material_pipeline_props(rasterizer_state, desc.params);
 
         // depth state
         SDL_GPUDepthStencilState depth_stencil_state = {
-            .compare_op = desc.depth_compare_op,
-            .enable_depth_test = desc.depth_test,
-            .enable_depth_write = desc.depth_write,
+            .compare_op = SDL_GPU_COMPAREOP_LESS,
+            .enable_depth_test = desc.params.depth_test,
+            .enable_depth_write = desc.params.depth_write,
             .enable_stencil_test = false
         };
 
         // final assembly
         SDL_GPUGraphicsPipelineCreateInfo create_info = {
-            .vertex_shader = desc.vert,
-            .fragment_shader = desc.frag,
+            .vertex_shader = vert,
+            .fragment_shader = frag,
             .vertex_input_state = vertex_input_state,
             .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
             .rasterizer_state = rasterizer_state,
-            .multisample_state = { .sample_count = desc.sample_count },
+            .multisample_state = { .sample_count = SDL_GPU_SAMPLECOUNT_1 },
             .depth_stencil_state = depth_stencil_state,
             .target_info = target_info
         };
 
-        return SDL_CreateGPUGraphicsPipeline(gdev, &create_info);
+        auto ret = SDL_CreateGPUGraphicsPipeline(gdev, &create_info);
+        if(ret)
+        {
+            _register_shader_mapping(vert, hash);
+            _register_shader_mapping(frag, hash);
+        }
+        return ret;
     }
 
 
     SDL_GPUColorTargetBlendState convert_blend_mode(render::blendmode mode) {
-        SDL_GPUColorTargetBlendState state{};
+        SDL_GPUColorTargetBlendState state {};
         if (mode == render::blendmode::BLEND) {
             state.enable_blend = true;
             state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
@@ -352,7 +308,7 @@ namespace nb::gpu
     }
 
 
-    void pipeline_cache::_register_shader_mapping(SDL_GPUShader *shader, pipeline_key hash)
+    void pipeline_cache::_register_shader_mapping(SDL_GPUShader *shader, hash_t hash)
     {
         auto it = m_shader_map.find(shader);
         if(it != m_shader_map.end())

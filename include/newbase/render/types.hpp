@@ -14,16 +14,40 @@ namespace nb::render
 {
     /**
      * Blend mode to use in drawing commands.
-     * We keep compatibility here with SDL_BlendMode for simplicity.
+     * Existing values must be compatible with SDL_BlendMode for simplicity
      */
-    enum class blendmode : uint32_t
+    enum class blendmode : uint8_t
     {
-        NONE    = 0x0,
-        BLEND   = 0x1,
-        ADD     = 0x2,
-        MOD     = 0x4,
-        MUL     = 0x8,
-        INVALID = 0x7FFFFFFF
+        NONE    = 0x00,
+        BLEND   = 0x01,
+        ADD     = 0x02,
+        MOD     = 0x04,
+        MUL     = 0x08,
+        INVALID = 0xFF
+    };
+
+    /**
+     * Culling mode to use in drawing commands.
+     */
+    enum class cull_mode : uint8_t
+    {
+        NONE    = 0x00,
+        BACK    = 0x01,
+        FRONT   = 0x02,
+        INVALID = 0xFF
+    };
+
+    /**
+     * These are parameters that are intrinsic the the fixed function
+     * part of the pipeline, so they are present for every material type.
+     * Mostly rasterization control parameters.
+     */
+    struct alignas(1) pipeline_params
+    {
+        blendmode blend {blendmode::NONE};
+        cull_mode cull {cull_mode::NONE};
+        bool depth_test {true};
+        bool depth_write {true};
     };
 
     /**
@@ -183,6 +207,39 @@ namespace nb::render
         sampler_addressing addr_mode_w {sampler_addressing::REPEAT};
         float max_aniso {1.0f};
         float max_lod {1000.0f}; // set to 0 to disable mipmapping
+
+        bool operator == (const sampler_config &other) const
+        {
+            return min_filter == other.min_filter
+                && mag_filter == other.mag_filter
+                && mip_filter == other.mip_filter
+                && addr_mode_u == other.addr_mode_u
+                && addr_mode_v == other.addr_mode_v
+                && addr_mode_w == other.addr_mode_w
+                && max_aniso == other.max_aniso
+                && max_lod   == other.max_lod;
+        }
+    };
+
+
+    // Material-related general types
+
+
+    /// provided by the material controller to denote shader variants according
+    /// to material parameters
+    /// directly added to pipeline descriptors to avoid hash collisions
+    /// use 1:1 with shader set that the the concrete controller may provide
+    /// to avoid unnecessary pipeline states
+    using material_variant = uint16_t;   // 64ksv should be enough for everyone
+
+    /// type of material known to the engine
+    /// maps directly to a material controller type
+    enum class material_type : uint8_t
+    {
+        INVALID,
+        STANDARD_2D,
+        STANDARD_PBR,
+        DYNAMIC  // TODO for custom/scriptable material types in the future
     };
 
 };

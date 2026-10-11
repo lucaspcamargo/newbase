@@ -9,6 +9,8 @@
 #include <SDL3/SDL_surface.h>
 #include "entt/core/hashed_string.hpp"
 #include "entt/meta/policy.hpp"
+#include "newbase/render/material.hpp"
+#include "newbase/render/types.hpp"
 #include <entt/entt.hpp>
 #include <memory>
 
@@ -59,35 +61,48 @@ pbr_mat_controller::~pbr_mat_controller()
     m_fallback_emissive.reset();
 }
 
+
+void pbr_mat_controller::make_pipeline_desc(const rmaterial& mat, pass_type pt,
+                        vertex_type vt, pipeline_descriptor &dst_desc) const
+{
+    dst_desc.mat_type = material_type::STANDARD_PBR;
+    dst_desc.params = mat.pipeline_params;
+    dst_desc.shader_variant = 0;
+    dst_desc.vertex_fmt = vt;
+}
+
 std::shared_ptr<rshader>
-pbr_mat_controller::get_vertex_program(const rmaterial &mat) const
+pbr_mat_controller::get_vertex_program(const pipeline_descriptor &dst_desc) const
 {
     return m_vert;
 }
 
 std::shared_ptr<rshader>
-pbr_mat_controller::get_fragment_program(const rmaterial &mat) const
+pbr_mat_controller::get_fragment_program(const pipeline_descriptor &dst_desc) const
 {
     return m_frag;
 }
 
-size_t pbr_mat_controller::get_vertex_ubo_size(const rmaterial &mat) const
+size_t pbr_mat_controller::get_vertex_ubo_size(const pipeline_descriptor &dst_desc) const
 {
     return 0;
 }
 
-size_t pbr_mat_controller::get_fragment_ubo_size(const rmaterial &mat) const
+size_t pbr_mat_controller::get_fragment_ubo_size(const pipeline_descriptor &dst_desc) const
 {
     return sizeof(pbr_frag_uniforms);
 }
 
 void pbr_mat_controller::pack_vertex_uniforms(const rmaterial &mat,
+                                              const pipeline_descriptor &dst_desc,
                                               uint8_t *out_buffer,
                                               size_t out_len) const
 {
 }
 
-void pbr_mat_controller::pack_fragment_uniforms(const rmaterial &mat, uint8_t *out_buffer,
+void pbr_mat_controller::pack_fragment_uniforms(const rmaterial &mat,
+                                                const pipeline_descriptor &dst_desc,
+                                                uint8_t *out_buffer,
                                                 size_t out_len) const
 {
     assert(out_len == sizeof(pbr_frag_uniforms));
@@ -110,8 +125,15 @@ void pbr_mat_controller::pack_fragment_uniforms(const rmaterial &mat, uint8_t *o
     dest._pad = 0.0f;
 }
 
+
+size_t pbr_mat_controller::get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest) const
+{
+    return 5;
+}
+
 void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
-                                                  tex_bind_vec_t &out_bindings) const
+                                                  const pipeline_descriptor &dst_desc,
+                                                  material_texture_binding *out_bindings) const
 {
     const auto param_data = mat.mat_params.try_cast<const pbr_mat_params>();
     if(!param_data)
@@ -120,48 +142,45 @@ void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
         return;
     }
 
-    out_bindings.clear();
-
     // color
-    out_bindings.push_back(material_texture_binding{
+    out_bindings[0] = material_texture_binding{
+        .texture = (param_data->base_color_tex? param_data->base_color_tex : m_fallback_color).get(),
         .slot = 0,
-        .texture = param_data->base_color_tex? param_data->base_color_tex : m_fallback_color,
         .sampler = param_data->base_color_sampling,
         .vertex = false
-    });
+    };
 
     // normal
-    out_bindings.push_back(material_texture_binding{
+    out_bindings[1] = material_texture_binding{
+        .texture = (param_data->normal_tex? param_data->normal_tex : m_fallback_normal).get(),
         .slot = 1,
-        .texture = param_data->normal_tex? param_data->normal_tex : m_fallback_normal,
         .sampler = param_data->normal_sampling,
         .vertex = false
-    });
+    };
 
     // metal-rough
-    out_bindings.push_back(material_texture_binding{
+    out_bindings[2] = material_texture_binding{
+        .texture = (param_data->metal_rough_tex? param_data->metal_rough_tex : m_fallback_metal).get(),
         .slot = 2,
-        .texture = param_data->metal_rough_tex? param_data->metal_rough_tex : m_fallback_metal,
         .sampler = param_data->normal_sampling,
         .vertex = false
-    });
+    };
 
     // AO
-    out_bindings.push_back(material_texture_binding{
+    out_bindings[3] = material_texture_binding{
+        .texture = (param_data->ao_tex? param_data->ao_tex : m_fallback_ao).get(),
         .slot = 3,
-        .texture = param_data->ao_tex? param_data->ao_tex : m_fallback_ao,
         .sampler = param_data->ao_sampling,
         .vertex = false
-    });
+    };
 
     // emissive
-    out_bindings.push_back(material_texture_binding{
+    out_bindings[4] = material_texture_binding{
+        .texture = (param_data->emissive_color_tex? param_data->emissive_color_tex : m_fallback_emissive).get(),
         .slot = 4,
-        .texture = param_data->emissive_color_tex? param_data->emissive_color_tex : m_fallback_emissive,
         .sampler = param_data->emissive_color_sampling,
         .vertex = false
-    });
-
+    };
 
     // set SRGB GPU format hints on textures that benefit from it
     if(param_data->base_color_tex)

@@ -35,19 +35,6 @@ public:
     // pipeline, which are common to every material
     render::pipeline_params pipeline_params;
 
-    // uniform buffer to be bound for fragment shader usage
-    std::vector<uint8_t> vert_uniforms;
-
-    // uniform buffer to be bound for fragment shader usage
-    std::vector<uint8_t> frag_uniforms;
-
-    // whether the material need to be regenerated from changed parameters
-    bool dirty {true};
-
-    bool materialize();
-
-    render::material_controller* controller() const { return m_controller; }
-
     // rtti
     static void _init_rtti();
 
@@ -58,8 +45,6 @@ private:
     bool _load_gltf_model_material(const tg3_model *model, const tg3_material *mat, const std::string &parent_path);
     std::shared_ptr<rtexture> _resolve_texture(const tg3_model *model, int32_t index, const std::string &parent_path);
     void _setup_sampler(const tg3_model *model, const tg3_texture_info &tex_info, render::sampler_config &sc);
-
-    render::material_controller *m_controller {nullptr};
 };
 
 }

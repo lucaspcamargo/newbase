@@ -16,12 +16,18 @@ This is a living document.
         * [ ] Required: use RTTI for dynamic dispatch of component building
     + [X] Decouple rtexture from SDL_Texture. Texture specialization is a renderer task.
     + [ ] Ship standard "engine intro" scene in core resources
-    + [ ] Ad-hoc event scaling is out of control. Uniformize behavior in render::window.
+    + [X] Ad-hoc event scaling is out of control. Uniformize behavior in render::window.
           It's our fault for having two different 2D coordinate systems, UI and pixel.
           But it's also SDL's fault for providing events in logical or real pixels depending on the platform.
     + [ ] Implement and actually use internationalization
 - Editor
     + [ ] Use render::window conversion for all pointer events
+    + [ ] 3D camera and rendering support
+        * [ ] Wireframes
+        * [ ] AABBs
+        * [ ] Picking
+        * [ ] Material resource editor
+    + [ ] Uniform interface for textual resources
     + [ ] Pre-docked windows
     + [ ] Scene editing: loading from etree, saving to etree
     + [ ] Multiple scenes in separate tabs. Requires MULTISCENE.
@@ -58,6 +64,11 @@ This is a living document.
     + [X] Elementary 3D rendering with render_gpu
         * [X] Below scope: "render_gpu and 3D - beginnings"
     + [~] 3D render command collection and batching
+        * [~] Renderer-agnostic pipeline description
+        * [~] Renderer-agnostic texture formats
+        * [ ] 3D collector with opaque<->transparent, depth sorting
+        * [X] Pipeline descriptors originating in materials
+        * [ ] PBR ateril adjustment
     + [~] Shader system
         * [X] Core shader structures, compilation, and introspection
         * [ ] Optional shader support in render_2d depending on backend
@@ -125,6 +136,7 @@ This is a living document.
 - Demo
     + [ ] Proper in-game UI
     + [ ] API for demo parameters in UI
+    + [ ] Hello 3D: mouse/touch controls
     + [ ] Asteroids: add proper game loop and dynamic object spawning in waves
     + [ ] Platformer: A bit more polish, no need to go overboard though
     + [ ] Fast-rodent: Get it working with some cool resources from the web
@@ -136,7 +148,10 @@ This is a living document.
           threads are unsupported by the browser.
     + [ ] Probe `SharedArrayBuffer` support in shell and launch correct version.
     + [ ] Evaluate a move to WASMFS, replacing IDBFS with something else.
-    
+- Input
+    + [ ] Use render::window event coordinate mapping
+    + [ ] Work with UI to determine if pointer events are in UI viewport
+    + [ ] Touch pinch events
     
 ## Scope: Viewports, Layers, and 2D Camera refactor
 
@@ -179,7 +194,7 @@ This is a living document.
 - [X] Update UI overlay callback signature and code
 
 
-## Scope: render_gpu and 3D
+## Scope: render_gpu and 3D - beginnings
 
 - [X] Rewrite render_gpu on a clean slate, based off of the 2D work we did before
 - [X] Define primitives for shaders, wrap the base 2D shaders on those for validation

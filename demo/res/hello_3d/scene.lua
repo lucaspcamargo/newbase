@@ -21,12 +21,35 @@ audio_bgm_gain(-3.0)
 
 -- rotation anim
 local ent_helmet = entity_find("mesh")
-local time = 0
+time = 0
+last_time_interact = 0;
+rot_spd = 0.0;
 local update_handle = clock_update_add(function(delta)
     time = time + delta
     local sp = get_spatial(ent_helmet)
     if sp then
-        sp.rot = vec3.new(90, 0, time * 45)
+        local dir = input_action_direction(hs("dir"))
+        if dir.x ~= 0.0 then
+            sp.rot.z = sp.rot.z - delta * dir.x * 150
+            last_time_interact = time
+        end
+        if dir.y ~= 0.0 then
+            sp.rot.x = sp.rot.x + delta * dir.y * 150
+            last_time_interact = time
+        end
+        if time > last_time_interact + 2 then
+            if rot_spd < 90 then
+                rot_spd = math.min(90, rot_spd + delta*90)
+            end
+        else
+--             if rot_spd > 0 then
+--                 rot_spd = math.max(0, rot_spd - delta*90)
+--             end
+            rot_spd = 0.0
+        end
+
+        sp.rot.z = sp.rot.z + rot_spd*delta
+
     end
 end)
 

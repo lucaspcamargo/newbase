@@ -1,35 +1,15 @@
 #pragma once
 
-#include "SDL3/SDL_gpu.h"
 #include <newbase/sys/render_gpu/pipelines.hpp>
 #include <newbase/render/batcher2d.hpp>
 #include <newbase/res/shader.hpp>
-#include <functional>
-#include <memory>
+#include <SDL3/SDL_gpu.h>
 
 // Utilities to map nb::render 2d data to nb::gpu structures
 // Also loads default 2d shaders from core resources
 
 namespace nb::gpu
 {
-
-    /// the standard set of shaders used for basic 2d rendering
-    struct shaders2d
-    {
-        std::shared_ptr<rshader> vert {nullptr};
-        std::shared_ptr<rshader> frag_col {nullptr};
-        std::shared_ptr<rshader> frag_tex {nullptr};
-
-        bool load(SDL_GPUDevice *dev);
-        bool prepare(std::function<bool(rshader*)> cb);
-        void clear()
-        {
-            vert.reset();
-            frag_col.reset();
-            frag_tex.reset();
-        }
-    };
-
 
     // some off-the-cuff estimates for reasonable initial buffer sizes
     // we try to keep it not too small to avoid thrashing
@@ -82,8 +62,5 @@ namespace nb::gpu
 
         return proj;
     }
-
-
-    bool command2d_get_pipeline(const render::command2d &cmd, pipeline_desc &target_desc, shaders2d &shaders);
 
 }

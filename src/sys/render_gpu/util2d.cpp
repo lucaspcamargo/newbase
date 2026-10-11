@@ -15,23 +15,6 @@
 
 using namespace nb;
 using namespace nb::gpu;
-using entt::operator""_hs;
-
-
-bool shaders2d::load(SDL_GPUDevice *dev)
-{
-    vert = rman().load_sync<rshader>("_nb_core/slang/vertex2d.vert.slang"_hs);
-    frag_col = rman().load_sync<rshader>("_nb_core/slang/untextured.frag.slang"_hs);
-    frag_tex = rman().load_sync<rshader>("_nb_core/slang/textured.frag.slang"_hs);
-
-    return vert && frag_col && frag_tex;
-}
-
-
-bool shaders2d::prepare(std::function<bool(rshader*)> cb)
-{
-    return cb(vert.get()) && cb(frag_col.get()) && cb(frag_tex.get());
-}
 
 
 void buffers2d::init(SDL_GPUDevice *dev)
@@ -225,64 +208,3 @@ void buffers2d::upload(SDL_GPUDevice *dev, SDL_GPUCommandBuffer *cmd, const rend
         true
     );
 }
-
-
-bool nb::gpu::command2d_get_pipeline(const render::command2d &cmd, pipeline_desc &desc, shaders2d &shaders)
-{
-    desc = pipeline_desc {};
-
-    // shaders (based on whether we have a texture)
-    const auto& active_frag = (cmd.texture!=-1) ? shaders.frag_tex : shaders.frag_col;
-    desc.vert = (SDL_GPUShader*) shaders.vert->rptr;
-    desc.frag = (SDL_GPUShader*) active_frag->rptr;
-    if(!desc.vert || !desc.frag)
-        return false;
-
-    const auto& vert_refl = shaders.vert->meta;
-
-    desc.setup_vertex_input( render::vertex_type_descriptor::descriptor_table()
-                                .at(render::vertex_type::STANDARD_2D), vert_refl);
-
-
-    // assemble vertex input state
-    desc.cull_mode   = SDL_GPU_CULLMODE_NONE;
-    desc.blend       = cmd.blend;
-    desc.depth_test  = false;
-    desc.depth_write = false;
-    desc.depth_clip  = false; // TEST
-
-    return true;
-}
-
-
-
-/*
- OLD, MANUAL 2D VTX LAYOUT:::
-
- // vertex buffer layout (render::vertex2d interleaved)
- desc.vert_bufs[0].slot = 0;
- desc.vert_bufs[0].pitch = sizeof(render::vertex2d);
- desc.vert_bufs[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
- desc.vert_buf_count  = 1;
-
- // vertex attribute layout
- SDL_GPUVertexAttribute *attributes = desc.vert_attrs;
- // pos
- attributes[0].location = 0;
- attributes[0].buffer_slot = 0;
- attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
- attributes[0].offset = offsetof(render::vertex2d, pos);
- // col
- attributes[1].location = 1;
- attributes[1].buffer_slot = 0;
- attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
- attributes[1].offset = offsetof(render::vertex2d, color);
- // uv
- attributes[2].location = 2;
- attributes[2].buffer_slot = 0;
- attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
- attributes[2].offset = offsetof(render::vertex2d, uv);
- // count
- desc.vert_attr_count = static_cast<uint16_t>(3);
-
- */

@@ -49,18 +49,11 @@ namespace nb::render
         // ordered texture set, for quick indexing and reuse :)
         // we keep the shared_ptr references on a flat structure for speed,
         // while also keeping an unordered map for quick index lookup by value
+        // TODO Since we do all of our batching at render time, after updates,
+        //      we don't necessarily need to hold shared_ptr's to textures.
+        //      A raw pointer should suffice.
         std::vector<std::shared_ptr<rtexture>> tex;
         std::unordered_map<rtexture*, size_t> tex_set;
-
-        // TODO consider whether taking raw rtexture* pointers is fine (would be faster)
-        //      right now it would be almost fine since we run at render time
-        //      EXCEPT that IF background resource loading can destroy resources
-        //      it would actually be catastrophic :)
-        //      right now it doesn't, though
-        //      if ti does we pause background loading ops for rendering (stutters?),
-        //      or we devise a plan for resources to never be deleted during background
-        //      loading (complex? implement main-thread resource swapping on reload/reset?)
-        //      may not be worth it rght now tbh
 
         inline void clear()
         {
