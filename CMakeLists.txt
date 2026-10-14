@@ -145,6 +145,7 @@ add_library(newbase STATIC
     src/render/mat/std_2d.cpp
     src/render/mat/matcap.cpp
     src/render/mat/ibl_integration.cpp
+    src/render/pass/ibl_integration.cpp
 
     # resource system
     src/res/manager.cpp

@@ -17,7 +17,6 @@
 #include <newbase/layer.hpp>
 #include <newbase/geom/picker2d.hpp>
 #include <newbase/geom/picker3d.hpp>
-#include <newbase/components/environment.hpp>
 #include <newbase/render/batcher2d.hpp>
 #include <newbase/render/collector2d.hpp>
 #include <newbase/render/collector3d.hpp>
@@ -411,12 +410,6 @@ void render_gpu::_render()
         auto tex_begin = _d->collector_3d.staging_textures().begin();
         auto tex_end = tex_begin + _d->collector_3d.staging_texture_count();
         _d->textures.prepare_multiple(_d->gdev, _d->cmds, tex_begin, tex_end, cpy);
-        for(auto *environment : _d->collector_3d.staging_ibl_environments())
-        {
-            if(environment && environment->equirectangular)
-                _d->textures.prepare(_d->gdev, _d->cmds, environment->equirectangular.get(), cpy);
-        }
-
         // 2D resouces
         _d->buffers2d.upload(_d->gdev, _d->cmds, _d->batcher, cpy);
         _d->textures.prepare_multiple(_d->gdev, _d->cmds, _d->batcher.data().tex.begin(), _d->batcher.data().tex.end(), cpy);
@@ -611,8 +604,6 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
 {
     const auto &marker = _d->collector_3d.markers()[layer_mark_index];
     const auto &passes = _d->collector_3d.passes();
-    std::unordered_map<rtexture*, uint32_t> completed_environment_faces;
-
     for(uint32_t pass_index = marker.pass_start;
         pass_index < marker.pass_start + marker.pass_count;
         ++pass_index)
@@ -623,31 +614,62 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
             continue;
         bool pass_drawn = false;
 
-        int viewport_x = l.viewport.x;
-        int viewport_y = l.viewport.y;
-        int viewport_w = l.viewport.w;
-        int viewport_h = l.viewport.h;
-        if(pass_desc.type == render::pass_type::EQUIRECTANGULAR_TO_CUBEMAP ||
-           pass_desc.type == render::pass_type::DIFFUSE_IRRADIANCE ||
-           pass_desc.type == render::pass_type::SPECULAR_PREFILTER)
+        auto pass_viewport = pass_desc.viewport;
+        if(pass_viewport == render::VIEWPORT_DEFAULT)
         {
-            auto *target_texture = pass_desc.target.color_textures[0];
+            rtexture *target_texture = nullptr;
+            uint32_t mip_level = 0;
+            for(int i = 0; i < render::PASS_MAX_COLOR_TARGETS; ++i)
+            {
+                if(pass_desc.target.color_textures[i])
+                {
+                    target_texture = pass_desc.target.color_textures[i];
+                    mip_level = pass_desc.targets.color_mip_level[i];
+                    break;
+                }
+            }
+            if(!target_texture && pass_desc.target.depth_texture)
+            {
+                target_texture = pass_desc.target.depth_texture;
+                mip_level = pass_desc.targets.depth_mip_level;
+            }
             if(!target_texture && pass_desc.target.uses_managed_target())
             {
                 const auto *target = _d->targets.target_get(pass_desc.target.managed_target);
                 if(target && target->color_texture_count)
+                {
                     target_texture = target->color_textures[0].get();
+                    mip_level = pass_desc.targets.color_mip_level[0];
+                }
+                else if(target && target->depth_texture)
+                {
+                    target_texture = target->depth_texture.get();
+                    mip_level = pass_desc.targets.depth_mip_level;
+                }
             }
-            if(target_texture)
+            if(!target_texture)
             {
-                const auto mip = pass_desc.targets.color_mip_level[0];
-                viewport_x = viewport_y = 0;
-                viewport_w = static_cast<int>(std::max(1u, target_texture->width >> mip));
-                viewport_h = static_cast<int>(std::max(1u, target_texture->height >> mip));
+                log::warn("[render_gpu] _render_3d_layer: cannot resolve target dimensions for pass");
+                _d->passes.unbind();
+                continue;
             }
+
+            auto mip_extent = [mip_level](uint32_t extent) {
+                uint32_t level = mip_level;
+                while(level > 0 && extent > 1)
+                {
+                    extent /= 2;
+                    --level;
+                }
+                return static_cast<int>(std::max(1u, extent));
+            };
+            pass_viewport = {0, 0, mip_extent(target_texture->width),
+                             mip_extent(target_texture->height)};
         }
-        SDL_GPUViewport viewport = { (float)viewport_x, (float)viewport_y,
-                                     (float)viewport_w, (float)viewport_h,
+        SDL_GPUViewport viewport = { static_cast<float>(pass_viewport.x),
+                                     static_cast<float>(pass_viewport.y),
+                                     static_cast<float>(pass_viewport.w),
+                                     static_cast<float>(pass_viewport.h),
                                      0.0f, 1.0f };
         SDL_SetGPUViewport(_d->passes.current(), &viewport);
 
@@ -661,15 +683,17 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
         std::array<SDL_GPUTexture*, MAX_TRACKED_SAMPLERS> bound_textures {};
         std::array<render::sampler_config, MAX_TRACKED_SAMPLERS> bound_samplers {};
 
-        // bind global scene uniforms
-        const auto &u_scn = _d->collector_3d.scene_uniforms()[pass.scene_uniform_index];
-        SDL_PushGPUVertexUniformData(_d->cmds, 0, &u_scn, sizeof(u_scn));
-        const bool integration_pass =
-            pass_desc.type == render::pass_type::EQUIRECTANGULAR_TO_CUBEMAP ||
-            pass_desc.type == render::pass_type::DIFFUSE_IRRADIANCE ||
-            pass_desc.type == render::pass_type::SPECULAR_PREFILTER;
-        if(!integration_pass)
-            SDL_PushGPUFragmentUniformData(_d->cmds, 0, &u_scn, sizeof(u_scn));
+        if(pass.scene_uniforms_size)
+        {
+            const auto *scene_uniforms =
+                _d->collector_3d.arena_ptr(pass.scene_uniforms_offset);
+            SDL_PushGPUVertexUniformData(_d->cmds, 0, scene_uniforms,
+                                        pass.scene_uniforms_size);
+            SDL_PushGPUFragmentUniformData(_d->cmds, 0, scene_uniforms,
+                                          pass.scene_uniforms_size);
+        }
+        const uint32_t material_fragment_uniform_slot =
+            pass.scene_uniforms_size ? 1 : 0;
 
         const auto &all_cmds = _d->collector_3d.commands();
 
@@ -730,7 +754,7 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
             const auto mat_frag_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_frag_uniforms_offset);
             if(bound_mat_frag_uniform != mat_frag_uniform_addr)
             {
-                SDL_PushGPUFragmentUniformData(_d->cmds, integration_pass ? 0 : 1,
+                SDL_PushGPUFragmentUniformData(_d->cmds, material_fragment_uniform_slot,
                                                mat_frag_uniform_addr, cmd.mat_frag_uniforms_len);
                 bound_mat_frag_uniform = mat_frag_uniform_addr;
             }
@@ -785,9 +809,6 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
         }
 
         _d->passes.unbind();
-        if(pass_drawn && pass_desc.target.color_textures[0])
-            ++completed_environment_faces[pass_desc.target.color_textures[0]];
-
         rtexture *explicit_mipmap_target = nullptr;
         if(pass_desc.generate_mipmaps_after_render)
         {
@@ -824,18 +845,6 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
             }
         }
 
-        for(auto *environment : _d->collector_3d.staging_ibl_environments())
-        {
-            if(!environment || !environment->environment_cubemap ||
-               !environment->irradiance_cubemap || !environment->prefiltered_cubemap)
-                continue;
-            const uint32_t prefilter_pass_count =
-                static_cast<uint32_t>(environment->prefiltered_cubemap->mipmaps.size()) * 6;
-            if(completed_environment_faces[environment->environment_cubemap.get()] == 6 &&
-               completed_environment_faces[environment->irradiance_cubemap.get()] == 6 &&
-               completed_environment_faces[environment->prefiltered_cubemap.get()] == prefilter_pass_count)
-                environment->mark_prepared();
-        }
     }
 }
 

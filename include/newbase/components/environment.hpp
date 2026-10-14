@@ -28,11 +28,10 @@ struct cenvironment
     {
         return equirectangular &&
             (m_preparation_pending ||
-             m_prepared_source.lock() != equirectangular ||
-             render::has_flag(equirectangular->flags, render::texture_flags::NEEDS_UPLOAD));
+             m_prepared_source.lock() != equirectangular);
     }
 
-    /// Called by the renderer only after all derived resources are ready.
+    /// Called after preparation passes have been emitted for the current source.
     void mark_prepared()
     {
         m_preparation_pending = false;

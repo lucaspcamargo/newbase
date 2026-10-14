@@ -4,8 +4,16 @@
 #include <newbase/render/types.hpp>
 #include <array>
 #include <cstdint>
+#include <memory>
 
-namespace nb { class rtexture; }
+namespace nb
+{
+    class rtexture;
+    class rmaterial;
+    class rmesh;
+    class scene;
+    struct render_layer;
+}
 
 // render target information for a render pass
 
@@ -40,6 +48,21 @@ struct pass_target_info : pipeline_target_info
     uint32_t depth_layer_index {0};
 };
 
+/// Input describing the scene and layer for which a builder may add work.
+struct pass_build_request
+{
+    const render_layer &layer;
+    nb::scene &scene;
+    pass_target_info layer_targets;
+};
+
+enum class build_result : uint8_t
+{
+    SUCCESS,
+    NOT_APPLICABLE,
+    FAILURE
+};
+
 // a render pass type
 enum class pass_type: uint8_t
 {
@@ -68,8 +91,32 @@ struct render_pass
     pass_type type {pass_type::INVALID};
     pass_target target {};
     pass_target_info targets {};
+    viewport_t viewport {VIEWPORT_DEFAULT};
     bool clear_color {false};
     bool generate_mipmaps_after_render {false};
+};
+
+/// Collector-owned operations available to pass builders.
+class pass_build_context
+{
+public:
+    virtual ~pass_build_context() = default;
+
+    virtual bool append_draw_pass(const render_pass &pass,
+                                  std::shared_ptr<rmaterial> material,
+                                  std::shared_ptr<rmesh> mesh,
+                                  const void *scene_uniforms = nullptr,
+                                  size_t scene_uniforms_size = 0) = 0;
+};
+
+/// Builds ordinary render work in response to a resource need.
+class pass_builder
+{
+public:
+    virtual ~pass_builder() = default;
+
+    virtual build_result build(pass_build_context &context,
+                               const pass_build_request &request) = 0;
 };
 
 }
