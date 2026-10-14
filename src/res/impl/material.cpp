@@ -1,6 +1,7 @@
 #include <newbase/render/material.hpp>
 #include <newbase/render/types.hpp>
 #include <newbase/render/mat/pbr.hpp>
+#include <newbase/render/mat/matcap.hpp>
 #include <newbase/res/material.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/res/texture.hpp>
@@ -75,6 +76,44 @@ bool rmaterial::do_load()
 bool rmaterial::_load_gltf_model_material(const tg3_model *model, const tg3_material *mat, const std::string &parent_path)
 {
     // NOTE that gltf 2.0 is basically just PBR (with optional extensios that we don't support right now)
+
+    constexpr bool use_test_matcap = false;
+    if(use_test_matcap)
+    {
+        mat_type = render::material_type::MATCAP;
+        render::matcap_mat_params matcap_params;
+        matcap_params.matcap_texture = rman().load_sync<rtexture>(
+            "_nb_core/tex/matcap/Pearl-4.png"_hs);
+        if(!matcap_params.matcap_texture)
+        {
+            log::error("[rmaterial] failed to load test matcap texture");
+            return false;
+        }
+        const auto &base_col = mat->pbr_metallic_roughness.base_color_factor;
+        matcap_params.base_color_factor = glm::vec4 {
+            static_cast<float>(base_col[0]), static_cast<float>(base_col[1]),
+            static_cast<float>(base_col[2]), static_cast<float>(base_col[3])
+        };
+        matcap_params.normal_texture =
+            _resolve_texture(model, mat->normal_texture.index, parent_path);
+        _setup_sampler(model, mat->normal_texture.index,
+                       matcap_params.normal_sampling);
+        matcap_params.normal_scaling = static_cast<float>(mat->normal_texture.scale);
+        matcap_params.ao_texture =
+            _resolve_texture(model, mat->occlusion_texture.index, parent_path);
+        _setup_sampler(model, mat->occlusion_texture.index,
+                       matcap_params.ao_sampling);
+        matcap_params.occlusion_strength =
+            static_cast<float>(mat->occlusion_texture.strength);
+        mat_params = std::move(matcap_params);
+
+        pipeline_params.cull = mat->double_sided ? render::cull_mode::NONE
+                                                 : render::cull_mode::BACK;
+        const std::string_view alpha_mode {mat->alpha_mode.data, mat->alpha_mode.len};
+        pipeline_params.blend = alpha_mode == "BLEND"
+            ? render::blendmode::BLEND : render::blendmode::NONE;
+        return true;
+    }
 
     mat_type = render::material_type::STANDARD_PBR;
     auto pbr_params = render::pbr_mat_params {};

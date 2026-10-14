@@ -237,7 +237,10 @@ bool load_ktx2(rtexture &texture, const uint8_t *bytes, size_t size)
     constexpr size_t header_size = 80;
     constexpr size_t level_index_entry_size = 24;
     if(size < header_size || std::memcmp(bytes, ktx2_identifier, sizeof(ktx2_identifier)) != 0)
+    {
+        log::warn("[rtexture] KTX2: truncated header or invalid identifier");
         return false;
+    }
 
     const uint32_t vk_format = read_u32_le(bytes + 12);
     const uint32_t pixel_width = read_u32_le(bytes + 20);
@@ -270,13 +273,20 @@ bool load_ktx2(rtexture &texture, const uint8_t *bytes, size_t size)
 
     const uint32_t pixel_size = bytes_per_pixel(format);
     if(!pixel_size)
+    {
+        log::warn("[rtexture] KTX2: unsupported pixel size for vkFormat %u", vk_format);
         return false;
+    }
     const uint32_t expected_type_size =
         format == render::texture_format::COLOR_R_16_FLOAT ||
         format == render::texture_format::COLOR_RG_16_FLOAT ||
         format == render::texture_format::COLOR_RGBA_16_FLOAT ? 2 : 1;
     if(type_size != expected_type_size)
+    {
+        log::warn("[rtexture] KTX2: invalid typeSize %u for vkFormat %u (expected %u)",
+                  type_size, vk_format, expected_type_size);
         return false;
+    }
 
     uint32_t full_mip_count = 1;
     for(uint32_t dimension = std::max({pixel_width, pixel_height, pixel_depth});
@@ -301,7 +311,10 @@ bool load_ktx2(rtexture &texture, const uint8_t *bytes, size_t size)
     if(!extend_metadata_end(dfd_offset, dfd_length) ||
        !extend_metadata_end(kvd_offset, kvd_length) ||
        !extend_metadata_end(sgd_offset, sgd_length))
+    {
+        log::warn("[rtexture] KTX2: invalid DFD, KVD, or SGD metadata range");
         return false;
+    }
 
     const uint32_t width = pixel_width;
     const uint32_t height = std::max(1u, pixel_height);

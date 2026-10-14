@@ -240,7 +240,8 @@ namespace nb::render
         STANDARD_2D,
         STANDARD_PBR,
         IBL_INTEGRATION,
-        DYNAMIC  // TODO for custom/scriptable material types in the future
+        DYNAMIC,  // TODO for custom/scriptable material types in the future
+        MATCAP
     };
 
 };
