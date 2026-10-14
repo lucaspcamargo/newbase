@@ -3,6 +3,11 @@
     script:
       lua: "res/hello_3d/scene.lua"
 
+- name: environment
+  comps:
+    environment:
+      equirectangular: "_nb_core/tex/blender/world/sunset.ktx2"
+
 - name: camera
   comps:
     spatial:

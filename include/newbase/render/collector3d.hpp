@@ -5,6 +5,8 @@
 #include <newbase/render/material.hpp>
 #include <newbase/layer.hpp>
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 // our 3d render command collector and batcher
 
@@ -22,7 +24,9 @@
 namespace nb
 {
     class rmesh;
+    class rmaterial;
     class rshader;
+    struct cenvironment;
 }
 struct SDL_GPUGraphicsPipeline;
 
@@ -139,26 +143,33 @@ namespace nb::render
         /// so we can have one collector for all layers
         struct layer_marker
         {
+            uint32_t pass_start {0};
+            uint32_t pass_count {0};
+        };
+
+        /// Collector-owned command range and scene data associated with a pass.
+        struct collected_pass
+        {
+            uint32_t desc_offset {UINT32_MAX};
             uint32_t cmd_start {0};
             uint32_t cmd_count {0};
-            // NOTE if a renderer needs to know group splits (for some reason)
-            //      this is where we'd add them. but the whole point is not
-            //      to need them
+            uint32_t scene_uniform_index {0};
         };
 
         /// clears all internal data lists and resets arena
         /// makes collector ready for a new frame
         void clear();
 
-        /// gather 3d rendering commands for a render layer, given target and pass config
-        /// they are annotated by a layer_marker, appended to the current frame's markers
-        void collect(const render_layer &l, const pass_target_info &targets, pass_type pt);
+        /// Collect the passes required for one render layer. Passes are selected
+        /// by the collector from layer and scene data.
+        void collect(const render_layer &l, const pass_target_info &layer_targets);
 
 
         // inline getters
 
         inline const std::vector<command3d>& commands() const { return m_cmds; }
         inline const std::vector<layer_marker>& markers() const { return m_layer_markers; }
+        inline const std::vector<collected_pass>& passes() const { return m_passes; }
         inline const std::vector<scene_uniform_std>& scene_uniforms() const { return m_scene_uniforms; }
 
         inline const auto& pipeline_hashes() const { return m_pipeline_hashes; }
@@ -171,17 +182,27 @@ namespace nb::render
         inline uint16_t staging_shader_count() const { return m_staging_shader_count; }
         inline const auto& staging_meshes() const { return m_staging_meshes; }
         inline uint16_t staging_mesh_count() const { return m_staging_mesh_count; }
+        inline const std::vector<cenvironment*>& staging_ibl_environments() const { return m_staging_ibl_environments; }
 
         inline const void * arena_ptr(uint32_t byte_offset) const { return m_arena.raw_data() + byte_offset; }
+        inline const render_pass& pass_desc(const collected_pass &pass) const
+        {
+            return *static_cast<const render_pass*>(arena_ptr(pass.desc_offset));
+        }
 
     private:
-        void _sort();
+        void _sort(const collected_pass &pass);
+        void _collect_pass(const render_layer &layer, const render_pass &pass,
+                           const mat_env_data *env_data);
+        bool _collect_integration_pass(const render_pass &pass, rtexture *source);
         uint16_t _get_pipeline_index(const pipeline_descriptor & desc);
         uint16_t _add_staging_texture(rtexture* tex);
         uint16_t _add_staging_shader(rshader* shd);
         uint16_t _add_staging_mesh(rmesh* shd);
+        void _add_staging_ibl_environment(cenvironment *environment);
 
         std::vector<layer_marker> m_layer_markers {};
+        std::vector<collected_pass> m_passes {};
         std::vector<scene_uniform_std> m_scene_uniforms; // one per collect()
         std::vector<command3d> m_cmds {}; // reserved at construction time
         std::array<pipeline_descriptor::hash_t, COLLECTOR_3D_MAX_PIPELINES> m_pipeline_hashes;
@@ -193,6 +214,9 @@ namespace nb::render
         uint16_t m_staging_shader_count {0};
         std::array<rmesh*, COLLECTOR_3D_MAX_MESHES> m_staging_meshes;
         uint16_t m_staging_mesh_count {0};
+        std::vector<cenvironment*> m_staging_ibl_environments;
+        std::vector<std::shared_ptr<rmaterial>> m_internal_materials;
+        std::shared_ptr<rmesh> m_fullscreen_quad;
         coll3d_frame_arena m_arena {COLLECTOR_3D_DEFAULT_ARENA_ALLOC_BYTES};
     };
 }

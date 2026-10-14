@@ -83,7 +83,8 @@ void texture_editor_widget::apply(resource* res)
     auto* rt = static_cast<rtexture*>(res);
     if (rt->surf) SDL_DestroySurface(rt->surf);
     rt->surf = SDL_DuplicateSurface(_canvas);
-    rt->uploaded = false; // renderer must update existing internal texture and reupload surface
+    rt->flags |= render::texture_flags::NEEDS_UPLOAD;
+    rt->flags &= ~render::texture_flags::UPLOADED;
 }
 
 void texture_editor_widget::open(SDL_Surface* source)
@@ -206,7 +207,8 @@ void texture_editor_widget::_push_texture()
 {
     if (!_canvas || !_ui_tex) return;
     _ui_tex->surf = SDL_DuplicateSurface(_canvas);
-    _ui_tex->uploaded = false;
+    _ui_tex->flags |= render::texture_flags::NEEDS_UPLOAD;
+    _ui_tex->flags &= ~render::texture_flags::UPLOADED;
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────

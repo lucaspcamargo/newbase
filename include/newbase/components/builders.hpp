@@ -8,6 +8,7 @@ namespace nb
     bool build_body2d(ryml::ConstNodeRef def, cbody2d &dst);
     bool build_camera(ryml::ConstNodeRef def, ccamera &dst);
     bool build_character2d(ryml::ConstNodeRef def, ccharacter2d &dst);
+    bool build_environment(ryml::ConstNodeRef def, cenvironment &dst);
     bool build_layers(ryml::ConstNodeRef def, clayers &dst);
     bool build_mesh(ryml::ConstNodeRef def, cmesh &dst);
     bool build_particle_emitter(ryml::ConstNodeRef def, cparticle_emitter &dst);

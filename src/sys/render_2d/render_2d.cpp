@@ -577,7 +577,7 @@ void render_2d::_draw_batches(render::batcher2d::sync_id_t range, render::clip_t
         auto rtex = cmd.texture != -1? data.tex[cmd.texture].get() : nullptr;
         auto sdltex = rtex? static_cast<SDL_Texture*>(rtex->rptr) : nullptr;
 
-        // if (!rtex->uploaded) continue; // we could skip rendering textures that fail to upload, or not
+        // if (!render::has_flag(rtex->flags, render::texture_flags::UPLOADED)) continue;
 
         // NOTE We could simplify these blend mode shenanigans by:
         //  -- always restoring draw blend mode in the end
@@ -627,7 +627,7 @@ bool render_2d::_prepare_texture(rtexture *rtex)
 
     auto sdltex = static_cast<SDL_Texture*>(rtex->rptr);
 
-    if(rtex->rtarget)
+    if(render::has_flag(rtex->flags, render::texture_flags::TARGET))
     {
         // this texture is a render target
 
@@ -695,7 +695,7 @@ bool render_2d::_prepare_texture(rtexture *rtex)
 
     // common texture
     // check if we need to do an upload, potentially recreating the texture
-    if (!rtex->uploaded && rtex->surf)
+    if (render::has_flag(rtex->flags, render::texture_flags::NEEDS_UPLOAD) && rtex->surf)
     {
         if(sdltex)
         {
@@ -718,14 +718,17 @@ bool render_2d::_prepare_texture(rtexture *rtex)
             SDL_ScaleMode sm = rtex->nearest?
                             SDL_SCALEMODE_NEAREST : _d->default_tex_scalemode;
             SDL_SetTextureScaleMode(sdltex, sm);
-            rtex->uploaded = true;
+            rtex->flags &= ~render::texture_flags::NEEDS_UPLOAD;
+            rtex->flags |= render::texture_flags::UPLOADED;
         }
         else
             log::warn("[render_2d] texture upload failure for 0x%08x: '%s'", rtex->id(), SDL_GetError());
 
-        // even on upload failure, we destroy the surface, to prevent continuous failure every frame
-        SDL_DestroySurface(rtex->surf);
-        rtex->surf = nullptr;
+        if(sdltex && !render::has_flag(rtex->flags, render::texture_flags::KEEP_CPU))
+        {
+            SDL_DestroySurface(rtex->surf);
+            rtex->surf = nullptr;
+        }
         return true;
     }
     return false;
@@ -828,7 +831,9 @@ render::target_id_t render_2d::target_create(const render::target_desc& desc)
     rname += std::to_string(target.id);
     auto rid = entt::hashed_string(rname.c_str()).value();
     target.color_tex = std::make_shared<rtexture>( rid );
-    target.color_tex->rtarget = true;
+    target.color_tex->flags &= ~render::texture_flags::SDL_SURFACE;
+    target.color_tex->flags &= ~render::texture_flags::NEEDS_UPLOAD;
+    target.color_tex->flags |= render::texture_flags::TARGET;
     target.color_tex->on_delete = &_texture_cleanup;
     target.color_tex->on_delete_uptr = _d.get();
 

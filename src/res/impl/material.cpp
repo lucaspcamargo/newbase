@@ -79,24 +79,31 @@ bool rmaterial::_load_gltf_model_material(const tg3_model *model, const tg3_mate
     mat_type = render::material_type::STANDARD_PBR;
     auto pbr_params = render::pbr_mat_params {};
 
-    // pbr params - TODO resolve sampler configs too
+    // Resolve each glTF texture's sampler independently from its image resource.
 
     pbr_params.base_color_tex = _resolve_texture(model, mat->pbr_metallic_roughness.base_color_texture.index, parent_path);
+    _setup_sampler(model, mat->pbr_metallic_roughness.base_color_texture.index,
+                   pbr_params.base_color_sampling);
     const auto &base_col = mat->pbr_metallic_roughness.base_color_factor;
     pbr_params.base_color_factor = glm::vec4 { (float) base_col[0],
         (float) base_col[1], (float) base_col[2], (float) base_col[3] };
 
     pbr_params.metal_rough_tex = _resolve_texture(model, mat->pbr_metallic_roughness.metallic_roughness_texture.index, parent_path);
+    _setup_sampler(model, mat->pbr_metallic_roughness.metallic_roughness_texture.index,
+                   pbr_params.metal_rough_sampling);
     pbr_params.metallic_factor = mat->pbr_metallic_roughness.metallic_factor;
     pbr_params.roughness_factor = mat->pbr_metallic_roughness.roughness_factor;
 
     pbr_params.normal_tex = _resolve_texture(model, mat->normal_texture.index, parent_path);
+    _setup_sampler(model, mat->normal_texture.index, pbr_params.normal_sampling);
     pbr_params.normal_scaling = (float) mat->normal_texture.scale;
 
     pbr_params.ao_tex = _resolve_texture(model, mat->occlusion_texture.index, parent_path);
+    _setup_sampler(model, mat->occlusion_texture.index, pbr_params.ao_sampling);
     pbr_params.occlusion_strength = mat->occlusion_texture.strength;
 
     pbr_params.emissive_color_tex = _resolve_texture(model, mat->emissive_texture.index, parent_path);
+    _setup_sampler(model, mat->emissive_texture.index, pbr_params.emissive_color_sampling);
     const auto &emit_col = mat->emissive_factor;
     pbr_params.emissive_color_factor = glm::vec4 { (float) emit_col[0],
         (float) emit_col[1], (float) emit_col[2], 1.0f };
@@ -137,17 +144,27 @@ std::shared_ptr<rtexture> rmaterial::_resolve_texture(const tg3_model *model, in
     return std::static_pointer_cast<rtexture>(rman().load_sync("rtexture"_hs, entt::hashed_string{tex_path.c_str()}.value()));
 }
 
-void rmaterial::_setup_sampler(const tg3_model *model, const tg3_texture_info &tex_info, render::sampler_config &sc)
+void rmaterial::_setup_sampler(const tg3_model *model, int32_t texture_index,
+                               render::sampler_config &sc)
 {
-    if(tex_info.index == -1)
+    sc.min_filter = render::sampler_filter::LINEAR;
+    sc.mag_filter = render::sampler_filter::LINEAR;
+    sc.mip_filter = render::sampler_filter::NEAREST;
+    sc.addr_mode_u = render::sampler_addressing::REPEAT;
+    sc.addr_mode_v = render::sampler_addressing::REPEAT;
+    sc.addr_mode_w = render::sampler_addressing::CLAMP_TO_EDGE;
+    sc.max_lod = 0.0f;
+
+    if(texture_index == -1)
         return;
 
-    const auto &tex_block = model->textures[tex_info.index];
+    const auto &tex_block = model->textures[texture_index];
 
     if(tex_block.sampler == -1)
         return;
 
     const auto &sampler_block = model->samplers[tex_block.sampler];
+    sc.max_lod = 1000.0f;
 
     if(sampler_block.min_filter != -1)
     {
@@ -188,7 +205,7 @@ void rmaterial::_setup_sampler(const tg3_model *model, const tg3_texture_info &t
                 sc.mag_filter = render::sampler_filter::NEAREST;
                 break;
             case TG3_TEXTURE_FILTER_LINEAR:
-                sc.mag_filter = render::sampler_filter::NEAREST;
+                sc.mag_filter = render::sampler_filter::LINEAR;
                 break;
         }
     }

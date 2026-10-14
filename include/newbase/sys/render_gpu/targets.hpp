@@ -71,7 +71,7 @@ namespace nb::gpu
         ///      blend states must be handled separately afterwards
         bool prepare_gpu_pipeline_target_info(SDL_GPUGraphicsPipelineTargetInfo &pti,
                                               SDL_GPUColorTargetDescription *color_targets,
-                                              render::pass_target_info native);
+                                              render::pipeline_target_info native);
 
     private:
         void _size_reorder();

@@ -44,7 +44,7 @@ protected:
 private:
     bool _load_gltf_model_material(const tg3_model *model, const tg3_material *mat, const std::string &parent_path);
     std::shared_ptr<rtexture> _resolve_texture(const tg3_model *model, int32_t index, const std::string &parent_path);
-    void _setup_sampler(const tg3_model *model, const tg3_texture_info &tex_info, render::sampler_config &sc);
+    void _setup_sampler(const tg3_model *model, int32_t texture_index, render::sampler_config &sc);
 };
 
 }

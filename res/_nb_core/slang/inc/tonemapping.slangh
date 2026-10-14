@@ -1,0 +1,118 @@
+float3 tone_map_reinhard(float3 color)
+{
+    return color / (1.0 + color);
+}
+
+float3 tone_map_aces_fitted(float3 color)
+{
+    float3 numerator = color * (2.51 * color + 0.03);
+    float3 denominator = color * (2.43 * color + 0.59) + 0.14;
+    return saturate(numerator / denominator);
+}
+
+float3 tone_map_agx_sigmoid(float3 color)
+{
+    float3 x2 = color * color;
+    float3 x3 = x2 * color;
+    float3 x4 = x2 * x2;
+    float3 x6 = x4 * x2;
+    float3 x5 = x4 * color;
+    return 15.5 * x6 - 40.14 * x5 + 31.96 * x4 -
+           6.868 * x3 + 0.4298 * x2 + 0.1191 * color - 0.00232;
+}
+
+float3 tone_map_agx(float3 color)
+{
+    color = max(color, 1.0e-10);
+    float3 inset = float3(
+        dot(float3(0.8424790623, 0.0423282423, 0.0423756549), color),
+        dot(float3(0.0784336, 0.8784686365, 0.0784336), color),
+        dot(float3(0.0792237451, 0.0791661275, 0.8791429738), color));
+    float3 log_color = clamp((log2(inset) + 12.47393) / 16.5, 0.0, 1.0);
+    float3 color_s = tone_map_agx_sigmoid(log_color);
+    float3 out_color = float3(
+        dot(float3(1.1968790051, -0.0528968518, -0.0529716355), color_s),
+        dot(float3(-0.0980208811, 1.1519031299, -0.0980434501), color_s),
+        dot(float3(-0.0990297441, -0.0989611768, 1.1510736726), color_s));
+    return saturate(out_color);
+}
+
+float3 tone_map_pbr_neutral(float3 color)
+{
+    color = max(color, 0.0);
+    float minimum = min(color.r, min(color.g, color.b));
+    float offset = minimum < 0.08 ? minimum - 6.25 * minimum * minimum : 0.04;
+    color -= offset;
+
+    float peak = max(color.r, max(color.g, color.b));
+    const float start_compression = 0.76;
+    if(peak < start_compression)
+        return saturate(color);
+
+    const float desaturation = 0.15;
+    float d = 1.0 - start_compression;
+    float new_peak = 1.0 - d * d / (peak + d - start_compression);
+    color *= new_peak / peak;
+    float gray = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
+    return saturate(lerp(color, float3(new_peak), gray));
+}
+
+float3 tone_map_lottes(float3 color)
+{
+    const float a = 1.6;
+    const float d = 0.977;
+    const float hdr_max = 8.0;
+    const float mid_in = 0.18;
+    const float mid_out = 0.267;
+    float b = (-pow(mid_in, a) + pow(hdr_max, a) * mid_out) /
+        ((pow(hdr_max, a * d) - pow(mid_in, a * d)) * mid_out);
+    float c = (pow(hdr_max, a * d) * pow(mid_in, a) -
+               pow(hdr_max, a) * pow(mid_in, a * d) * mid_out) /
+        ((pow(hdr_max, a * d) - pow(mid_in, a * d)) * mid_out);
+    color = max(color, 0.0);
+    return saturate(pow(color, a) / (pow(color, a * d) * b + c));
+}
+
+float3 tone_map_weird_posterize(float3 color)
+{
+    color = saturate(color);
+    return float3(
+        floor(color.r * 5.0 + 0.5) / 5.0,
+        floor(color.g * 4.0 + 0.5) / 4.0,
+        floor(color.b * 3.0 + 0.5) / 3.0);
+}
+
+float3 tone_map_filmic_curve(float3 color)
+{
+    const float A = 0.15;
+    const float B = 0.50;
+    const float C = 0.10;
+    const float D = 0.20;
+    const float E = 0.02;
+    const float F = 0.30;
+    return ((color * (A * color + C * B) + D * E) /
+            (color * (A * color + B) + D * F)) - E / F;
+}
+
+float3 tone_map_filmic(float3 color)
+{
+    const float white_point = 11.2;
+    return saturate(tone_map_filmic_curve(color) /
+                    tone_map_filmic_curve(float3(white_point)));
+}
+
+float linear_to_srgb_channel(float value)
+{
+    value = max(value, 0.0);
+    return value <= 0.0031308
+        ? 12.92 * value
+        : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
+}
+
+float3 linear_to_srgb(float3 color)
+{
+    return float3(
+        linear_to_srgb_channel(color.r),
+        linear_to_srgb_channel(color.g),
+        linear_to_srgb_channel(color.b));
+}

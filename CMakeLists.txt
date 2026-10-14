@@ -107,6 +107,7 @@ add_library(newbase STATIC
     src/components/body2d_rtti.cpp
     src/components/builders.cpp
     src/components/camera_rtti.cpp
+    src/components/environment_rtti.cpp
     src/components/character2d_rtti.cpp
     src/components/layers_rtti.cpp
     src/components/mesh2d_rtti.cpp
@@ -143,6 +144,7 @@ add_library(newbase STATIC
     src/render/mat/pbr.cpp
     src/render/mat/std_2d.cpp
     src/render/mat/matcap.cpp
+    src/render/mat/ibl_integration.cpp
 
     # resource system
     src/res/manager.cpp
@@ -191,6 +193,7 @@ add_library(newbase STATIC
     ${TRACY_SOURCES}
     vendored/tinygltf/tiny_gltf_v3.c
     vendored/MikkTSpace/mikktspace.c
+    vendored/tiny_ktx/src/tinyktx.c
 )
 
 if(NEWBASE_USE_XDG_DATA_DIRS)
@@ -257,6 +260,8 @@ target_include_directories(newbase PUBLIC
     vendored/imgui-markdown
     vendored/tinygltf
     vendored/MikkTSpace
+    vendored/tiny_ktx/include
+    vendored/tiny_imageformat/include
     ${IMGUI_INCLUDES}
     ${LUA_INCLUDES}
     ${TRACY_INCLUDES}

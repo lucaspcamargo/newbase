@@ -1,3 +1,5 @@
+#include "./inc/std_uniforms.slangh"
+
 static const float PI = 3.14159265359;
 
 struct VSOutput
@@ -8,20 +10,6 @@ struct VSOutput
     float2 uv         : TEXCOORD2;
     float3 world_tangent   : TEXCOORD3;
     float  bitangent_sign  : TEXCOORD4;
-};
-
-struct SceneUniforms
-{
-    column_major float4x4 view;
-    column_major float4x4 proj;
-    column_major float4x4 view_proj;
-    column_major float4x4 inv_view;
-    float3   camera_pos;
-    float    _pad0;
-    float3   light_dir;      // Normalized direction towards light source
-    float    _pad1;
-    float3   light_color;    // Light radiance (color * intensity)
-    float    _pad2;
 };
 
 [[vk::binding(0, 3)]]

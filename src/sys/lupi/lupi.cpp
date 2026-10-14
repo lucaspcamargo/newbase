@@ -463,7 +463,8 @@ bool nb::lupi::lupi::step(step_phase phase)
             _d->fb_tex->surf = SDL_CreateSurfaceFrom(LUPI_SCREEN_W, LUPI_SCREEN_H,
                                                      SDL_PIXELFORMAT_RGBA32, _d->rgba_scratch.data(),
                                                      4*LUPI_SCREEN_W);
-            _d->fb_tex->uploaded = false;
+            _d->fb_tex->flags |= render::texture_flags::NEEDS_UPLOAD;
+            _d->fb_tex->flags &= ~render::texture_flags::UPLOADED;
 
         }
     }

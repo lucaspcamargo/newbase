@@ -36,6 +36,15 @@ namespace nb::render
         }
     };
 
+    /// Scene-provided environment resources available to a material draw.
+    struct mat_env_data
+    {
+        bool ibl_enabled {false};
+        rtexture *environment_cubemap {nullptr};
+        rtexture *irradiance_cubemap {nullptr};
+        rtexture *prefiltered_cubemap {nullptr};
+    };
+
     struct pipeline_descriptor; //fwd
 
     /// A material controller is an interface that handles
@@ -53,11 +62,9 @@ namespace nb::render
         /// or optionally filter it or replace it entirely
         /// TODO pass also some global scene rendering settings (when they become necessary)
         /// NOTE: DOES NOT touch pass_target_info
-        virtual void make_pipeline_desc(const rmaterial& mat, pass_type pt, vertex_type vt,
+        virtual void make_pipeline_desc(const rmaterial& mat, const mat_env_data *env_data,
+                                        pass_type pt, vertex_type vt,
                                         pipeline_descriptor &dst_desc) const = 0;
-
-        // TODO for uniforms and tex bind generation: pass structure with local environment info
-        //      this will be crucial for IBL probe switch, SH-ambient coefficients, what have you
 
         /// returns the vertex program associated with this pipeline
         virtual std::shared_ptr<rshader> get_vertex_program(const pipeline_descriptor &desc) const = 0;
@@ -65,27 +72,33 @@ namespace nb::render
         /// returns the fragment program associated with this pipeline
         virtual std::shared_ptr<rshader> get_fragment_program(const pipeline_descriptor &desc) const = 0;
 
-        /// returns the raw structure size for the vertex shader ubo
-        virtual size_t get_vertex_ubo_size(const pipeline_descriptor &desc) const = 0;
+        /// Returns the raw structure size for the vertex shader UBO.
+        virtual size_t get_vertex_ubo_size(const pipeline_descriptor &desc,
+                                           const mat_env_data *env_data) const = 0;
 
-        /// returns the raw structure size for the fragment shader ubo
-        virtual size_t get_fragment_ubo_size(const pipeline_descriptor &desc) const = 0;
+        /// Returns the raw structure size for the fragment shader UBO.
+        virtual size_t get_fragment_ubo_size(const pipeline_descriptor &desc,
+                                             const mat_env_data *env_data) const = 0;
 
         /// generates the fragment uniform buffer for this material
         virtual void pack_vertex_uniforms( const rmaterial& mat, const pipeline_descriptor &desc,
+                                           const mat_env_data *env_data,
                                            uint8_t* out_buffer, size_t out_len) const = 0;
 
         /// generates the fragment uniform buffer for this material
         virtual void pack_fragment_uniforms(const rmaterial& mat, const pipeline_descriptor &desc,
+                                            const mat_env_data *env_data,
                                             uint8_t* out_buffer, size_t out_len) const = 0;
 
 
         /// returns the number of textures bindings for the shader
-        virtual size_t get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest) const = 0;
+        virtual size_t get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest,
+                                                const mat_env_data *env_data) const = 0;
 
         /// writes all the texture binds required for the shader into the given buffer
         /// the amount to be witten is given by get_num_texture_bindings()
         virtual void collect_texture_bindings( const rmaterial& mat, const pipeline_descriptor &desc,
+                                               const mat_env_data *env_data,
                                                material_texture_binding* out_bindings_buf) const = 0;
 
         /// material controller accessor

@@ -9,6 +9,7 @@
 #include <tiny_gltf_v3.h>
 #include <mikktspace.h>
 #include <memory>
+#include <cstring>
 
 using namespace ::nb;
 using namespace ::nb::render;
@@ -74,6 +75,26 @@ rmesh::rmesh(entt::id_type id) :
     resource(id, entt::hashed_string{"rmesh"}.value())
 {
 
+}
+
+std::shared_ptr<rmesh> rmesh::make_fullscreen_quad()
+{
+    auto mesh = std::make_shared<rmesh>();
+    mesh->m_vtx_type = vertex_type::STANDARD_2D;
+    mesh->m_data_index_offset = (sizeof(vertex2d) * 4 + 15) & ~size_t(15);
+    mesh->m_data.resize(mesh->m_data_index_offset + sizeof(uint32_t) * 6);
+
+    const vertex2d vertices[] = {
+        {{-1.0f, -1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+        {{ 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+        {{ 1.0f,  1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},
+        {{-1.0f,  1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}
+    };
+    const uint32_t indices[] = {0, 1, 2, 0, 2, 3};
+    std::memcpy(mesh->m_data.data(), vertices, sizeof(vertices));
+    std::memcpy(mesh->m_data.data() + mesh->m_data_index_offset, indices, sizeof(indices));
+    mesh->m_submeshes.push_back({0, 0, 0, 6});
+    return mesh;
 }
 
 

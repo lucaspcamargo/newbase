@@ -70,7 +70,8 @@ rmaterial * mat_std_2d::get_token_material(const command2d &cmd)
 
 // controller impl
 
-void mat_std_2d::make_pipeline_desc(const rmaterial& mat, pass_type pt, vertex_type vt,
+void mat_std_2d::make_pipeline_desc(const rmaterial& mat, const mat_env_data *,
+                                    pass_type pt, vertex_type vt,
                                     pipeline_descriptor &dst_desc) const
 {
     assert(vt == vertex_type::STANDARD_2D);

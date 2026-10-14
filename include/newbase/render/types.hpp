@@ -199,12 +199,12 @@ namespace nb::render
 
     struct sampler_config
     {
-        sampler_filter min_filter {sampler_filter::NEAREST};
-        sampler_filter mag_filter {sampler_filter::NEAREST};
+        sampler_filter min_filter {sampler_filter::LINEAR};
+        sampler_filter mag_filter {sampler_filter::LINEAR};
         sampler_filter mip_filter {sampler_filter::NEAREST};
-        sampler_addressing addr_mode_u {sampler_addressing::REPEAT};
-        sampler_addressing addr_mode_v {sampler_addressing::REPEAT};
-        sampler_addressing addr_mode_w {sampler_addressing::REPEAT};
+        sampler_addressing addr_mode_u {sampler_addressing::CLAMP_TO_EDGE};
+        sampler_addressing addr_mode_v {sampler_addressing::CLAMP_TO_EDGE};
+        sampler_addressing addr_mode_w {sampler_addressing::CLAMP_TO_EDGE};
         float max_aniso {1.0f};
         float max_lod {1000.0f}; // set to 0 to disable mipmapping
 
@@ -239,8 +239,8 @@ namespace nb::render
         INVALID,
         STANDARD_2D,
         STANDARD_PBR,
+        IBL_INTEGRATION,
         DYNAMIC  // TODO for custom/scriptable material types in the future
     };
 
 };
-

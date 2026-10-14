@@ -128,7 +128,8 @@ void imgui_nb::_rebuild_font_atlas(bool force)
         _d->font_tex->surf = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_ARGB8888, pixels, width*4);
         _d->font_tex->width = width;
         _d->font_tex->height = height;
-        _d->font_tex->uploaded = false;
+        _d->font_tex->flags |= render::texture_flags::NEEDS_UPLOAD;
+        _d->font_tex->flags &= ~render::texture_flags::UPLOADED;
         // The created surface is just a reference for ImGui's internal pixel buffer and can safely be destroyed,
         // as it won't touch its backing memory
         // This relies on the fact that the pointer remains constant as long as we don't call GetTex

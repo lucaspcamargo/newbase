@@ -16,7 +16,7 @@
 //   "material_type + pass_type + vertex_format + shader_variant + raster config"
 // defines all of the gfx pipeline info in one go (shaders, vert attrs, raster config)
 
-// well, almost. pass_target_info is also part of it, but does not change with
+// well, almost. pipeline_target_info is also part of it, but does not change with
 // the material or mesh info
 
 // That said, materialization of this descriptor is the responsibility of a
@@ -30,7 +30,7 @@ namespace nb::render
 struct pipeline_descriptor // NOTE keep tightly-packed pls
 {
     // common render target information
-    pass_target_info targets {};
+    pipeline_target_info targets {};
 
     // shader and vertex
     material_variant shader_variant {0};
@@ -70,4 +70,3 @@ static_assert(sizeof(pipeline_descriptor)==14, "Make sure we notice if size chan
 static_assert(alignof(pipeline_descriptor)==2, "Make sure we notice if alignment changes");
 
 }
-

@@ -2,6 +2,7 @@
 #include <newbase/components/body2d.hpp>
 #include <newbase/components/camera.hpp>
 #include <newbase/components/character2d.hpp>
+#include <newbase/components/environment.hpp>
 #include <newbase/components/mesh.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/script.hpp>
@@ -191,6 +192,25 @@ bool nb::build_camera(ryml::ConstNodeRef def, ccamera &dst)
         if (def3d.has_child("clip_far"))   def3d["clip_far"]   >> dst.cam3d.clip_far;
         if (def3d.has_child("fov"))   def3d["fov"]   >> dst.cam3d.fov;
     }
+    return true;
+}
+
+bool nb::build_environment(ryml::ConstNodeRef def, cenvironment &dst)
+{
+    if(!def.has_child("equirectangular"))
+        return true;
+
+    std::string respath;
+    c4::from_chars(def["equirectangular"].val(), &respath);
+    const auto asset_id = entt::hashed_string{respath.c_str()}.value();
+    auto source = rman().load_sync<rtexture>(asset_id);
+    if(!source)
+    {
+        log::error("[build_environment] cannot load equirectangular texture '%s'", respath.c_str());
+        return false;
+    }
+
+    dst.set_equirectangular(std::move(source));
     return true;
 }
 

@@ -74,6 +74,7 @@ bool rshader::do_load()
     }
 
     const auto &name = it->second.name;
+    const auto &full_path = it->second.path;
     auto path = std::filesystem::path{name};
     if(!path.has_extension())
     {
@@ -94,7 +95,7 @@ bool rshader::do_load()
         stage = render::shader_stage::COMPUTE;
 
 #ifdef NEWBASE_SLANG_RUNTIME
-    if(!compile_slang_to_spirv(data.data(), name, name, "main", stage, *this))
+    if(!compile_slang_to_spirv(data.data(), name, full_path, "main", stage, *this))
     {
         log::error("[rshader] loading failed: %s", path.c_str());
         return false;
@@ -432,6 +433,93 @@ slang::IGlobalSession* _slang_get_global_session()
     return global_session.get();
 }
 
+class slang_resource_file_system : public ISlangFileSystem
+{
+public:
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) override
+    {
+        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (uuid == ISlangUnknown::getTypeGuid() ||
+            uuid == ISlangCastable::getTypeGuid() ||
+            uuid == ISlangFileSystem::getTypeGuid())
+        {
+            *outObject = static_cast<ISlangFileSystem*>(this);
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
+    {
+        if (guid == ISlangUnknown::getTypeGuid() ||
+            guid == ISlangCastable::getTypeGuid() ||
+            guid == ISlangFileSystem::getTypeGuid())
+        {
+            return static_cast<ISlangFileSystem*>(this);
+        }
+        return nullptr;
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob) override
+    {
+        if (!path || !outBlob)
+            return SLANG_E_INVALID_ARG;
+
+        std::string clean_path = path;
+        for (char& c : clean_path)
+        {
+            if (c == '\\') c = '/';
+        }
+
+        size_t start = 0;
+        while (start < clean_path.size())
+        {
+            if (clean_path[start] == '/')
+                start++;
+            else if (clean_path.compare(start, 2, "./") == 0)
+                start += 2;
+            else
+                break;
+        }
+        std::string_view p = std::string_view{clean_path}.substr(start);
+
+        auto id = entt::hashed_string{p.data(), p.size()}.value();
+        std::vector<char> data;
+        if (!nb::rman().read_all_sync(id, data, false))
+        {
+            // Fallback: check if any handle matches by suffix or name
+            entt::id_type found_id = 0;
+            for (const auto& [hid, handle] : nb::rman().handles())
+            {
+                if (handle.path.size() >= p.size() &&
+                    handle.path.compare(handle.path.size() - p.size(), p.size(), p) == 0 &&
+                    (handle.path.size() == p.size() || handle.path[handle.path.size() - p.size() - 1] == '/'))
+                {
+                    found_id = hid;
+                    break;
+                }
+            }
+            if (!found_id || !nb::rman().read_all_sync(found_id, data, false))
+            {
+                return SLANG_E_NOT_FOUND;
+            }
+        }
+
+        ISlangBlob* blob = slang_createBlob(data.data(), data.size());
+        if (!blob)
+            return SLANG_E_OUT_OF_MEMORY;
+
+        *outBlob = blob;
+        return SLANG_OK;
+    }
+};
+
+static slang_resource_file_system s_slang_resource_fs;
+
 slang::ISession* _slang_get_thread_local_session()
 {
     thread_local Slang::ComPtr<slang::ISession> t_session {};
@@ -447,6 +535,7 @@ slang::ISession* _slang_get_thread_local_session()
         slang::SessionDesc session_desc = {};
         session_desc.targets = &target_desc;
         session_desc.targetCount = 1;
+        session_desc.fileSystem = &s_slang_resource_fs;
 
         // ISession is created from the thread-safe IGlobalSession
         global->createSession(session_desc, t_session.writeRef());

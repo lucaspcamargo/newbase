@@ -513,7 +513,8 @@ static const graphplan::domain AUDIO_DOMAIN = []() {
                 fb->texture->surf = SDL_CreateSurfaceFrom(fb->surface->w, fb->surface->h,
                                                           fb->surface->format, fb->surface->pixels,
                                                           fb->surface->pitch);
-                fb->texture->uploaded = false;
+                fb->texture->flags |= render::texture_flags::NEEDS_UPLOAD;
+                fb->texture->flags &= ~render::texture_flags::UPLOADED;
             }
 
             ImGui::Image(ImTextureID{fb->texture_hnd},

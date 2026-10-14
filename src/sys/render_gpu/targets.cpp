@@ -307,7 +307,7 @@ bool target_manager::target_info_get(render::target_id_t id, render::pass_target
 
 bool target_manager::prepare_gpu_pipeline_target_info(SDL_GPUGraphicsPipelineTargetInfo &pti,
                                       SDL_GPUColorTargetDescription *color_targets,
-                                      render::pass_target_info native)
+                                      render::pipeline_target_info native)
 {
     int num_color_targets = 0;
     if(native.color_targets[0] == render::texture_format::INVALID)
@@ -341,6 +341,14 @@ static render::pass_target_info target_desc_to_pass_info(const render::target_de
 {
     render::pass_target_info ret;
     ret.color_targets[0] = render::texture_format::COLOR_RGBA_8888;
+    // default to base mip / first layer
+    for(int i = 0; i < render::PASS_MAX_COLOR_TARGETS; ++i) {
+        ret.color_mip_level[i] = 0;
+        ret.color_layer_index[i] = 0;
+    }
+    ret.depth_mip_level = 0;
+    ret.depth_layer_index = 0;
+
     if(td.has_depth)
         ret.depth_target = render::texture_format::DEPTH_16;
     return ret;

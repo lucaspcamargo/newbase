@@ -20,9 +20,6 @@ namespace nb::gpu
     /// manager structure for shaders in render_gpu
     struct texture_manager
     {
-        // TODO instead of creating a sampler for every texture, create a sampler
-        //      object cache not dissimilar to what we do with pipelines
-
         // TODO allow for the cretion of better depth buffers
 
         /// initializes the texture manager
@@ -36,6 +33,18 @@ namespace nb::gpu
         /// @returns Whether the texture can be used by the renderer.
         bool prepare(SDL_GPUDevice * dev, SDL_GPUCommandBuffer *cmd, rtexture *tex, SDL_GPUCopyPass *cpy = nullptr);
 
+        /// Generates mipmaps for textures prepared since the previous call.
+        /// Must be called outside of a GPU pass.
+        void generate_mipmaps(SDL_GPUCommandBuffer *cmd);
+
+        /// Generates mipmaps for a target texture after it has been rendered to.
+        /// Must be called outside of a GPU pass.
+        void generate_mipmaps_deferred(SDL_GPUCommandBuffer *cmd, rtexture *tex);
+
+        /// Generates all mip levels for a target texture, regardless of its flags.
+        /// Must be called outside of a GPU pass.
+        bool generate_mipmaps_for_target(SDL_GPUCommandBuffer *cmd, rtexture *tex);
+
         /// Prepares multiple textures from an iterator type.
         /// The copy pass is optinal. A new one is created if it does not exist.
         /// @returns Whether all texture can be used by the renderer.
@@ -45,7 +54,10 @@ namespace nb::gpu
             bool ret = true;
             copy_scope cpy_scope(cmd, cpy);
             for(auto it = begin; it!= end; it++)
-                ret = ret && prepare(dev, cmd, &**it, cpy_scope);
+            {
+                const bool prepared = prepare(dev, cmd, &**it, cpy_scope);
+                ret = prepared && ret;
+            }
             return ret;
         }
 
@@ -94,6 +106,7 @@ namespace nb::gpu
 
         std::vector<texture_block> m_delete; // deferred delete list
         std::mutex m_delete_mtx;
+        std::vector<rtexture*> m_mipmap_generation;
 
         struct {
             std::vector<SDL_GPUTextureFormat> samplers;
@@ -109,11 +122,12 @@ namespace nb::gpu
     struct texture_block
     {
         SDL_GPUTexture *gtex {nullptr};
-        SDL_GPUSampler *gsamp {nullptr}; // TODO remove, use sampler cache!!!
         SDL_GPUTextureFormat gfmt {SDL_GPU_TEXTUREFORMAT_INVALID};
+        SDL_GPUTextureType type {SDL_GPU_TEXTURETYPE_2D};
         uint32_t w {0};
         uint32_t h {0};
+        uint32_t layer_count_or_depth {1};
+        uint32_t num_levels {1};
         bool owns_texture {true};
-        bool owns_sampler {true};
     };
 }

@@ -191,8 +191,8 @@ bool demo_system::step(nb::step_phase phase)
             {
                 nb::log::error("[demo] empty load results");
             }
+            load_hnd = nb::res::load::TASK_INVALID;
         }
-        load_hnd = nb::res::load::TASK_INVALID;
     }
     else if(load_results_hold.root.size())
         load_results_hold = {};

@@ -167,7 +167,7 @@ bool rtexfont::do_load()
     atlas_tex->surf         = surf;
     atlas_tex->width        = surf->w;
     atlas_tex->height       = surf->h;
-    atlas_tex->uploaded     = false;
+    atlas_tex->flags |= render::texture_flags::NEEDS_UPLOAD;
     atlas_tex->rptr         = nullptr;
     atlas_tex->reload_surface = nullptr;
     atlas = atlas_tex;

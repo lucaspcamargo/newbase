@@ -53,6 +53,7 @@ struct nb::editor_p
     bool render_layers_enabled= false;
     bool show_demo            = false;
     bool show_wireframes      = true;
+    bool three_dee            = false;
     int  log_observer         = -1;
 
     console              con;
@@ -87,16 +88,46 @@ editor::~editor()
 
 void editor::_sync_editor_cam_to_game()
 {
-    const auto &layers = engine::instance().render_layers();
+    const auto &layers = engine::instance().render_layers_real();
     if (layers.empty()) return;
     const auto &first = layers.front();
+    _d->three_dee = first.three_dee;
     auto *sc = engine::instance().find_scene(first.scene_id);
     if (!sc) return;
     auto &reg = sc->registry();
-    if (first.camera != entt::null)
+    if (first.camera != entt::null && reg.valid(first.camera))
     {
-        if (auto *sp  = reg.try_get<cspatial>(first.camera)) { _d->cam_x = sp->pos.x; _d->cam_y = sp->pos.y; }
-        if (auto *cam = reg.try_get<ccamera> (first.camera)) { _d->cam_zoom = cam->cam2d.scale; }
+        if (auto *sp  = reg.try_get<cspatial>(first.camera))
+        {
+            _d->cam_x = sp->pos.x;
+            _d->cam_y = sp->pos.y;
+            if (_d->three_dee)
+            {
+                auto &ed_reg = engine::instance().default_scene().registry();
+                if (_d->editor_cam_eid != entt::null && ed_reg.valid(_d->editor_cam_eid))
+                {
+                    if (auto *ed_sp = ed_reg.try_get<cspatial>(_d->editor_cam_eid))
+                    {
+                        *ed_sp = *sp;
+                    }
+                }
+            }
+        }
+        if (auto *cam = reg.try_get<ccamera> (first.camera))
+        {
+            _d->cam_zoom = cam->cam2d.scale;
+            if (_d->three_dee)
+            {
+                auto &ed_reg = engine::instance().default_scene().registry();
+                if (_d->editor_cam_eid != entt::null && ed_reg.valid(_d->editor_cam_eid))
+                {
+                    if (auto *ed_cam = ed_reg.try_get<ccamera>(_d->editor_cam_eid))
+                    {
+                        ed_cam->cam3d = cam->cam3d;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -105,18 +136,6 @@ void editor::_apply_override_layers()
     auto *uim = entt::locator<ui_manager*>::value();
     if (!uim || _d->editor_cam_eid == entt::null)
         return;
-
-    render_layer rl_grid;
-    rl_grid.scene_id   = entt::null;
-    rl_grid.layer_mask = clayers::MASK_ALL;
-    rl_grid.camera     = _d->editor_cam_eid;
-    rl_grid.viewport   = {};
-    rl_grid.order      = 0;
-    rl_grid.follow_ui  = true;
-    rl_grid.clear      = true;
-    rl_grid.custom_2d_draw = [&](const render_layer &l, render::batcher2d &batcher){
-        this->_draw_grid(l, batcher);
-    };
 
     render_layer rl;
     rl.scene_id   = entt::null;
@@ -127,8 +146,37 @@ void editor::_apply_override_layers()
     rl.follow_ui  = true;
     rl.ui_overlays = true;
     rl.clear      = false;
+    rl.three_dee  = _d->three_dee;
 
-    engine::instance().set_override_render_layers({rl_grid, rl});
+    if (_d->three_dee)
+    {
+        rl.clear = true;
+        const auto &layers = engine::instance().render_layers_real();
+        if (!layers.empty())
+        {
+            rl.clear_r = layers.front().clear_r;
+            rl.clear_g = layers.front().clear_g;
+            rl.clear_b = layers.front().clear_b;
+        }
+        rl.order = 0;
+        engine::instance().set_override_render_layers({rl});
+    }
+    else
+    {
+        render_layer rl_grid;
+        rl_grid.scene_id   = entt::null;
+        rl_grid.layer_mask = clayers::MASK_ALL;
+        rl_grid.camera     = _d->editor_cam_eid;
+        rl_grid.viewport   = {};
+        rl_grid.order      = 0;
+        rl_grid.follow_ui  = true;
+        rl_grid.clear      = true;
+        rl_grid.custom_2d_draw = [&](const render_layer &l, render::batcher2d &batcher){
+            this->_draw_grid(l, batcher);
+        };
+
+        engine::instance().set_override_render_layers({rl_grid, rl});
+    }
 }
 
 void editor::_ensure_editor_cam()
@@ -204,7 +252,10 @@ bool editor::step(step_phase phase)
         if (_d->editor_cam_eid != entt::null && reg.valid(_d->editor_cam_eid))
         {
             if (auto *sp = reg.try_get<cspatial>(_d->editor_cam_eid))
-                { sp->pos.x = _d->cam_x; sp->pos.y = _d->cam_y; }
+            {
+                if (!_d->three_dee)
+                    { sp->pos.x = _d->cam_x; sp->pos.y = _d->cam_y; }
+            }
             if (auto *cam = reg.try_get<ccamera>(_d->editor_cam_eid))
                 cam->cam2d.scale = _d->cam_zoom;
         }
@@ -392,6 +443,7 @@ bool editor::event(SDL_Event* evt)
             rl.layer_mask = clayers::MASK_ALL;
             rl.camera     = _d->editor_cam_eid;
             rl.viewport   = engine::instance().render_layers().front().viewport; // TODO review this, kinda hacky
+            rl.three_dee = _d->three_dee;
 
             entt::entity hit = picker->pick(rl, vp_x, vp_y);
             if (hit != _d->editor_cam_eid)
@@ -471,7 +523,7 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
                 {
                     const glm::vec4 &csr = spr->current_source_rect;
                     if (csr.z > 0.f) dims = {csr.z, csr.w};
-                    else if (sr.tex && sr.tex->uploaded) dims = {(float)sr.tex->width, (float)sr.tex->height};
+                    else if (sr.tex && render::has_flag(sr.tex->flags, render::texture_flags::UPLOADED)) dims = {(float)sr.tex->width, (float)sr.tex->height};
                     else continue;
                 }
                 const float ql = -sr.anchor.x * dims.x, qt = -sr.anchor.y * dims.y;
@@ -580,6 +632,14 @@ void editor::_draw_main_menu()
             _d->render_layers_enabled = true;
         if (ImGui::MenuItem("Wireframes", nullptr, _d->show_wireframes))
             _d->show_wireframes = !_d->show_wireframes;
+        if (ImGui::MenuItem("3D", nullptr, _d->three_dee))
+        {
+            _d->three_dee = !_d->three_dee;
+            if (_d->three_dee)
+                _sync_editor_cam_to_game();
+            if (_d->override_layers && _d->enabled)
+                _apply_override_layers();
+        }
 
         ImGui::Separator();
 
@@ -636,6 +696,23 @@ void editor::_draw_main_menu()
             _d->show_wireframes ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
         if (ImGui::Button(ICON_FK_OBJECT_GROUP " Wireframes"))
             _d->show_wireframes = !_d->show_wireframes;
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::SameLine();
+
+    {
+        ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+        ImGui::PushStyleColor(ImGuiCol_Button,
+            _d->three_dee ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
+        if (ImGui::Button(ICON_FK_CUBE " 3D"))
+        {
+            _d->three_dee = !_d->three_dee;
+            if (_d->three_dee)
+                _sync_editor_cam_to_game();
+            if (_d->override_layers && _d->enabled)
+                _apply_override_layers();
+        }
         ImGui::PopStyleColor();
     }
 

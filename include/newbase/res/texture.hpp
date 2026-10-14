@@ -1,8 +1,13 @@
 #pragma once
 
+#include <newbase/render/texture.hpp>
 #include <newbase/res/resource.hpp>
 #include <SDL3/SDL_surface.h>
 #include <entt/entt.hpp>
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace nb {
 
@@ -17,21 +22,36 @@ public:
     // for usage with ANONYMOUS RESOURCES ONLY
     void load_from(SDL_Surface* surf);
 
-    bool uploaded {false};
-    SDL_Surface *surf {nullptr};
+    struct mip_level
+    {
+        size_t offset {0};
+        size_t size {0};
+    };
 
-    int width {0};
-    int height {0};
+    render::texture_type type {render::texture_type::IMAGE_2D};
+    render::texture_format format {render::texture_format::INVALID};
+    render::texture_sample_count sample_count {render::texture_sample_count::SAMPLES_1};
+    render::texture_flags flags {
+        render::texture_flags::SDL_SURFACE | render::texture_flags::NEEDS_UPLOAD
+    };
+
+    uint32_t width {0};
+    uint32_t height {0};
+    uint32_t depth {1};
+
+    // Number of image layers, including cubemap faces (six per cube).
+    uint32_t layer_count {1};
+
+    // For uploaded textures, entries identify mip payloads in data. For a
+    // target-only texture, the vector size can request allocated mip levels.
+    std::vector<mip_level> mipmaps;
+    std::vector<uint8_t> data;
+
+    SDL_Surface *surf {nullptr};
 
     // opaque pointer for renderer usage, do not touch
     // unless you are the renderer, of course
     void *rptr {nullptr};
-
-    // render target flag
-    // DO NOT try to create render targets with this
-    // use the renderer_service interface instead
-    // if you are not the renderer, consider this RO
-    bool rtarget {false};
 
     // use nearest neighbor scaling when rendering
     // TODO replace by real enum when we get 3D?

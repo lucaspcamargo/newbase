@@ -2,6 +2,7 @@
 
 #include "entt/core/fwd.hpp"
 #include <cstdint>
+#include <memory>
 #include <newbase/res/resource.hpp>
 #include <newbase/render/vertex.hpp>
 
@@ -25,6 +26,7 @@ class rmesh : public resource
 public:
     explicit rmesh(entt::id_type id = 0);
     ~rmesh() override;
+    static std::shared_ptr<rmesh> make_fullscreen_quad();
 
     const std::vector<dependency_t>* dependencies() const override { return &m_deps; }
 

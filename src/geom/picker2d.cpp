@@ -61,7 +61,7 @@ entt::entity geom::picker_2d::pick(const render_layer &layer, float vp_x, float 
                 const glm::vec4 &csr = sprite->current_source_rect;
                 if (csr.z > 0.f)
                     dims = { csr.z, csr.w };
-                else if (spr.tex && spr.tex->uploaded && spr.tex->rptr)
+                else if (spr.tex && render::has_flag(spr.tex->flags, render::texture_flags::UPLOADED) && spr.tex->rptr)
                     dims = { spr.tex->width, spr.tex->height };
                 else continue;
             }

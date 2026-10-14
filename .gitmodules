@@ -68,3 +68,12 @@
 [submodule "vendored/MikkTSpace"]
 	path = vendored/MikkTSpace
 	url = https://github.com/mmikk/MikkTSpace.git
+[submodule "vendored/tiny_ktx"]
+	path = vendored/tiny_ktx
+	url = https://github.com/DeanoC/tiny_ktx.git
+[submodule "vendored/tiny_imageformat"]
+	path = vendored/tiny_imageformat
+	url = https://github.com/DeanoC/tiny_imageformat.git
+[submodule "vendored/tinyexr"]
+	path = vendored/tinyexr
+	url = https://github.com/syoyo/tinyexr.git

@@ -6,6 +6,7 @@
 #include <newbase/components/mesh2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/camera.hpp>
+#include <newbase/components/environment.hpp>
 #include <newbase/components/layers.hpp>
 
 namespace nb::rtti
@@ -18,6 +19,7 @@ namespace nb::rtti
         cmesh2d::_ensure_rtti();
         cparticle_emitter::_ensure_rtti();
         ccamera::_ensure_rtti();
+        cenvironment::_ensure_rtti();
         clayers::_ensure_rtti();
     }
 }

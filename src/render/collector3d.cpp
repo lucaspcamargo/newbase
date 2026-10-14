@@ -3,13 +3,19 @@
 #include "newbase/render/pipeline.hpp"
 #include "newbase/render/types.hpp"
 #include <newbase/render/collector3d.hpp>
+#include <newbase/render/mat/ibl_integration.hpp>
 #include <newbase/res/material.hpp>
+#include <newbase/res/manager.hpp>
+#include <newbase/res/texture.hpp>
 #include <newbase/engine.hpp>
 #include <newbase/scene.hpp>
 #include <newbase/components/camera.hpp>
+#include <newbase/components/environment.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/mesh.hpp>
 #include <newbase/res/mesh.hpp>
+#include <algorithm>
+#include <entt/core/hashed_string.hpp>
 
 using namespace ::nb;
 using namespace ::nb::render;
@@ -81,14 +87,280 @@ void collector3d::clear()
     m_scene_uniforms.clear();
     m_cmds.clear();
     m_layer_markers.clear();
+    m_passes.clear();
     m_pipeline_count = 0;
     m_staging_mesh_count = 0;
     m_staging_texture_count = 0;
     m_staging_shader_count = 0;
+    m_staging_ibl_environments.clear();
+    m_internal_materials.clear();
 }
 
 
-void collector3d::collect(const render_layer &l, const pass_target_info &targets, pass_type pt)
+void collector3d::collect(const render_layer &l, const pass_target_info &layer_targets)
+{
+    const auto pass_start = static_cast<uint32_t>(m_passes.size());
+
+    auto *scn = engine::instance().find_scene(l.scene_id);
+    if(!scn)
+    {
+        m_layer_markers.push_back(layer_marker {
+            .pass_start = pass_start,
+            .pass_count = 0
+        });
+        return;
+    }
+
+    auto environment_view = scn->registry().view<cenvironment>();
+    for(auto entity : environment_view)
+    {
+        auto &environment = environment_view.get<cenvironment>(entity);
+        if(!environment.preparation_pending())
+            continue;
+        if(std::find(m_staging_ibl_environments.begin(), m_staging_ibl_environments.end(),
+                     &environment) != m_staging_ibl_environments.end())
+            continue;
+        if(!environment.equirectangular)
+            continue;
+
+        auto *controller = static_cast<ibl_integration_controller*>(
+            material_controller::get_controller(material_type::IBL_INTEGRATION));
+        if(!controller || !controller->load_shaders())
+            continue;
+
+        const uint32_t environment_size = std::max(1u, environment.equirectangular->height / 2);
+        auto ensure_cubemap = [](std::shared_ptr<rtexture> &texture, uint32_t size, uint32_t mip_count)
+        {
+            if(!texture)
+                texture = std::make_shared<rtexture>();
+            auto &target = *texture;
+            const bool changed = target.type != texture_type::CUBEMAP ||
+                target.format != texture_format::COLOR_RGBA_16_FLOAT ||
+                target.width != size || target.height != size ||
+                target.layer_count != 6 || target.mipmaps.size() != mip_count;
+            target.type = texture_type::CUBEMAP;
+            target.format = texture_format::COLOR_RGBA_16_FLOAT;
+            target.width = size;
+            target.height = size;
+            target.depth = 1;
+            target.layer_count = 6;
+            target.mipmaps.resize(mip_count);
+            target.flags |= texture_flags::TARGET;
+            if(changed)
+            {
+                target.flags |= texture_flags::NEEDS_UPLOAD;
+                target.flags &= ~texture_flags::UPLOADED;
+            }
+        };
+
+        uint32_t environment_mip_count = 1;
+        for(uint32_t size = environment_size; size > 1; size >>= 1)
+            ++environment_mip_count;
+        ensure_cubemap(environment.environment_cubemap, environment_size, environment_mip_count);
+        ensure_cubemap(environment.irradiance_cubemap, 32, 1);
+        ensure_cubemap(environment.prefiltered_cubemap, environment_size, environment_mip_count);
+
+        auto collect_cubemap_passes = [&](pass_type type, rtexture *source, rtexture *target,
+                                          uint32_t mip_count)
+        {
+            for(uint32_t mip = 0; mip < mip_count; ++mip)
+            {
+                for(uint32_t face = 0; face < 6; ++face)
+                {
+                    render_pass integration;
+                    integration.type = type;
+                    integration.target.color_textures[0] = target;
+                    integration.targets.color_targets[0] = target->format;
+                    integration.targets.color_mip_level[0] = mip;
+                    integration.targets.color_layer_index[0] = face;
+                    integration.clear_color = true;
+                    integration.generate_mipmaps_after_render =
+                        type == pass_type::EQUIRECTANGULAR_TO_CUBEMAP &&
+                        target->mipmaps.size() > 1 &&
+                        mip == mip_count - 1 && face == 5;
+                    if(!_collect_integration_pass(integration, source))
+                        return false;
+                }
+            }
+            return true;
+        };
+
+        bool integration_passes_collected =
+            collect_cubemap_passes(pass_type::EQUIRECTANGULAR_TO_CUBEMAP,
+                                   environment.equirectangular.get(),
+                                   environment.environment_cubemap.get(), 1);
+        integration_passes_collected =
+            collect_cubemap_passes(pass_type::DIFFUSE_IRRADIANCE,
+                                   environment.environment_cubemap.get(),
+                                   environment.irradiance_cubemap.get(), 1) &&
+            integration_passes_collected;
+        integration_passes_collected =
+            collect_cubemap_passes(pass_type::SPECULAR_PREFILTER,
+                                   environment.environment_cubemap.get(),
+                                   environment.prefiltered_cubemap.get(), environment_mip_count) &&
+            integration_passes_collected;
+        if(integration_passes_collected)
+        {
+            _add_staging_ibl_environment(&environment);
+        }
+    }
+
+    mat_env_data env_data {};
+    for(auto entity : environment_view)
+    {
+        auto &environment = environment_view.get<cenvironment>(entity);
+        const bool preparation_scheduled =
+            std::find(m_staging_ibl_environments.begin(), m_staging_ibl_environments.end(),
+                      &environment) != m_staging_ibl_environments.end();
+        if((environment.preparation_pending() && !preparation_scheduled) ||
+           !environment.environment_cubemap ||
+           !environment.irradiance_cubemap ||
+           !environment.prefiltered_cubemap)
+            continue;
+        env_data.ibl_enabled = true;
+        env_data.environment_cubemap = environment.environment_cubemap.get();
+        env_data.irradiance_cubemap = environment.irradiance_cubemap.get();
+        env_data.prefiltered_cubemap = environment.prefiltered_cubemap.get();
+        break;
+    }
+
+    // Scene preparation passes are ordered before the layer's forward pass.
+    render_pass forward;
+    forward.type = pass_type::FORWARD;
+    forward.target.managed_target = l.target_id;
+    forward.targets = layer_targets;
+    _collect_pass(l, forward, env_data.ibl_enabled ? &env_data : nullptr);
+
+    m_layer_markers.push_back(layer_marker {
+        .pass_start = pass_start,
+        .pass_count = static_cast<uint32_t>(m_passes.size() - pass_start)
+    });
+}
+
+bool collector3d::_collect_integration_pass(const render_pass &pass, rtexture *source)
+{
+    auto *controller = static_cast<ibl_integration_controller*>(
+        material_controller::get_controller(material_type::IBL_INTEGRATION));
+    if(!controller || !source)
+        return false;
+
+    auto vertex_shader = controller->get_vertex_program(pipeline_descriptor{});
+    if(!vertex_shader)
+    {
+        if(!controller->load_shaders())
+            return false;
+        vertex_shader = controller->get_vertex_program(pipeline_descriptor{});
+    }
+    if(!vertex_shader)
+        return false;
+
+    if(!m_fullscreen_quad)
+        m_fullscreen_quad = rmesh::make_fullscreen_quad();
+    if(!m_fullscreen_quad)
+        return false;
+
+    auto material = std::make_shared<rmaterial>();
+    material->mat_type = material_type::IBL_INTEGRATION;
+    material->pipeline_params = pipeline_params {
+        .blend = blendmode::NONE,
+        .cull = cull_mode::NONE,
+        .depth_test = false,
+        .depth_write = false
+    };
+    material->mat_params = ibl_integration_params {
+        .source = source,
+        .face_index = pass.targets.color_layer_index[0],
+        .mip_level = pass.targets.color_mip_level[0],
+        .mip_count = pass.target.color_textures[0]
+            ? static_cast<uint32_t>(pass.target.color_textures[0]->mipmaps.size()) : 1,
+        .sample_count = pass.type == pass_type::DIFFUSE_IRRADIANCE ? 4096u : 1024u,
+        .source_resolution = static_cast<float>(source->width),
+        .source_mip_count = std::max(1u, static_cast<uint32_t>(source->mipmaps.size()))
+    };
+    m_internal_materials.push_back(material);
+
+    pipeline_descriptor pd {};
+    pd.targets = pass.targets;
+    controller->make_pipeline_desc(*material, nullptr, pass.type,
+                                   m_fullscreen_quad->vertex_type(), pd);
+    const auto pipeline_index = _get_pipeline_index(pd);
+
+    auto &collected = m_passes.emplace_back(collected_pass {
+        .desc_offset = UINT32_MAX,
+        .cmd_start = static_cast<uint32_t>(m_cmds.size()),
+        .cmd_count = 0,
+        .scene_uniform_index = static_cast<uint32_t>(m_scene_uniforms.size())
+    });
+    scene_uniform_std scene_uniform {};
+    scene_uniform.view = glm::mat4(1.0f);
+    scene_uniform.proj = glm::mat4(1.0f);
+    scene_uniform.view_proj = glm::mat4(1.0f);
+    scene_uniform.inv_view = glm::mat4(1.0f);
+    m_scene_uniforms.push_back(scene_uniform);
+    collected.desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass));
+
+    const auto vertex_uniform_size = controller->get_vertex_ubo_size(pd, nullptr);
+    const auto fragment_uniform_size = controller->get_fragment_ubo_size(pd, nullptr);
+    uint32_t vertex_uniform_offset = UINT32_MAX;
+    uint32_t fragment_uniform_offset = UINT32_MAX;
+    if(vertex_uniform_size)
+    {
+        auto *uniform_data = static_cast<uint8_t*>(m_arena.alloc_raw(nullptr, vertex_uniform_size));
+        controller->pack_vertex_uniforms(*material, pd, nullptr, uniform_data, vertex_uniform_size);
+        vertex_uniform_offset = m_arena.byte_offset(uniform_data);
+    }
+    if(fragment_uniform_size)
+    {
+        auto *uniform_data = static_cast<uint8_t*>(m_arena.alloc_raw(nullptr, fragment_uniform_size));
+        controller->pack_fragment_uniforms(*material, pd, nullptr, uniform_data, fragment_uniform_size);
+        fragment_uniform_offset = m_arena.byte_offset(uniform_data);
+    }
+
+    const auto texture_binding_count =
+        static_cast<uint8_t>(controller->get_num_texture_bindings(*material, pd, nullptr));
+    uint32_t texture_bindings_offset = UINT32_MAX;
+    if(texture_binding_count)
+    {
+        auto *bindings = static_cast<material_texture_binding*>(
+            m_arena.alloc_raw(nullptr, texture_binding_count * sizeof(material_texture_binding)));
+        controller->collect_texture_bindings(*material, pd, nullptr, bindings);
+        texture_bindings_offset = m_arena.byte_offset(bindings);
+        for(uint8_t i = 0; i < texture_binding_count; ++i)
+            if(bindings[i].texture)
+                _add_staging_texture(bindings[i].texture);
+    }
+
+    for(auto *texture : pass.target.color_textures)
+        if(texture)
+            _add_staging_texture(texture);
+    if(pass.target.depth_texture)
+        _add_staging_texture(pass.target.depth_texture);
+
+    _add_staging_mesh(m_fullscreen_quad.get());
+    _add_staging_shader(controller->get_vertex_program(pd).get());
+    _add_staging_shader(controller->get_fragment_program(pd).get());
+
+    m_cmds.emplace_back(command3d {
+        .sort_key = 0,
+        .material = material.get(),
+        .mat_vert_uniforms_offset = vertex_uniform_offset,
+        .mat_vert_uniforms_len = static_cast<uint32_t>(vertex_uniform_size),
+        .mat_frag_uniforms_offset = fragment_uniform_offset,
+        .mat_frag_uniforms_len = static_cast<uint32_t>(fragment_uniform_size),
+        .model_uniforms_offset = UINT32_MAX,
+        .pipeline_index = pipeline_index,
+        .mesh_index = _add_staging_mesh(m_fullscreen_quad.get()),
+        .submesh = 0,
+        ._pad0 = 0,
+        .tex_bind_count = texture_binding_count,
+        .tex_binds_offset = texture_bindings_offset
+    });
+    collected.cmd_count = 1;
+    return true;
+}
+
+void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
+                                const mat_env_data *env_data)
 {
     auto cmd_start = (uint32_t) m_cmds.size();
 
@@ -99,8 +371,6 @@ void collector3d::collect(const render_layer &l, const pass_target_info &targets
     auto *scn = engine::instance().find_scene(l.scene_id);
     if(!scn)
     {
-        // for a scene not found, just push en empty layer marker
-        m_layer_markers.push_back(layer_marker {});
         return;
     }
 
@@ -123,7 +393,29 @@ void collector3d::collect(const render_layer &l, const pass_target_info &targets
     // HACK temporary, this will change
     u_scn.light_color = glm::vec3{1.8f, 1.8f, 1.5f};        // TODO
     u_scn.light_dir = glm::vec3{0.0f, 1.0f, 0.5f}; // TODO
+    const uint32_t scene_uniform_index = static_cast<uint32_t>(m_scene_uniforms.size());
     m_scene_uniforms.push_back(u_scn);
+
+    render_pass pass_desc = pass;
+    bool has_explicit_target = pass_desc.target.depth_texture != nullptr;
+    for(auto *texture : pass_desc.target.color_textures)
+        has_explicit_target = has_explicit_target || texture != nullptr;
+    if(pass_desc.target.managed_target == render::TARGET_INVALID && !has_explicit_target)
+        pass_desc.target.managed_target = l.target_id;
+    for(auto *texture : pass_desc.target.color_textures)
+        if(texture)
+            _add_staging_texture(texture);
+    if(pass_desc.target.depth_texture)
+        _add_staging_texture(pass_desc.target.depth_texture);
+
+    const auto pass_desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass_desc));
+    const uint32_t pass_index = static_cast<uint32_t>(m_passes.size());
+    m_passes.push_back(collected_pass {
+        .desc_offset = pass_desc_offset,
+        .cmd_start = cmd_start,
+        .cmd_count = 0,
+        .scene_uniform_index = scene_uniform_index
+    });
 
     // iterate over meshes
     auto mesh_view = scn->registry().view<cmesh, cspatial>();
@@ -161,37 +453,40 @@ void collector3d::collect(const render_layer &l, const pass_target_info &targets
 
             // prepare pipeline descriptor
             pipeline_descriptor pd;
-            pd.targets = targets;
-            mat_ctrl->make_pipeline_desc(material, pt, msh.mesh->vertex_type(), pd);
+            pd.targets = pass_desc.targets;
+            mat_ctrl->make_pipeline_desc(material, env_data, pass_desc.type,
+                                         msh.mesh->vertex_type(), pd);
             auto pd_index = _get_pipeline_index(pd);
 
             // make material vert uniforms
-            auto u_vtx_sz = mat_ctrl->get_vertex_ubo_size(pd);
+            auto u_vtx_sz = mat_ctrl->get_vertex_ubo_size(pd, env_data);
             auto u_vtx_offset = 0;
             if(u_vtx_sz)
             {
                 auto alloc = m_arena.alloc_raw(nullptr, u_vtx_sz);
-                mat_ctrl->pack_vertex_uniforms(material, pd, (uint8_t*) alloc, u_vtx_sz);
+                mat_ctrl->pack_vertex_uniforms(material, pd, env_data,
+                                               (uint8_t*) alloc, u_vtx_sz);
                 u_vtx_offset = m_arena.byte_offset(alloc);
             }
 
             // make material frag uniforms
-            auto u_frag_sz = mat_ctrl->get_fragment_ubo_size(pd);
+            auto u_frag_sz = mat_ctrl->get_fragment_ubo_size(pd, env_data);
             auto u_frag_offset = 0;
             if(u_frag_sz)
             {
                 auto alloc = m_arena.alloc_raw(nullptr, u_frag_sz);
-                mat_ctrl->pack_fragment_uniforms(material, pd, (uint8_t*) alloc, u_frag_sz);
+                mat_ctrl->pack_fragment_uniforms(material, pd, env_data,
+                                                 (uint8_t*) alloc, u_frag_sz);
                 u_frag_offset = m_arena.byte_offset(alloc);
             }
 
-            uint8_t tex_bind_count = mat_ctrl->get_num_texture_bindings(material, pd);
+            uint8_t tex_bind_count = mat_ctrl->get_num_texture_bindings(material, pd, env_data);
             uint32_t tex_bind_offset = 0;
             if(tex_bind_count)
             {
                 auto alloc = m_arena.alloc_raw(nullptr, tex_bind_count*sizeof(material_texture_binding));
                 material_texture_binding* bind_dest = (material_texture_binding*) alloc;
-                mat_ctrl->collect_texture_bindings(material, pd, bind_dest);
+                mat_ctrl->collect_texture_bindings(material, pd, env_data, bind_dest);
                 tex_bind_offset = m_arena.byte_offset(alloc);
 
                 // stage textures
@@ -257,23 +552,27 @@ void collector3d::collect(const render_layer &l, const pass_target_info &targets
         }
     }
 
-    m_layer_markers.push_back(layer_marker {
-        .cmd_start = cmd_start,
-        .cmd_count = (uint32_t)(m_cmds.size() - cmd_start)
-    });
-
-    _sort();
+    auto &collected = m_passes[pass_index];
+    collected.cmd_count = static_cast<uint32_t>(m_cmds.size() - cmd_start);
+    _sort(collected);
 }
 
-// sorts rendering commands for the last layer marker
-void collector3d::_sort()
+void collector3d::_add_staging_ibl_environment(cenvironment *environment)
 {
-    const auto &lm = m_layer_markers.at(m_layer_markers.size() - 1);
-    if(lm.cmd_count)
+    if(environment &&
+       std::find(m_staging_ibl_environments.begin(), m_staging_ibl_environments.end(), environment) ==
+           m_staging_ibl_environments.end())
+        m_staging_ibl_environments.push_back(environment);
+}
+
+// sorts rendering commands belonging to one pass
+void collector3d::_sort(const collected_pass &pass)
+{
+    if(!pass.cmd_count)
         return;
 
-    auto begin = m_cmds.begin() + lm.cmd_start;
-    auto end = begin + lm.cmd_count;
+    auto begin = m_cmds.begin() + pass.cmd_start;
+    auto end = begin + pass.cmd_count;
 
     // TODO we can move less memory around and do better than this with radix sort, but later
     std::sort(begin, end, +[](const command3d &a, const command3d &b)->bool{

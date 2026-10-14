@@ -4,6 +4,7 @@ namespace nb {
     struct cbody2d;
     struct ccamera;
     struct ccharacter2d;
+    struct cenvironment;
     struct clayers;
     struct cmesh;
     struct cparticle_emitter;

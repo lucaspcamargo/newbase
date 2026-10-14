@@ -34,7 +34,8 @@ public:
     ~pbr_mat_controller() override;
 
     /// prepares a pipeline for a pbr material (except for target format setup)
-    void make_pipeline_desc(const rmaterial& mat, pass_type pt, vertex_type vt,
+    void make_pipeline_desc(const rmaterial& mat, const mat_env_data *env_data,
+                            pass_type pt, vertex_type vt,
                             pipeline_descriptor &dst_desc) const override;
 
     /// returns the vertex program associated with this material type
@@ -44,35 +45,44 @@ public:
     std::shared_ptr<rshader> get_fragment_program(const pipeline_descriptor& pd) const override;
 
     /// returns the raw structure size for the vertex shader ubo
-    size_t get_vertex_ubo_size(const pipeline_descriptor& pd) const override;
+    size_t get_vertex_ubo_size(const pipeline_descriptor& pd,
+                               const mat_env_data *env_data) const override;
 
     /// returns the raw structure size for the fragment shader ubo
-    size_t get_fragment_ubo_size(const pipeline_descriptor& pd) const override;
+    size_t get_fragment_ubo_size(const pipeline_descriptor& pd,
+                                 const mat_env_data *env_data) const override;
 
     /// generates the fragment uniform buffer for this material
-    void pack_vertex_uniforms( const rmaterial& mat, const pipeline_descriptor& pd, uint8_t* out_buffer,
+    void pack_vertex_uniforms( const rmaterial& mat, const pipeline_descriptor& pd,
+                               const mat_env_data *env_data, uint8_t* out_buffer,
                                size_t out_len) const override;
 
     /// generates the fragment uniform buffer for this material
-    void pack_fragment_uniforms(const rmaterial& mat, const pipeline_descriptor& pd, uint8_t* out_buffer,
+    void pack_fragment_uniforms(const rmaterial& mat, const pipeline_descriptor& pd,
+                                const mat_env_data *env_data, uint8_t* out_buffer,
                                         size_t out_len) const override;
 
 
-    size_t get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest) const override;
+    size_t get_num_texture_bindings(const rmaterial& mat, const pipeline_descriptor &dest,
+                                    const mat_env_data *env_data) const override;
 
     /// returns all the textures required for the shader
-    void collect_texture_bindings( const rmaterial& mat, const pipeline_descriptor& pd, material_texture_binding *out) const override;
+    void collect_texture_bindings( const rmaterial& mat, const pipeline_descriptor& pd,
+                                   const mat_env_data *env_data,
+                                   material_texture_binding *out) const override;
 
     static void _init_rtti();
 
 private:
     std::shared_ptr<rshader>  m_frag;
+    std::shared_ptr<rshader>  m_frag_ibl;
     std::shared_ptr<rshader>  m_vert;
     std::shared_ptr<rtexture> m_fallback_color;
     std::shared_ptr<rtexture> m_fallback_normal;
     std::shared_ptr<rtexture> m_fallback_metal;
     std::shared_ptr<rtexture> m_fallback_ao;
     std::shared_ptr<rtexture> m_fallback_emissive;
+    std::shared_ptr<rtexture> m_brdf_lut;
 };
 
 }

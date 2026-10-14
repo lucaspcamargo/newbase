@@ -8,6 +8,7 @@
 #include <newbase/sys/render_gpu/pipelines.hpp>
 #include <newbase/sys/render_gpu/pass_control.hpp>
 #include <newbase/sys/render_gpu/shaders.hpp>
+#include <newbase/sys/render_gpu/samplers.hpp>
 #include <newbase/sys/render_gpu/targets.hpp>
 #include <newbase/sys/render_gpu/textures.hpp>
 #include <newbase/sys/render_gpu/util2d.hpp>
@@ -15,6 +16,8 @@
 #include <newbase/scene.hpp>
 #include <newbase/layer.hpp>
 #include <newbase/geom/picker2d.hpp>
+#include <newbase/geom/picker3d.hpp>
+#include <newbase/components/environment.hpp>
 #include <newbase/render/batcher2d.hpp>
 #include <newbase/render/collector2d.hpp>
 #include <newbase/render/collector3d.hpp>
@@ -30,6 +33,8 @@
 
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
+#include <algorithm>
+#include <unordered_map>
 
 
 using namespace nb;
@@ -50,6 +55,7 @@ struct nb::render_gpu_p
     gpu::buffer_manager buffers {};
     gpu::shader_manager shaders {};
     gpu::texture_manager textures {};
+    gpu::sampler_cache samplers {};
     gpu::target_manager targets {textures};
     gpu::pass_control passes {targets};
     gpu::pipeline_cache pipelines {targets};
@@ -70,6 +76,7 @@ struct nb::render_gpu_p
 
     // picking
     geom::picker_2d picker;
+    geom::picker_3d picker_3d;
 
     // TEST
     SDL_GPUBuffer *m_cube_v;
@@ -118,6 +125,7 @@ render_gpu::~render_gpu()
 
         // release pipelines
         _d->pipelines.clear(_d->gdev);
+        _d->samplers.teardown(_d->gdev);
 
         // relase streaming 2d geometry buffers
         _d->buffers2d.teardown(_d->gdev);
@@ -325,7 +333,7 @@ bool render_gpu::step(nb::step_phase phase)
                 log::warn("[render_gpu] could not get pass target info: %u", (unsigned)l.target_id);
                 continue;
             }
-            _d->collector_3d.collect(l, pt_info, render::pass_type::FORWARD);
+            _d->collector_3d.collect(l, pt_info);
         }
     }
     else if(phase == step_phase::RENDER)
@@ -403,11 +411,17 @@ void render_gpu::_render()
         auto tex_begin = _d->collector_3d.staging_textures().begin();
         auto tex_end = tex_begin + _d->collector_3d.staging_texture_count();
         _d->textures.prepare_multiple(_d->gdev, _d->cmds, tex_begin, tex_end, cpy);
+        for(auto *environment : _d->collector_3d.staging_ibl_environments())
+        {
+            if(environment && environment->equirectangular)
+                _d->textures.prepare(_d->gdev, _d->cmds, environment->equirectangular.get(), cpy);
+        }
 
         // 2D resouces
         _d->buffers2d.upload(_d->gdev, _d->cmds, _d->batcher, cpy);
         _d->textures.prepare_multiple(_d->gdev, _d->cmds, _d->batcher.data().tex.begin(), _d->batcher.data().tex.end(), cpy);
     }
+    _d->textures.generate_mipmaps(_d->cmds);
 
     // acquire the swapchain texture for this frame
     SDL_GPUTexture *swapchain = NULL;
@@ -458,7 +472,6 @@ void render_gpu::_render()
         _render_ui();
 
     _d->passes.unbind();
-
     // submit
     SDL_SubmitGPUCommandBuffer(_d->cmds);
     _d->cmds = nullptr;
@@ -477,6 +490,9 @@ void render_gpu::_render_ui()
         false,
         render::TARGET_DEFAULT
     };
+
+    if(!_d->passes.bind_target(ui_l, _d->cmds))
+        return;
 
     // setting GPU viewport
     SDL_GPUViewport viewport = { 0.0f, 0.0f, static_cast<float>(_d->rwin.width()), static_cast<float>(_d->rwin.height()), 0.0f, 1.0f };
@@ -516,6 +532,9 @@ void render_gpu::_render_2d_batches(render::batcher2d::sync_id_t sync_point, con
 
     const auto &batcher = _d->batcher;
     auto cmd_range = batcher.sync_point_get(sync_point);
+    SDL_GPUTexture *bound_texture = nullptr;
+    render::sampler_config bound_sampler_config {};
+    bool has_bound_sampler = false;
     for (size_t i = 0; i < cmd_range.cmd_count; i++)
     {
         const auto &cmd = batcher.commands()[cmd_range.cmd_offset + i];
@@ -537,18 +556,43 @@ void render_gpu::_render_2d_batches(render::batcher2d::sync_id_t sync_point, con
                 continue;
 
             gpu::texture_block *tb = (gpu::texture_block*) rtex->rptr;
-            SDL_GPUTextureSamplerBinding binding = {
-                .texture = tb->gtex,
-                .sampler = tb->gsamp  // TODO use sampler cache
-            };
+            render::sampler_config sampler {};
+            const auto filter = rtex->nearest
+                ? render::sampler_filter::NEAREST : render::sampler_filter::LINEAR;
+            sampler.min_filter = filter;
+            sampler.mag_filter = filter;
+            sampler.mip_filter = render::sampler_filter::NEAREST;
+            const auto addressing = render::has_flag(
+                rtex->flags, render::texture_flags::SDL_SURFACE)
+                ? render::sampler_addressing::REPEAT
+                : render::sampler_addressing::CLAMP_TO_EDGE;
+            sampler.addr_mode_u = addressing;
+            sampler.addr_mode_v = addressing;
+            sampler.addr_mode_w = render::sampler_addressing::CLAMP_TO_EDGE;
+            sampler.max_lod = static_cast<float>(tb->num_levels - 1);
+            if(!has_bound_sampler || bound_texture != tb->gtex ||
+               bound_sampler_config != sampler)
+            {
+                auto *gpu_sampler = _d->samplers.get(_d->gdev, sampler);
+                if(!gpu_sampler)
+                    continue;
+                SDL_GPUTextureSamplerBinding binding = {
+                    .texture = tb->gtex,
+                    .sampler = gpu_sampler
+                };
 
-            // slot 0 maps to set 2, binding 0 in SPIR-V
-            SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+                // slot 0 maps to set 2, binding 0 in SPIR-V
+                SDL_BindGPUFragmentSamplers(pass, 0, &binding, 1);
+                bound_texture = tb->gtex;
+                bound_sampler_config = sampler;
+                has_bound_sampler = true;
+            }
         }
 
         render::pipeline_descriptor pd {};
         mat_controller->make_pipeline_desc(*mat_controller->get_token_material(cmd),
-                        render::pass_type::FORWARD,render::vertex_type::STANDARD_2D, pd);
+                        nullptr, render::pass_type::FORWARD,
+                        render::vertex_type::STANDARD_2D, pd);
         pd.targets = _d->passes.current_target_block()->pt_info;
         auto pipeline = _d->pipelines.find_or_create(_d->gdev, pd);
 
@@ -565,34 +609,74 @@ void render_gpu::_render_2d_batches(render::batcher2d::sync_id_t sync_point, con
 
 void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
 {
+    const auto &marker = _d->collector_3d.markers()[layer_mark_index];
+    const auto &passes = _d->collector_3d.passes();
+    std::unordered_map<rtexture*, uint32_t> completed_environment_faces;
 
-    SDL_GPUViewport viewport = { (float)l.viewport.x, (float)l.viewport.y,
-                                 (float)l.viewport.w, (float)l.viewport.h,
-                                 0.0f, 1.0f };
-    float aspect = l.viewport.w/(float)l.viewport.h;
-
-    SDL_SetGPUViewport(_d->passes.current(), &viewport);
-
-    // shdow state tracking
-    static constexpr int MAX_TRACKED_SAMPLERS = 8;
-    const void * bound_mesh {nullptr};
-    const void * bound_model_uniform {nullptr};
-    const void * bound_mat_vert_uniform {nullptr};
-    const void * bound_mat_frag_uniform {nullptr};
-    render::pipeline_descriptor::hash_t bound_pipeline {0};
-    std::array<render::material_texture_binding, MAX_TRACKED_SAMPLERS> bound_textures {};
-
-    // bind global scene uniforms
-    const auto &u_scn = _d->collector_3d.scene_uniforms()[layer_mark_index];
-    SDL_PushGPUVertexUniformData( _d->cmds, 0, &u_scn, sizeof(u_scn));
-    SDL_PushGPUFragmentUniformData( _d->cmds, 0, &u_scn, sizeof(u_scn));
-
-    const auto &all_cmds = _d->collector_3d.commands();
-    const auto mark = _d->collector_3d.markers()[layer_mark_index];
-
-    for(int cmd_i = mark.cmd_start; cmd_i < (mark.cmd_start + mark.cmd_count); ++cmd_i)
+    for(uint32_t pass_index = marker.pass_start;
+        pass_index < marker.pass_start + marker.pass_count;
+        ++pass_index)
     {
+        const auto &pass = passes[pass_index];
+        const auto &pass_desc = _d->collector_3d.pass_desc(pass);
+        if(!_d->passes.bind_pass(pass_desc, l, _d->cmds))
+            continue;
+        bool pass_drawn = false;
+
+        int viewport_x = l.viewport.x;
+        int viewport_y = l.viewport.y;
+        int viewport_w = l.viewport.w;
+        int viewport_h = l.viewport.h;
+        if(pass_desc.type == render::pass_type::EQUIRECTANGULAR_TO_CUBEMAP ||
+           pass_desc.type == render::pass_type::DIFFUSE_IRRADIANCE ||
+           pass_desc.type == render::pass_type::SPECULAR_PREFILTER)
+        {
+            auto *target_texture = pass_desc.target.color_textures[0];
+            if(!target_texture && pass_desc.target.uses_managed_target())
+            {
+                const auto *target = _d->targets.target_get(pass_desc.target.managed_target);
+                if(target && target->color_texture_count)
+                    target_texture = target->color_textures[0].get();
+            }
+            if(target_texture)
+            {
+                const auto mip = pass_desc.targets.color_mip_level[0];
+                viewport_x = viewport_y = 0;
+                viewport_w = static_cast<int>(std::max(1u, target_texture->width >> mip));
+                viewport_h = static_cast<int>(std::max(1u, target_texture->height >> mip));
+            }
+        }
+        SDL_GPUViewport viewport = { (float)viewport_x, (float)viewport_y,
+                                     (float)viewport_w, (float)viewport_h,
+                                     0.0f, 1.0f };
+        SDL_SetGPUViewport(_d->passes.current(), &viewport);
+
+        // shadow state tracking
+        static constexpr int MAX_TRACKED_SAMPLERS = 8;
+        const void * bound_mesh {nullptr};
+        const void * bound_model_uniform {nullptr};
+        const void * bound_mat_vert_uniform {nullptr};
+        const void * bound_mat_frag_uniform {nullptr};
+        render::pipeline_descriptor::hash_t bound_pipeline {0};
+        std::array<SDL_GPUTexture*, MAX_TRACKED_SAMPLERS> bound_textures {};
+        std::array<render::sampler_config, MAX_TRACKED_SAMPLERS> bound_samplers {};
+
+        // bind global scene uniforms
+        const auto &u_scn = _d->collector_3d.scene_uniforms()[pass.scene_uniform_index];
+        SDL_PushGPUVertexUniformData(_d->cmds, 0, &u_scn, sizeof(u_scn));
+        const bool integration_pass =
+            pass_desc.type == render::pass_type::EQUIRECTANGULAR_TO_CUBEMAP ||
+            pass_desc.type == render::pass_type::DIFFUSE_IRRADIANCE ||
+            pass_desc.type == render::pass_type::SPECULAR_PREFILTER;
+        if(!integration_pass)
+            SDL_PushGPUFragmentUniformData(_d->cmds, 0, &u_scn, sizeof(u_scn));
+
+        const auto &all_cmds = _d->collector_3d.commands();
+
+        for(uint32_t cmd_i = pass.cmd_start; cmd_i < pass.cmd_start + pass.cmd_count; ++cmd_i)
+        {
         const auto &cmd = all_cmds[cmd_i];
+        bool command_ready = true;
 
         // check need rebind pipeline
         auto p_hash = _d->collector_3d.pipeline_hashes()[cmd.pipeline_index];
@@ -621,8 +705,9 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
         }
 
         // check need rebind model uniforms
-        const auto model_uniform_addr = _d->collector_3d.arena_ptr(cmd.model_uniforms_offset);
-        if(bound_model_uniform != model_uniform_addr)
+        const void *model_uniform_addr = cmd.model_uniforms_offset != UINT32_MAX
+            ? _d->collector_3d.arena_ptr(cmd.model_uniforms_offset) : nullptr;
+        if(model_uniform_addr && bound_model_uniform != model_uniform_addr)
         {
             SDL_PushGPUVertexUniformData(_d->cmds, 1, model_uniform_addr, sizeof(render::model_uniforms_std));
             bound_model_uniform = model_uniform_addr;
@@ -645,7 +730,8 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
             const auto mat_frag_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_frag_uniforms_offset);
             if(bound_mat_frag_uniform != mat_frag_uniform_addr)
             {
-                SDL_PushGPUFragmentUniformData(_d->cmds, 1, mat_frag_uniform_addr, cmd.mat_frag_uniforms_len);
+                SDL_PushGPUFragmentUniformData(_d->cmds, integration_pass ? 0 : 1,
+                                               mat_frag_uniform_addr, cmd.mat_frag_uniforms_len);
                 bound_mat_frag_uniform = mat_frag_uniform_addr;
             }
         }
@@ -653,27 +739,103 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
         // check texture binds
         for(int bind_i = 0; bind_i < cmd.tex_bind_count; ++bind_i)
         {
-            bool track = bind_i < MAX_TRACKED_SAMPLERS;
             const auto &bind = *((render::material_texture_binding*)_d->collector_3d.arena_ptr(cmd.tex_binds_offset) + bind_i);
             gpu::texture_block *tb = (gpu::texture_block*) bind.texture->rptr;
-            if(tb && (!track || bind != bound_textures[bind_i]))
+            if(tb)
             {
+                auto sampler_config = bind.sampler;
+                sampler_config.max_lod = std::min(sampler_config.max_lod,
+                    static_cast<float>(tb->num_levels - 1));
+                const bool track = bind.slot < MAX_TRACKED_SAMPLERS;
+                if(track && bound_textures[bind.slot] == tb->gtex &&
+                   bound_samplers[bind.slot] == sampler_config)
+                    continue;
+                auto *gpu_sampler = _d->samplers.get(_d->gdev, sampler_config);
+                if(!gpu_sampler)
+                {
+                    command_ready = false;
+                    continue;
+                }
                 SDL_GPUTextureSamplerBinding gbind {
                     .texture = tb->gtex,
-                    .sampler = tb->gsamp  // TODO use sampler cache
+                    .sampler = gpu_sampler
                 };
                 SDL_BindGPUFragmentSamplers(_d->passes.current(), bind.slot, &gbind, 1);
+                if(track)
+                {
+                    bound_textures[bind.slot] = tb->gtex;
+                    bound_samplers[bind.slot] = sampler_config;
+                }
             }
             else if(!tb){
                 log::warn("[render_gpu] _render_3d_layer: missing texture block for 0x%08x!", bind.texture->id());
+                command_ready = false;
             }
         }
+
+        if(!command_ready)
+            continue;
 
         // finally, we draw
         auto ind_offset = mesh->submeshes()[cmd.submesh].index_offset;
         auto ind_count  = mesh->submeshes()[cmd.submesh].index_count;
         auto vtx_offset = mesh->submeshes()[cmd.submesh].vertex_offset;
         SDL_DrawGPUIndexedPrimitives(_d->passes.current(), ind_count, 1, ind_offset, vtx_offset, 0);
+        pass_drawn = true;
+        }
+
+        _d->passes.unbind();
+        if(pass_drawn && pass_desc.target.color_textures[0])
+            ++completed_environment_faces[pass_desc.target.color_textures[0]];
+
+        rtexture *explicit_mipmap_target = nullptr;
+        if(pass_desc.generate_mipmaps_after_render)
+        {
+            explicit_mipmap_target = pass_desc.target.color_textures[0];
+            if(!explicit_mipmap_target && pass_desc.target.uses_managed_target())
+            {
+                const auto *target = _d->targets.target_get(pass_desc.target.managed_target);
+                if(target && target->color_texture_count)
+                    explicit_mipmap_target = target->color_textures[0].get();
+            }
+        }
+        if(pass_drawn && pass_desc.generate_mipmaps_after_render)
+        {
+            if(!_d->textures.generate_mipmaps_for_target(_d->cmds, explicit_mipmap_target))
+                log::error("[render_gpu] failed to generate requested target mipmaps");
+        }
+
+        auto generate_deferred_mipmaps = [&](rtexture *texture) {
+            if(texture && texture != explicit_mipmap_target &&
+               render::has_flag(texture->flags, render::texture_flags::GENERATE_MIPMAPS_DEFERRED))
+                _d->textures.generate_mipmaps_deferred(_d->cmds, texture);
+        };
+        for(auto *texture : pass_desc.target.color_textures)
+            generate_deferred_mipmaps(texture);
+        generate_deferred_mipmaps(pass_desc.target.depth_texture);
+        if(pass_desc.target.uses_managed_target())
+        {
+            const auto *target = _d->targets.target_get(pass_desc.target.managed_target);
+            if(target)
+            {
+                for(int i = 0; i < target->color_texture_count; ++i)
+                    generate_deferred_mipmaps(target->color_textures[i].get());
+                generate_deferred_mipmaps(target->depth_texture.get());
+            }
+        }
+
+        for(auto *environment : _d->collector_3d.staging_ibl_environments())
+        {
+            if(!environment || !environment->environment_cubemap ||
+               !environment->irradiance_cubemap || !environment->prefiltered_cubemap)
+                continue;
+            const uint32_t prefilter_pass_count =
+                static_cast<uint32_t>(environment->prefiltered_cubemap->mipmaps.size()) * 6;
+            if(completed_environment_faces[environment->environment_cubemap.get()] == 6 &&
+               completed_environment_faces[environment->irradiance_cubemap.get()] == 6 &&
+               completed_environment_faces[environment->prefiltered_cubemap.get()] == prefilter_pass_count)
+                environment->mark_prepared();
+        }
     }
 }
 
@@ -727,8 +889,7 @@ float render_gpu::display_scale() const { return _d->rwin.ui_scale(); }
 
 entt::entity render_gpu::pick(const render_layer &layer, float vp_x, float vp_y)
 {
-    // TODO 3D
-    // just forward to default 2D cpu picker
+    if (layer.three_dee)
+        return _d->picker_3d.pick(layer, vp_x, vp_y);
     return _d->picker.pick(layer, vp_x, vp_y);
 }
-
