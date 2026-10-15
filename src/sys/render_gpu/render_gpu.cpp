@@ -266,12 +266,12 @@ bool render_gpu::step(nb::step_phase phase)
         {
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
             ui_mgr->draw_tool_windows();
-            ui_mgr->draw_perf();
         }
     }
     else if(phase == step_phase::PRE_UPDATE)
     {
         // ui (except overlays) is ready
+        // draw perf window
         // update targets and viewports geometry for accurate data in udpdate
 
         if(_d->has_ui)
@@ -313,6 +313,7 @@ bool render_gpu::step(nb::step_phase phase)
         if(_d->has_ui)
         {
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->draw_perf();
             ui_mgr->draw_overlays();
             _d->imgui.render_flush(_d->batcher);
         }
@@ -420,6 +421,7 @@ void render_gpu::_render()
     SDL_GPUTexture *swapchain = NULL;
     if (!SDL_WaitAndAcquireGPUSwapchainTexture(_d->cmds, window, &swapchain, NULL, NULL)) {
         log::warn("[render_gpu] failed to acquire swapchain texture: %s", SDL_GetError());
+        assert(false);
         return;
     }
 
@@ -692,120 +694,129 @@ void render_gpu::_render_3d_layer(const render_layer &l, int layer_mark_index)
             SDL_PushGPUFragmentUniformData(_d->cmds, 0, scene_uniforms,
                                           pass.scene_uniforms_size);
         }
-        const uint32_t material_fragment_uniform_slot =
-            pass.scene_uniforms_size ? 1 : 0;
 
         const auto &all_cmds = _d->collector_3d.commands();
 
         for(uint32_t cmd_i = pass.cmd_start; cmd_i < pass.cmd_start + pass.cmd_count; ++cmd_i)
         {
-        const auto &cmd = all_cmds[cmd_i];
-        bool command_ready = true;
+            const auto &cmd = all_cmds[cmd_i];
+            bool command_ready = true;
 
-        // check need rebind pipeline
-        auto p_hash = _d->collector_3d.pipeline_hashes()[cmd.pipeline_index];
-        if(p_hash != bound_pipeline)
-        {
-            gpu::pipeline_object *pobj = _d->pipelines.find_or_create_prehashed(_d->gdev,
-                                        _d->collector_3d.pipeline_descriptors()[cmd.pipeline_index], p_hash);
-            if(!pobj || !pobj->pipeline)
+            // check need rebind pipeline
+            auto p_hash = _d->collector_3d.pipeline_hashes()[cmd.pipeline_index];
+            if(p_hash != bound_pipeline)
             {
-                log::warn("[render_gpu] _render_3d_layer: invalid pipeline: 0x%08x", p_hash);
-                continue;
-            }
-            else
-            {
-                SDL_BindGPUGraphicsPipeline(_d->passes.current(), pobj->pipeline);
-                bound_pipeline = p_hash;
-            }
-        }
-
-        // check need rebind buffers
-        const auto mesh = _d->collector_3d.staging_meshes()[cmd.mesh_index];
-        if(bound_mesh != mesh)
-        {
-            _d->buffers.bind(_d->passes.current(), mesh);
-            bound_mesh = mesh;
-        }
-
-        // check need rebind model uniforms
-        const void *model_uniform_addr = cmd.model_uniforms_offset != UINT32_MAX
-            ? _d->collector_3d.arena_ptr(cmd.model_uniforms_offset) : nullptr;
-        if(model_uniform_addr && bound_model_uniform != model_uniform_addr)
-        {
-            SDL_PushGPUVertexUniformData(_d->cmds, 1, model_uniform_addr, sizeof(render::model_uniforms_std));
-            bound_model_uniform = model_uniform_addr;
-        }
-
-        // check need rebind material vert uniforms
-        if(cmd.mat_vert_uniforms_len)
-        {
-            const auto mat_vert_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_vert_uniforms_offset);
-            if(bound_mat_vert_uniform != mat_vert_uniform_addr)
-            {
-                SDL_PushGPUVertexUniformData(_d->cmds, 2, mat_vert_uniform_addr, cmd.mat_vert_uniforms_len);
-                bound_mat_vert_uniform = mat_vert_uniform_addr;
-            }
-        }
-
-        // check need rebind material frag uniforms
-        if(cmd.mat_frag_uniforms_len)
-        {
-            const auto mat_frag_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_frag_uniforms_offset);
-            if(bound_mat_frag_uniform != mat_frag_uniform_addr)
-            {
-                SDL_PushGPUFragmentUniformData(_d->cmds, material_fragment_uniform_slot,
-                                               mat_frag_uniform_addr, cmd.mat_frag_uniforms_len);
-                bound_mat_frag_uniform = mat_frag_uniform_addr;
-            }
-        }
-
-        // check texture binds
-        for(int bind_i = 0; bind_i < cmd.tex_bind_count; ++bind_i)
-        {
-            const auto &bind = *((render::material_texture_binding*)_d->collector_3d.arena_ptr(cmd.tex_binds_offset) + bind_i);
-            gpu::texture_block *tb = (gpu::texture_block*) bind.texture->rptr;
-            if(tb)
-            {
-                auto sampler_config = bind.sampler;
-                sampler_config.max_lod = std::min(sampler_config.max_lod,
-                    static_cast<float>(tb->num_levels - 1));
-                const bool track = bind.slot < MAX_TRACKED_SAMPLERS;
-                if(track && bound_textures[bind.slot] == tb->gtex &&
-                   bound_samplers[bind.slot] == sampler_config)
-                    continue;
-                auto *gpu_sampler = _d->samplers.get(_d->gdev, sampler_config);
-                if(!gpu_sampler)
+                gpu::pipeline_object *pobj = _d->pipelines.find_or_create_prehashed(_d->gdev,
+                                            _d->collector_3d.pipeline_descriptors()[cmd.pipeline_index], p_hash);
+                if(!pobj || !pobj->pipeline)
                 {
+                    log::warn("[render_gpu] _render_3d_layer: invalid pipeline: 0x%08x", p_hash);
+                    continue;
+                }
+                else
+                {
+                    SDL_BindGPUGraphicsPipeline(_d->passes.current(), pobj->pipeline);
+                    bound_pipeline = p_hash;
+                }
+            }
+
+            // check need rebind buffers
+            const auto mesh = _d->collector_3d.staging_meshes()[cmd.mesh_index];
+            if(bound_mesh != mesh)
+            {
+                _d->buffers.bind(_d->passes.current(), mesh);
+                bound_mesh = mesh;
+            }
+
+            uint32_t material_fragment_uniform_slot = pass.scene_uniforms_size ? 1 : 0;
+            uint32_t material_vertex_uniform_slot = material_fragment_uniform_slot;
+
+            // check need rebind model uniforms
+            const void *model_uniform_addr = cmd.model_uniforms_offset != UINT32_MAX
+                ? _d->collector_3d.arena_ptr(cmd.model_uniforms_offset) : nullptr;
+            if(model_uniform_addr)
+            {
+
+                if( bound_model_uniform != model_uniform_addr)
+                {
+                    SDL_PushGPUVertexUniformData(_d->cmds, material_vertex_uniform_slot, model_uniform_addr, cmd.model_uniforms_len);
+                    SDL_PushGPUFragmentUniformData(_d->cmds, material_fragment_uniform_slot, model_uniform_addr, cmd.model_uniforms_len);
+                    bound_model_uniform = model_uniform_addr;
+                }
+
+                material_vertex_uniform_slot++;
+                material_fragment_uniform_slot++;
+            }
+
+            // check need rebind material vert uniforms
+            if(cmd.mat_vert_uniforms_len)
+            {
+                const auto mat_vert_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_vert_uniforms_offset);
+                if(bound_mat_vert_uniform != mat_vert_uniform_addr)
+                {
+                    SDL_PushGPUVertexUniformData(_d->cmds, material_vertex_uniform_slot, mat_vert_uniform_addr, cmd.mat_vert_uniforms_len);
+                    bound_mat_vert_uniform = mat_vert_uniform_addr;
+                }
+            }
+
+            // check need rebind material frag uniforms
+            if(cmd.mat_frag_uniforms_len)
+            {
+                const auto mat_frag_uniform_addr = _d->collector_3d.arena_ptr(cmd.mat_frag_uniforms_offset);
+                if(bound_mat_frag_uniform != mat_frag_uniform_addr)
+                {
+                    SDL_PushGPUFragmentUniformData(_d->cmds, material_fragment_uniform_slot,
+                                                mat_frag_uniform_addr, cmd.mat_frag_uniforms_len);
+                    bound_mat_frag_uniform = mat_frag_uniform_addr;
+                }
+            }
+
+            // check texture binds
+            for(int bind_i = 0; bind_i < cmd.tex_bind_count; ++bind_i)
+            {
+                const auto &bind = *((render::material_texture_binding*)_d->collector_3d.arena_ptr(cmd.tex_binds_offset) + bind_i);
+                gpu::texture_block *tb = (gpu::texture_block*) bind.texture->rptr;
+                if(tb)
+                {
+                    auto sampler_config = bind.sampler;
+                    sampler_config.max_lod = std::min(sampler_config.max_lod,
+                        static_cast<float>(tb->num_levels - 1));
+                    const bool track = bind.slot < MAX_TRACKED_SAMPLERS;
+                    if(track && bound_textures[bind.slot] == tb->gtex &&
+                    bound_samplers[bind.slot] == sampler_config)
+                        continue;
+                    auto *gpu_sampler = _d->samplers.get(_d->gdev, sampler_config);
+                    if(!gpu_sampler)
+                    {
+                        command_ready = false;
+                        continue;
+                    }
+                    SDL_GPUTextureSamplerBinding gbind {
+                        .texture = tb->gtex,
+                        .sampler = gpu_sampler
+                    };
+                    SDL_BindGPUFragmentSamplers(_d->passes.current(), bind.slot, &gbind, 1);
+                    if(track)
+                    {
+                        bound_textures[bind.slot] = tb->gtex;
+                        bound_samplers[bind.slot] = sampler_config;
+                    }
+                }
+                else if(!tb){
+                    log::warn("[render_gpu] _render_3d_layer: missing texture block for 0x%08x!", bind.texture->id());
                     command_ready = false;
-                    continue;
-                }
-                SDL_GPUTextureSamplerBinding gbind {
-                    .texture = tb->gtex,
-                    .sampler = gpu_sampler
-                };
-                SDL_BindGPUFragmentSamplers(_d->passes.current(), bind.slot, &gbind, 1);
-                if(track)
-                {
-                    bound_textures[bind.slot] = tb->gtex;
-                    bound_samplers[bind.slot] = sampler_config;
                 }
             }
-            else if(!tb){
-                log::warn("[render_gpu] _render_3d_layer: missing texture block for 0x%08x!", bind.texture->id());
-                command_ready = false;
-            }
-        }
 
-        if(!command_ready)
-            continue;
+            if(!command_ready)
+                continue;
 
-        // finally, we draw
-        auto ind_offset = mesh->submeshes()[cmd.submesh].index_offset;
-        auto ind_count  = mesh->submeshes()[cmd.submesh].index_count;
-        auto vtx_offset = mesh->submeshes()[cmd.submesh].vertex_offset;
-        SDL_DrawGPUIndexedPrimitives(_d->passes.current(), ind_count, 1, ind_offset, vtx_offset, 0);
-        pass_drawn = true;
+            // finally, we draw
+            auto ind_offset = mesh->submeshes()[cmd.submesh].index_offset;
+            auto ind_count  = mesh->submeshes()[cmd.submesh].index_count;
+            auto vtx_offset = mesh->submeshes()[cmd.submesh].vertex_offset;
+            SDL_DrawGPUIndexedPrimitives(_d->passes.current(), ind_count, 1, ind_offset, vtx_offset, 0);
+            pass_drawn = true;
         }
 
         _d->passes.unbind();

@@ -1,0 +1,34 @@
+#pragma once
+
+#include "./constants.slangh"
+
+// Light data and helper functions
+
+struct LightEntry
+{
+    // xyz = World Position (Point/Spot) or Direction (Directional)
+    // w   = Light Type (0 = Directional, 1 = Point, 2 = Spot)
+    float4 pos_dir;
+
+    // direction in case of spot lights
+    // w is padding but could be used for something else later
+    float4 spot_dir;
+
+    // rgb = Color * Intensity
+    // w   = Range (Point/Spot)
+    float4 color;
+
+    // x = Linear attenuation
+    // y = Quadratic attenuation
+    // z = Inner cone angle cosine (Spot)
+    // w = Outer cone angle cosine (Spot)
+    float4 params;
+};
+
+
+struct LightsBlock
+{
+    float3 ambient;
+    float _pad0;
+    LightEntry lights[SCENE_LIGHTS_MAX];
+};

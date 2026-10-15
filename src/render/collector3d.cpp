@@ -4,6 +4,8 @@
 #include "newbase/render/types.hpp"
 #include <newbase/render/collector3d.hpp>
 #include <newbase/render/pass/ibl_integration.hpp>
+#include <newbase/render/mat/skybox.hpp>
+#include <newbase/render/lights.hpp>
 #include <newbase/res/material.hpp>
 #include <newbase/res/manager.hpp>
 #include <newbase/res/texture.hpp>
@@ -14,6 +16,7 @@
 #include <newbase/components/environment.hpp>
 #include <newbase/components/spatial.hpp>
 #include <newbase/components/mesh.hpp>
+#include <newbase/components/light.hpp>
 #include <newbase/res/mesh.hpp>
 #include <algorithm>
 #include <entt/core/hashed_string.hpp>
@@ -58,6 +61,7 @@ using namespace ::nb::render;
 // draw_id:      derived from entity IDs, to avoid reorder aliasing
 
 static constexpr uint64_t CMD_3D_GROUP_OPAQUE = 0x40000000'00000000;
+static constexpr uint64_t CMD_3D_GROUP_OPAQUE_SKYBOX = 0x41000000'00000000;
 static constexpr uint64_t CMD_3D_GROUP_TRANSPARENT = 0xC0000000'00000000;
 static constexpr uint64_t CMD_3D_GROUP_MASK = 0xFF000000'00000000;
 
@@ -120,7 +124,9 @@ void collector3d::collect(const render_layer &l, const pass_target_info &layer_t
     for(auto entity : environment_view)
     {
         auto &environment = environment_view.get<cenvironment>(entity);
+        env_data.ambient = environment.ambient;
         if(environment.preparation_pending() ||
+           !environment.equirectangular || // We check this so that you can clear out the env map
            !environment.environment_cubemap ||
            !environment.irradiance_cubemap ||
            !environment.prefiltered_cubemap)
@@ -138,7 +144,7 @@ void collector3d::collect(const render_layer &l, const pass_target_info &layer_t
     forward.target.managed_target = l.target_id;
     forward.targets = layer_targets;
     forward.viewport = l.viewport;
-    _collect_pass(l, forward, env_data.ibl_enabled ? &env_data : nullptr);
+    _collect_pass(l, forward, &env_data);
 
     m_layer_markers.push_back(layer_marker {
         .pass_start = pass_start,
@@ -168,14 +174,6 @@ bool collector3d::append_draw_pass(const render_pass &pass,
             m_arena.alloc_raw(scene_uniforms, scene_uniforms_size));
     }
 
-    m_internal_materials.push_back(material);
-
-    pipeline_descriptor pd {};
-    pd.targets = pass.targets;
-    controller->make_pipeline_desc(*material, nullptr, pass.type,
-                                   mesh->vertex_type(), pd);
-    const auto pipeline_index = _get_pipeline_index(pd);
-
     auto &collected = m_passes.emplace_back(collected_pass {
         .desc_offset = UINT32_MAX,
         .cmd_start = static_cast<uint32_t>(m_cmds.size()),
@@ -184,6 +182,36 @@ bool collector3d::append_draw_pass(const render_pass &pass,
         .scene_uniforms_size = static_cast<uint32_t>(scene_uniforms_size)
     });
     collected.desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass));
+
+    for(auto *texture : pass.target.color_textures)
+        if(texture)
+            _add_staging_texture(texture);
+    if(pass.target.depth_texture)
+        _add_staging_texture(pass.target.depth_texture);
+
+    if(!_append_draw_command(pass, std::move(material), std::move(mesh), nullptr, 0))
+        return false;
+    collected.cmd_count = static_cast<uint32_t>(m_cmds.size() - collected.cmd_start);
+    return true;
+}
+
+bool collector3d::_append_draw_command(const render_pass &pass,
+                                       std::shared_ptr<rmaterial> material,
+                                       std::shared_ptr<rmesh> mesh,
+                                       const model_uniforms_std *model_uniforms,
+                                       uint64_t sort_key)
+{
+    if(!material || !mesh || m_passes.empty())
+        return false;
+
+    auto *controller = material_controller::get_controller(material->mat_type);
+    if(!controller)
+        return false;
+    pipeline_descriptor pd {};
+    pd.targets = pass.targets;
+    controller->make_pipeline_desc(*material, nullptr, pass.type,
+                                   mesh->vertex_type(), pd);
+    const auto pipeline_index = _get_pipeline_index(pd);
 
     const auto vertex_uniform_size = controller->get_vertex_ubo_size(pd, nullptr);
     const auto fragment_uniform_size = controller->get_fragment_ubo_size(pd, nullptr);
@@ -216,24 +244,25 @@ bool collector3d::append_draw_pass(const render_pass &pass,
                 _add_staging_texture(bindings[i].texture);
     }
 
-    for(auto *texture : pass.target.color_textures)
-        if(texture)
-            _add_staging_texture(texture);
-    if(pass.target.depth_texture)
-        _add_staging_texture(pass.target.depth_texture);
-
     _add_staging_mesh(mesh.get());
     _add_staging_shader(controller->get_vertex_program(pd).get());
     _add_staging_shader(controller->get_fragment_program(pd).get());
 
+    uint32_t model_uniform_offset = UINT32_MAX;
+    const uint32_t model_uniforms_len = (uint32_t) sizeof(model_uniforms_std);
+    if(model_uniforms)
+        model_uniform_offset = m_arena.byte_offset(m_arena.alloc<model_uniforms_std>(*model_uniforms));
+
+    m_internal_materials.push_back(material);
     m_cmds.emplace_back(command3d {
-        .sort_key = 0,
+        .sort_key = sort_key,
         .material = material.get(),
         .mat_vert_uniforms_offset = vertex_uniform_offset,
         .mat_vert_uniforms_len = static_cast<uint32_t>(vertex_uniform_size),
         .mat_frag_uniforms_offset = fragment_uniform_offset,
         .mat_frag_uniforms_len = static_cast<uint32_t>(fragment_uniform_size),
-        .model_uniforms_offset = UINT32_MAX,
+        .model_uniforms_offset = model_uniform_offset,
+        .model_uniforms_len = model_uniforms_len,
         .pipeline_index = pipeline_index,
         .mesh_index = _add_staging_mesh(mesh.get()),
         .submesh = 0,
@@ -241,7 +270,7 @@ bool collector3d::append_draw_pass(const render_pass &pass,
         .tex_bind_count = texture_binding_count,
         .tex_binds_offset = texture_bindings_offset
     });
-    collected.cmd_count = 1;
+    ++m_passes.back().cmd_count;
     return true;
 }
 
@@ -276,9 +305,22 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
         u_scn.inv_view = glm::inverse(view);
         u_scn.camera_pos = cam_sp->pos;
     }
-    // HACK temporary, this will change
-    u_scn.light_color = glm::vec3{1.8f, 1.8f, 1.5f};        // TODO
-    u_scn.light_dir = glm::vec3{0.0f, 1.0f, 0.5f}; // TODO
+
+    // collect and cull lights
+    aabb::frustum_culler frustum_culler {u_scn.view_proj};
+    light_culler lights {frustum_culler};
+    auto light_view = scn->registry().view<clight, cspatial>();
+    for(const auto &[eid, light, spa]: light_view.each())
+    {
+        lights.add_light(light, &spa);
+    }
+    lights.write_culled_lights(u_scn.light_data);
+    if(env_data)
+    {
+        u_scn.light_data.ambient = env_data->ambient;
+    }
+
+    // write scene uniforrms to rean and take offset
     const uint32_t scene_uniforms_offset =
         m_arena.byte_offset(m_arena.alloc_raw(&u_scn, sizeof(u_scn)));
 
@@ -311,14 +353,22 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
         if(!msh.mesh || !msh.mesh->submeshes().size())
             continue;
 
+        // do a simple aabb frustum cull check
+        aabb model_aabb = msh.mesh->get_aabb().transform(spa.world);
+        if(!frustum_culler.intersects(model_aabb))
+            continue;
+
         // stage mesh
         const auto msh_idx = _add_staging_mesh(msh.mesh.get());
 
-        const model_uniforms_std * u_model = m_arena.alloc<model_uniforms_std>(
+        model_uniforms_lit_std * u_model = m_arena.alloc<model_uniforms_lit_std>(
             spa.world,
-            glm::transpose(glm::inverse(spa.world))
+            glm::mat3{glm::inverse(spa.world)}
         );
         const auto u_model_offset = m_arena.byte_offset(u_model);
+        const auto u_model_len = sizeof(model_uniforms_lit_std);
+
+        lights.write_culled_model_lights(u_model->light_indices, model_aabb);
 
         for (int sub_i = 0; sub_i < msh.mesh->submeshes().size(); ++sub_i)
         {
@@ -428,7 +478,8 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
                 .mat_vert_uniforms_len = (uint32_t) u_vtx_sz,
                 .mat_frag_uniforms_offset = (uint32_t) u_frag_offset,
                 .mat_frag_uniforms_len = (uint32_t) u_frag_sz,
-                .model_uniforms_offset = u_model_offset,
+                .model_uniforms_offset = (uint32_t) u_model_offset,
+                .model_uniforms_len = (uint32_t) u_model_len,
                 .pipeline_index = pd_index,
                 .mesh_index = msh_idx,
                 .submesh = (uint16_t)sub_i,
@@ -437,6 +488,42 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
                 .tex_binds_offset = tex_bind_offset
             } );
         }
+    }
+
+    // environment skybox
+    auto skybox_view = scn->registry().view<cenvironment>();
+    for(auto entity : skybox_view)
+    {
+        auto &environment = skybox_view.get<cenvironment>(entity);
+        if(environment.preparation_pending() || !environment.prefiltered_cubemap
+            || !environment.equirectangular)
+                continue;
+
+        if(!environment.skybox_mesh)
+            environment.skybox_mesh = rmesh::make_skybox_cube();
+        if(!environment.skybox_material)
+        {
+            environment.skybox_material = std::make_shared<rmaterial>();
+            environment.skybox_material->mat_type = material_type::SKYBOX;
+            environment.skybox_material->pipeline_params = pipeline_params {
+                .blend = blendmode::NONE,
+                .cull = cull_mode::FRONT,
+                .depth_test = true,
+                .depth_write = false
+            };
+        }
+        environment.skybox_material->mat_params =
+            skybox_mat_params {.cubemap = environment.prefiltered_cubemap,
+                .sample_level = (float)environment.prefiltered_cubemap->mipmaps.size()/1.5f};
+
+        const model_uniforms_std skybox_model {
+            glm::mat4(1.0f),
+            glm::mat3(1.0f)
+        };
+        _append_draw_command(pass_desc, environment.skybox_material,
+                             environment.skybox_mesh, &skybox_model,
+                             CMD_3D_GROUP_OPAQUE_SKYBOX);
+        break;
     }
 
     auto &collected = m_passes[pass_index];

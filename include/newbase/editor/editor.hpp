@@ -22,6 +22,7 @@ public:
 
 private:
     void _draw_main_menu();
+    void _draw_viewport_toolbar();
     void _draw_overlay(const render_layer &rl, glm::vec4 ui_vp);
     void _draw_grid(const render_layer &l, render::batcher2d &batcher);
     void _sync_editor_cam_to_game();

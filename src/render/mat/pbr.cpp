@@ -238,7 +238,9 @@ void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
         out_bindings[6] = material_texture_binding{
             .texture = env_data->prefiltered_cubemap,
             .slot = 6,
-            .sampler = {},
+            .sampler = {
+                .mip_filter = render::sampler_filter::LINEAR
+            },
             .vertex = false
         };
         out_bindings[7] = material_texture_binding{
@@ -285,12 +287,22 @@ void pbr_mat_controller::_init_rtti()
     entt::meta_factory<pbr_mat_params>{}
     .type(entt::hashed_string{"pbr_mat_params"}.value())
     .custom<type_info>(type_info{.identifier = "pbr_mat_params"})
+    .data<&pbr_mat_params::base_color_tex, entt::as_ref_t>(entt::hashed_string{"base_color_tex"}.value())
+    .custom<data_info>(data_info{.identifier = "base_color_tex", .subtype=rtti::DATA_SUBTYPE_RESOURCE})
     .data<&pbr_mat_params::base_color_factor, entt::as_ref_t>(entt::hashed_string{"base_color_factor"}.value())
     .custom<data_info>(data_info{.identifier = "base_color_factor", .subtype=DATA_SUBTYPE_COLOR})
+    .data<&pbr_mat_params::emissive_color_tex, entt::as_ref_t>(entt::hashed_string{"emissive_color_tex"}.value())
+    .custom<data_info>(data_info{.identifier = "emissive_color_tex", .subtype=rtti::DATA_SUBTYPE_RESOURCE})
     .data<&pbr_mat_params::emissive_color_factor, entt::as_ref_t>(entt::hashed_string{"emissive_color_factor"}.value())
     .custom<data_info>(data_info{.identifier = "emissive_color_factor", .subtype=DATA_SUBTYPE_COLOR})
+    .data<&pbr_mat_params::metal_rough_tex, entt::as_ref_t>(entt::hashed_string{"metal_rough_tex"}.value())
+    .custom<data_info>(data_info{.identifier = "metal_rough_tex", .subtype=rtti::DATA_SUBTYPE_RESOURCE})
     .data<&pbr_mat_params::roughness_factor, entt::as_ref_t>(entt::hashed_string{"roughness_factor"}.value())
     .custom<data_info>(data_info{.identifier = "roughness_factor"})
     .data<&pbr_mat_params::metallic_factor, entt::as_ref_t>(entt::hashed_string{"metallic_factor"}.value())
-    .custom<data_info>(data_info{.identifier = "metallic_factor"});
+    .custom<data_info>(data_info{.identifier = "metallic_factor"})
+    .data<&pbr_mat_params::ao_tex, entt::as_ref_t>(entt::hashed_string{"ao_tex"}.value())
+    .custom<data_info>(data_info{.identifier = "ao_tex", .subtype=rtti::DATA_SUBTYPE_RESOURCE})
+    .data<&pbr_mat_params::occlusion_strength, entt::as_ref_t>(entt::hashed_string{"occlusion_strength"}.value())
+    .custom<data_info>(data_info{.identifier = "occlusion_strength"});
 }

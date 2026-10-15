@@ -4,8 +4,10 @@
 #include <newbase/reflection/data.hpp>
 #include <newbase/utility/glm.hpp>
 #include <newbase/res/resource.hpp>
+#include <newbase/log.hpp>
 #include <imgui.h>
 #include <memory>
+#include <string>
 
 namespace nb {
 
@@ -50,6 +52,25 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
             char buf[256]; strncpy(buf, v->c_str(), 255); buf[255] = 0;
             if (ImGui::InputText(label, buf, sizeof(buf))) { *v = buf; changed = true; }
         }
+    } else if (ti == entt::type_id<entt::meta_any>())
+    {
+        auto *any = ref.try_cast<entt::meta_any>();
+        if(any)
+        {
+            return draw_meta_any_editor(label, *any, true, hint);
+        }
+        else ImGui::LabelText(label, "(meta::any)");
+    } else if (ref.type().is_sequence_container())
+    {
+        if(auto view = ref.as_sequence_container(); view) {
+            int idx {0};
+            for (auto iref : view)
+            {
+                std::string lbl {label};
+                lbl += std::to_string(idx++);
+                draw_meta_any_editor(lbl.c_str(), iref, true, hint);
+            }
+        }
     } else {
         // shared_ptr<resource> types
         auto type = ref.type();
@@ -83,7 +104,8 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
             if(recursing)
                 ImGui::TreePop();
         } else if (!has_data) {
-            ImGui::LabelText(label, "(unknown type)");
+            ImGui::LabelText(label, "(? '%s' 0x%08x)",
+                             std::string(ref.type().info().name()).c_str(), ref.type().id());
         }
     }
     return changed;

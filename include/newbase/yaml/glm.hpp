@@ -17,6 +17,7 @@ namespace nb {
     bool try_load_float(ryml::ConstNodeRef in, float &dst);
     bool try_load_bool (ryml::ConstNodeRef in, bool  &dst);
     bool try_load_vec2 (ryml::ConstNodeRef in, glm::vec2 &dst);
+    bool try_load_vec3 (ryml::ConstNodeRef in, glm::vec3 &dst);
     bool try_load_vec4 (ryml::ConstNodeRef in, glm::vec4 &dst);
 
 }

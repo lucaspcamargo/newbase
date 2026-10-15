@@ -45,7 +45,7 @@ namespace nb::rtti {
             .custom<type_info>(type_info{
                 .identifier = "texture",
                 .type_class = TYPE_CLASS_RESOURCE,
-                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp",
+                .data = {.resource = {.editor_icon = ICON_FK_FILE_IMAGE_O, .extensions = "png jpg jpeg bmp ktx ktx2",
                     .factory_fn = +[](entt::id_type id) -> std::shared_ptr<nb::resource> {
                         return std::make_shared<rtexture>(id);
                     }

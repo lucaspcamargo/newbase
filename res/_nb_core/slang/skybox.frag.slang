@@ -11,7 +11,7 @@ struct SkyBoxParams
 
 
 [[vk::binding(0, 3)]]
-ConstantBuffer<SkyBoxParams> g_material : register(b2);
+ConstantBuffer<SkyBoxParams> g_material : register(b0);
 
 struct VSOutput
 {

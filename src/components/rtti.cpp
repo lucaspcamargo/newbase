@@ -8,6 +8,7 @@
 #include <newbase/components/camera.hpp>
 #include <newbase/components/environment.hpp>
 #include <newbase/components/layers.hpp>
+#include <newbase/components/mesh.hpp>
 
 namespace nb::rtti
 {
@@ -21,5 +22,6 @@ namespace nb::rtti
         ccamera::_ensure_rtti();
         cenvironment::_ensure_rtti();
         clayers::_ensure_rtti();
+        cmesh::_ensure_rtti();
     }
 }

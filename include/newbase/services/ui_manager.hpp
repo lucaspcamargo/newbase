@@ -56,6 +56,11 @@ namespace nb
         virtual glm::ivec4 update_viewports() = 0;  // returns central ui viewport in pixel coords
         virtual glm::vec4 central_viewport(bool pixel_coords = false) = 0; // return in ui coords by default
 
+        // Shrink the central viewport by the given amounts (in GUI / logical-pixel units).
+        // Must be called before update_viewports() each frame. Insets are reset to zero
+        // at the start of every new frame so callers don't need to clean up.
+        virtual void set_viewport_insets(float top, float right = 0.f, float bottom = 0.f, float left = 0.f) = 0;
+
         // Resource editor integration.
         // A system that can display a resource editor (e.g. the editor system) registers a
         // callback here. Callers (resource field widget, resource browser, etc.) invoke

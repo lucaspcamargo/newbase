@@ -13,3 +13,4 @@
 #include <glm/gtc/quaternion.hpp>  // remember, construct with wxyz argument order
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/norm.hpp>

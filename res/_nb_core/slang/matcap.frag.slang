@@ -12,7 +12,11 @@ struct MatCapMaterialUniforms
     float padding;
 };
 
+
 [[vk::binding(1, 3)]]
+ConstantBuffer<ModelUniforms> g_model : register(b1);
+
+[[vk::binding(2, 3)]]
 ConstantBuffer<MatCapMaterialUniforms> g_material : register(b2);
 
 [[vk::binding(0, 2)]]

@@ -11,6 +11,7 @@
 #include <newbase/components/textext.hpp>
 #include <newbase/components/tilemap.hpp>
 #include <newbase/components/layers.hpp>
+#include <newbase/components/light.hpp>
 #include <newbase/sys/textext/rtexfont.hpp>  // TODO remove once we have component building via RTTI
 #include <newbase/res/tilemap.hpp>
 #include <newbase/res/manager.hpp>
@@ -197,6 +198,9 @@ bool nb::build_camera(ryml::ConstNodeRef def, ccamera &dst)
 
 bool nb::build_environment(ryml::ConstNodeRef def, cenvironment &dst)
 {
+
+    if (def.has_child("ambient")) try_load_vec3(def["ambient"], dst.ambient);
+
     if(!def.has_child("equirectangular"))
         return true;
 
@@ -258,5 +262,17 @@ bool nb::build_mesh(ryml::ConstNodeRef def, cmesh &dst)
                 dst.materials[i] = rman().load_sync<rmaterial>(mat_slots[i]);
         }
     }
+    return true;
+}
+
+bool nb::build_light(ryml::ConstNodeRef def, clight &dst)
+{
+    dst = clight {};
+    if (def.has_child("type")) def["type"] >> *(uint8_t*)&dst.type;
+    if (def.has_child("color")) try_load_vec3(def["color"], dst.color);
+    if (def.has_child("intensity")) def["intensity"] >> dst.intensity;
+    if (def.has_child("range")) def["range"] >> dst.range;
+    if (def.has_child("linear")) def["linear"] >> dst.linear;
+    if (def.has_child("quadratic")) def["quadratic"] >> dst.quadratic;
     return true;
 }

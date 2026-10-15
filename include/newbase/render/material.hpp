@@ -1,12 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <newbase/render/lights.hpp>
 #include <newbase/render/pass.hpp>
 #include <newbase/render/pipeline.hpp>
-#include <newbase/render/vertex.hpp>
 #include <newbase/render/types.hpp>
+#include <newbase/render/vertex.hpp>
 #include <newbase/utility/glm.hpp>
-#include <vector>
-#include <memory>
 
 
 namespace nb  // fwd decls
@@ -39,6 +39,7 @@ namespace nb::render
     /// Scene-provided environment resources available to a material draw.
     struct mat_env_data
     {
+        glm::vec3 ambient {0.0f};
         bool ibl_enabled {false};
         rtexture *environment_cubemap {nullptr};
         rtexture *irradiance_cubemap {nullptr};
@@ -120,16 +121,30 @@ namespace nb::render
         glm::mat4   inv_view;
         glm::vec3   camera_pos;
         float    _pad0;
-        glm::vec3   light_dir;      // Normalized direction towards light source
-        float    _pad1;
-        glm::vec3   light_color;    // Light radiance (color * intensity)
-        float    _pad2;
+
+        light_uniform_block light_data;
+    };
+
+    struct packed_normal_matrix
+    {
+        packed_normal_matrix(const glm::mat3x3 &src) :
+            packed{glm::vec4{src[0][0], src[1][0], src[2][0], 0.0f},
+                   glm::vec4{src[0][1], src[1][1], src[2][1], 0.0f},
+                   glm::vec4{src[0][2], src[1][2], src[2][2], 0.0f},} {}
+        std::array<glm::vec4, 3> packed;   // x, y = col 1, rows 1-2; z, w = col 2, rows 0-1
     };
 
     struct alignas(16) model_uniforms_std
     {
         glm::mat4 model;
-        glm::mat4 normal_matrix;  // Transpose(Inverse(Model)) to scale normals correctly
+        packed_normal_matrix normal_matrix;  // Transpose(Inverse(Model)) to scale normals correctly
     };
 
+    struct alignas(16) model_uniforms_lit_std
+    {
+        glm::mat4 model;
+        packed_normal_matrix normal_matrix;  // Transpose(Inverse(Model)) to scale normals correctly
+
+        light_model_uniform_block light_indices;
+    };
 }

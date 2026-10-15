@@ -1,9 +1,9 @@
 # TODO
 
-The tasks that are still meant to be done. Some have dependencies or subtasks.
+The tasks that were planned and got done, sometime after devlog #1.
+Or that are still meant to be done. Some have dependencies or subtasks.
 
 This is a living document.
-
 
 - Core
     + [X] Fix shutdown sequence
@@ -22,10 +22,10 @@ This is a living document.
     + [ ] Implement and actually use internationalization
 - Editor
     + [ ] Use render::window conversion for all pointer events
-    + [ ] 3D camera and rendering support
+    + [~] 3D camera and rendering support
         * [ ] Wireframes
         * [ ] AABBs
-        * [ ] Picking
+        * [X] Picking
         * [ ] Material resource editor
     + [ ] Uniform interface for textual resources
     + [ ] Pre-docked windows
@@ -37,9 +37,9 @@ This is a living document.
 - Resources
     + [X] Move resource loading to ::nb::resource virtual methods, one TU per class. 
     + [~] Load jobs
-        + [~] Well-defined nb::resource states, preloaded state with list of deps
+        + [X] Well-defined nb::resource states, preloaded state with list of deps
               Need implementation in concrete resource types
-        + [~] Implement async loading and thread-safe resource cache management
+        + [X] Implement async loading and thread-safe resource cache management
         + [ ] Resource dependencies in components and other resources(scene->cscript->rscript->rtexture, for example)
     + [ ] HTTP(S) resource provider, for emscripten mostly
     + [ ] Archive resource provider, for resource packing (WAD-like)
@@ -63,38 +63,45 @@ This is a living document.
     + [X] Rewrite render_gpu to use the new stuff and get 2D working right for a start.
     + [X] Elementary 3D rendering with render_gpu
         * [X] Below scope: "render_gpu and 3D - beginnings"
-    + [~] 3D render command collection and batching
-        * [~] Renderer-agnostic pipeline description
-        * [~] Renderer-agnostic texture formats
-        * [ ] 3D collector with opaque<->transparent, depth sorting
+    + [X] 3D render command collection and batching
+        * [X] Renderer-agnostic pipeline description
+        * [X] Renderer-agnostic texture formats
+        * [X] 3D collector with opaque<->transparent, depth sorting
         * [X] Pipeline descriptors originating in materials
-        * [ ] PBR ateril adjustment
     + [~] Shader system
         * [X] Core shader structures, compilation, and introspection
         * [ ] Optional shader support in render_2d depending on backend
         * [ ] Shader support in render_gpu for 2d too
-    + [~] Materials system + shader derivation
-        * [ ] Core material definitions (controllers and types, shaders, texure bindins, uniform buffers)
+    + [X] Materials system + shader derivation
+        * [X] Core material definitions (controllers and types, shaders, texure bindins, uniform buffers)
     + [ ] "Classic" fixed-function-like materials system
     + [~] PBR material system
-        * [+] Basic Metal-Roughness with fallback textures
-        + [+] Render helmet correctly
+        * [X] Basic Metal-Roughness with fallback textures
+        * [X] Render helmet correctly
         * [ ] Direct light loops
-    + [ ] Matcap material controller
+        * [X] Environment IBL
+    + [X] Matcap material controller
     + [ ] Shader improvements
-        * [ ] include support
+        * [X] include support
         * [ ] combinatorics mechanism (At least for vertex formats. Look into slang facilities for that.)
     + [X] GLTF import and rendering
-    + [ ] Fancier techniques
-        * [ ] Create render_pass system, distinct from render layers (but similar)
-        * [ ] HDR and Tonemapping
+    + [~] Fancier techniques
+        * [X] Create render_pass system, distinct from render layers (but similar)
+        * [~] HDR and Tonemapping
         * [ ] Shadow mapping
-        * [ ] SSAO, SSR 
+        * [ ] SSAO, SSR
+- Rendering: Web and Android-compat
+    + [ ] Introduce render_gles for rendering with OpenglES 3.0 (WebGL 2)
+            Use same renderer-agnostic `::nb::render` constructs as render_gpu
+        * [ ] 2D parity with render_2d
+        * [ ] Shader transpiles to GLSL via SPIRV-Cross
+        * [ ] 3D rendering
 - Audio
-    + [ ] Take audio resources instead of handles in playback functions (don't force load anything ever)
+    + [ ] Take resources instead of handles in playback functions (don't sync-load anything)
         + [ ] Only play if loaded
-    + [ ] Spatial sound support, 2D and 3D
+    + [ ] Spatial sound support, for 2D and 3D
     + [ ] Basic HRTF support in spatial functionality
+    + [ ] Support for ambisonics
     + [ ] Sequenced music and sfx usin synths. Look into tsf/tml, and pl_synth.
           Also integrate ymfm.
     + [ ] "Maestro" system for handling dynamic music and transitions
@@ -107,13 +114,14 @@ This is a living document.
         * [X] Restore image editor
     + [X] Clipboard, IME area
     + [ ] Unify tool window toggle, remove dedicated debug actions
+    + [ ] Compact performance overlay by default
     + [ ] Default dock layout mechanism for tool and editor windows
     + [~] Integrate imgui-text-editor for scripts and text files
           Initial integration done, but cannot save. Script reload will be tricky.
     + [ ] Make resource editor work with plain shared_ptr, resource manager registration should be optional for resource types.
 - In-Game UI
-    + [ ] Integrate LVGL
-    + [ ] Integrate RmlUi
+    + [ ] Integrate LVGL (?)
+    + [ ] Integrate RmlUi (?)
 - Lua Scripting
     + [ ] Refactor some the API glue out of script_lua.cpp (too big, and decoupled)
     + [ ] Mechanism for automatic callback cleanup
@@ -192,7 +200,6 @@ This is a living document.
         perhaps? Providing a render_layer should give the overlay enough context.
         If/when RTT is being used is another story in this scenario.
 - [X] Update UI overlay callback signature and code
-
 
 ## Scope: render_gpu and 3D - beginnings
 

@@ -6,6 +6,7 @@ namespace nb {
     struct ccharacter2d;
     struct cenvironment;
     struct clayers;
+    struct clight;
     struct cmesh;
     struct cparticle_emitter;
     struct cscript;

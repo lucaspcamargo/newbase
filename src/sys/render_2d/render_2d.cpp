@@ -275,7 +275,6 @@ bool render_2d::step(nb::step_phase phase)
             ZoneScopedN("RenderDrawUI");
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
             ui_mgr->draw_tool_windows();
-            ui_mgr->draw_perf();
         }
     }
     else if(phase == step_phase::PRE_UPDATE)
@@ -364,6 +363,7 @@ bool render_2d::step(nb::step_phase phase)
         {
             _d->ui_sync = _d->batcher.sync_point_new();
             ui_manager* ui_mgr = entt::locator<ui_manager*>::value();
+            ui_mgr->draw_perf();
             ui_mgr->draw_overlays();
             _d->imgui.render_flush(_d->batcher);
         }

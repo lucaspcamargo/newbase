@@ -31,7 +31,7 @@ VSOutput main(VSInput input)
     output.position = mul(g_scene.view_proj, world_pos);
 
     float3 world_normal = normalize(
-        mul((float3x3)g_model.normal_matrix, input.normal));
+        mul(g_model.unpack_normal_matrix(), input.normal));
     output.world_normal = world_normal;
     output.uv = input.uv;
     output.world_tangent = normalize(

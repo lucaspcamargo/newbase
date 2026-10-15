@@ -268,6 +268,7 @@ bool editor::step(step_phase phase)
         auto &reg = scn.registry();
 
         _draw_main_menu();
+        _draw_viewport_toolbar();
 
         // (wireframes + gizmo are drawn via the registered UI overlay — see init())
 
@@ -476,6 +477,96 @@ bool editor::event(SDL_Event* evt)
     return true;
 }
 
+void editor::_draw_viewport_toolbar()
+{
+
+    auto *uim = entt::locator<ui_manager*>::value();
+    if (!uim) return;
+
+    ImGuiDockNode *cn = ImGui::DockBuilderGetCentralNode(
+        static_cast<ImGuiID>(uim->dockspace_id()));
+    if (!cn) return;
+
+    const float toolbar_h = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y * 4.f;
+
+    // Register the inset so update_viewports() shrinks the render area
+    uim->set_viewport_insets(toolbar_h);
+
+    // Draw a frameless window flush with the top of the central node
+    ImGui::SetNextWindowPos({cn->Pos.x, cn->Pos.y});
+    ImGui::SetNextWindowSize({cn->Size.x, toolbar_h});
+    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,    0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,  0.f);
+    constexpr ImGuiWindowFlags toolbar_flags =
+        ImGuiWindowFlags_NoDecoration  | ImGuiWindowFlags_NoMove        |
+        ImGuiWindowFlags_NoScrollbar   | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking     | ImGuiWindowFlags_NoNav;
+    ImGui::Begin("##vp_toolbar", nullptr, toolbar_flags);
+    ImGui::PopStyleVar(2); // WindowRounding, WindowBorderSize
+
+    // --- Toolbar contents ---
+    const ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
+    const ImVec4 normal_col = ImGui::GetStyleColorVec4(ImGuiCol_Button);
+
+    // Camera (editor override) toggle
+    ImGui::PushStyleColor(ImGuiCol_Button, _d->override_layers ? active_col : normal_col);
+    if (ImGui::Button(ICON_FK_VIDEO_CAMERA " Camera"))
+    {
+        _d->override_layers = !_d->override_layers;
+        if (_d->override_layers)
+        {
+            _ensure_editor_cam();
+            _sync_editor_cam_to_game();
+            _apply_override_layers();
+        }
+        else
+        {
+            _d->panning = false;
+            engine::instance().clear_override_render_layers();
+        }
+    }
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine();
+
+    // Wireframes toggle
+    ImGui::BeginDisabled(!_d->override_layers);
+    ImGui::PushStyleColor(ImGuiCol_Button, _d->show_wireframes ? active_col : normal_col);
+    if (ImGui::Button(ICON_FK_OBJECT_GROUP " Wireframes"))
+        _d->show_wireframes = !_d->show_wireframes;
+    ImGui::PopStyleColor();
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+
+    // 3D toggle
+    ImGui::PushStyleColor(ImGuiCol_Button, _d->three_dee ? active_col : normal_col);
+    if (ImGui::Button(ICON_FK_CUBE " 3D"))
+    {
+        _d->three_dee = !_d->three_dee;
+        if (_d->three_dee)
+            _sync_editor_cam_to_game();
+        if (_d->override_layers && _d->enabled)
+            _apply_override_layers();
+    }
+    ImGui::PopStyleColor();
+
+    ImGui::SameLine();
+
+    // Play / Pause
+    if (engine::instance().is_paused())
+    {
+        if (ImGui::Button(ICON_FK_PLAY " Play"))   engine::instance().set_paused(false);
+    }
+    else
+    {
+        if (ImGui::Button(ICON_FK_PAUSE " Pause")) engine::instance().set_paused(true);
+    }
+
+    ImGui::End();
+}
+
 void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
 {
     if (!_d->override_layers || ui_vp.z <= 0 || ui_vp.w <= 0) return;
@@ -582,30 +673,68 @@ void editor::_draw_overlay(const render_layer &rl, glm::vec4 ui_vp)
 
         ImGuizmo::SetDrawlist(dl);
         ImGuizmo::SetRect(lvp_x, lvp_y, lvp_w, lvp_h);
-        ImGuizmo::SetOrthographic(true);
 
-        const glm::mat4 view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
-        const float half_w = wb.z*0.5f;
-        const float half_h = wb.w*0.5f;
-        const glm::mat4 proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
+        glm::mat4 view, proj;
 
-        auto *sp = reg.try_get<cspatial>(_d->selected_entity);
-        if (sp)
+        if (_d->three_dee)
         {
-            glm::mat4 world = sp->world;
-            if (ImGuizmo::Manipulate(
-                    glm::value_ptr(view), glm::value_ptr(proj),
-                    ImGuizmo::TRANSLATE, ImGuizmo::LOCAL,
-                    glm::value_ptr(world)))
+            ImGuizmo::SetOrthographic(false);
+            auto &ed_reg = engine::instance().default_scene().registry();
+            auto *ed_sp  = ed_reg.try_get<cspatial>(_d->editor_cam_eid);
+            auto *ed_cam = ed_reg.try_get<ccamera> (_d->editor_cam_eid);
+            if (!ed_sp || !ed_cam) goto gizmo_skip;
+            view = glm::inverse(ed_sp->world);
+            const float aspect = lvp_w / (lvp_h > 0.f ? lvp_h : 1.f);
+            proj = glm::perspective(ed_cam->cam3d.fov, aspect,
+                                    ed_cam->cam3d.clip_near, ed_cam->cam3d.clip_far);
+        }
+        else
+        {
+            ImGuizmo::SetOrthographic(true);
+            view = glm::translate(glm::mat4{1.f}, glm::vec3{-_d->cam_x, -_d->cam_y, -1.f});
+            const float half_w = wb.z * 0.5f;
+            const float half_h = wb.w * 0.5f;
+            proj = glm::ortho(-half_w, half_w, half_h, -half_h, -1000.f, 1000.f);
+        }
+
+        {
+            auto *sp = reg.try_get<cspatial>(_d->selected_entity);
+            if (sp)
             {
-                float t[3], r[3], s[3];
-                ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(world), t, r, s);
-                sp->pos = {t[0], t[1], t[2]};
-                sp->rot = {r[0], r[1], r[2]};
-                sp->scale = {s[0], s[1], s[2]};
-                sp->apply();
+                glm::mat4 old_world = sp->world;
+                glm::mat4 world     = old_world;
+                if (ImGuizmo::Manipulate(
+                        glm::value_ptr(view), glm::value_ptr(proj),
+                        ImGuizmo::UNIVERSAL, ImGuizmo::LOCAL,
+                        glm::value_ptr(world)))
+                {
+                    // Translation: direct from column 3
+                    sp->pos = glm::vec3(world[3]);
+
+                    // Scale: lengths of basis column vectors
+                    sp->scale = {
+                        glm::length(glm::vec3(world[0])),
+                        glm::length(glm::vec3(world[1])),
+                        glm::length(glm::vec3(world[2]))
+                    };
+
+                    // Rotation: accumulate delta to avoid Euler decompose mismatch.
+                    // Strip scale from both matrices, compute delta in local space,
+                    // convert to quat → euler degrees and add to stored rot.
+                    auto norm_rot = [](const glm::mat4 &m) -> glm::mat3 {
+                        return glm::mat3(
+                            glm::normalize(glm::vec3(m[0])),
+                            glm::normalize(glm::vec3(m[1])),
+                            glm::normalize(glm::vec3(m[2])));
+                    };
+                    const glm::mat3 delta = glm::transpose(norm_rot(old_world)) * norm_rot(world);
+                    sp->rot += glm::degrees(glm::eulerAngles(glm::quat_cast(delta)));
+
+                    sp->apply();
+                }
             }
         }
+        gizmo_skip:;
     }
 
     dl->PopClipRect();
@@ -661,70 +790,6 @@ void editor::_draw_main_menu()
         if (ImGui::MenuItem("Hash Calculator"))  _d->hash_enabled = true;
         if (ImGui::MenuItem("About"))            _d->about_enabled = true;
         ImGui::EndMenu();
-    }
-
-    // Separator + editor cam + play/pause buttons
-    ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-    ImGui::SameLine();
-    {
-        ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-        ImGui::PushStyleColor(ImGuiCol_Button,
-            _d->override_layers ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
-        if (ImGui::Button(ICON_FK_VIDEO_CAMERA " Camera"))
-        {
-            _d->override_layers = !_d->override_layers;
-            if (_d->override_layers)
-            {
-                _ensure_editor_cam();
-                _sync_editor_cam_to_game();
-                _apply_override_layers();
-            }
-            else
-            {
-                _d->panning = false;
-                engine::instance().clear_override_render_layers();
-            }
-        }
-        ImGui::PopStyleColor();
-    }
-
-    ImGui::SameLine();
-
-    {
-        ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-        ImGui::PushStyleColor(ImGuiCol_Button,
-            _d->show_wireframes ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
-        if (ImGui::Button(ICON_FK_OBJECT_GROUP " Wireframes"))
-            _d->show_wireframes = !_d->show_wireframes;
-        ImGui::PopStyleColor();
-    }
-
-    ImGui::SameLine();
-
-    {
-        ImVec4 active_col = ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive);
-        ImGui::PushStyleColor(ImGuiCol_Button,
-            _d->three_dee ? active_col : ImGui::GetStyleColorVec4(ImGuiCol_Button));
-        if (ImGui::Button(ICON_FK_CUBE " 3D"))
-        {
-            _d->three_dee = !_d->three_dee;
-            if (_d->three_dee)
-                _sync_editor_cam_to_game();
-            if (_d->override_layers && _d->enabled)
-                _apply_override_layers();
-        }
-        ImGui::PopStyleColor();
-    }
-
-    ImGui::SameLine();
-
-    if (engine::instance().is_paused())
-    {
-        if (ImGui::Button(ICON_FK_PLAY " Play"))   engine::instance().set_paused(false);
-    }
-    else
-    {
-        if (ImGui::Button(ICON_FK_PAUSE " Pause")) engine::instance().set_paused(true);
     }
 
     ImGui::EndMainMenuBar();

@@ -1,0 +1,117 @@
+#pragma once
+
+#include "./pbr_funcs.slangh"
+#include "./std_uniforms.slangh"
+#include "./lights.slangh"
+
+float3 pbr_lighting(SceneUniforms g_scene, LitModelUniforms g_model,
+    float3 world_pos, float3 N,
+    float3 albedo, float metallic, float roughness)
+{
+    float3 radiance_out = float3(0.0);
+
+    for(uint lii = 0; lii < g_model.light_count; lii++)
+    {
+        uint li = g_model.get_light_index(lii);
+        LightEntry light = g_scene.light_data.lights[li];
+        uint light_type = uint(light.pos_dir.w + 0.5);
+
+        float3 light_dir;
+        float attenuation = 1.0;
+        float3 light_color = light.color.rgb;
+
+        if (light_type == 0) {
+            // directional
+            light_dir = normalize(-light.pos_dir.xyz);
+            attenuation = 1.0; // Directional lights do not attenuate with distance
+        }
+        else {
+            // point and spot
+            // pos_dir.xyz contains the world position
+            float3 light_pos = light.pos_dir.xyz;
+            float3 to_light = light_pos - world_pos;
+            float distance = length(to_light);
+            light_dir = to_light / distance;
+
+            float linear_att = light.params.x;
+            float quad_att = light.params.y;
+            float dist_attenuation = 1.0 / (1.0 + linear_att * distance + quad_att * (distance * distance));
+
+            float light_range = light.color.w;
+            float range_factor = saturate(1.0 - (distance / light_range));
+            range_factor *= range_factor;
+
+            attenuation = dist_attenuation * range_factor;
+
+            // spot light cone attenuation
+            if (light_type == 2) {
+                float3 spot_dir = normalize(light.spot_dir.xyz);
+
+                // Vector from the light source TO the fragment
+                float3 light_to_frag = -light_dir;
+
+                // Dot product gives the cosine of the angle between the spot direction and the fragment
+                float theta = dot(spot_dir, light_to_frag);
+
+                float inner_cos = light.params.z;
+                float outer_cos = light.params.w;
+
+                // Linear interpolation factor between outer and inner cone
+                float epsilon = inner_cos - outer_cos;
+                float spot_factor = saturate((theta - outer_cos) / epsilon);
+
+                // Optional: square it for a smoother, more natural quadratic falloff
+                spot_factor = spot_factor * spot_factor;
+
+                attenuation *= spot_factor;
+            }
+        }
+
+        // apply attenuation
+        light_color *= attenuation;
+
+        float3 V = normalize(g_scene.camera_pos - world_pos);
+
+        // Light vector pointing from surface to light source
+        float3 L = normalize(light_dir);
+
+        // Halfway vector between View and Light
+        float3 H = normalize(V + L);
+
+        // Pre-calculate dot products used in BRDF equations
+        float NdotV = max(dot(N, V), 0.000001);
+        float NdotL = max(dot(N, L), 0.0);
+        float NdotH = max(dot(N, H), 0.0);
+        float HdotV = max(dot(H, V), 0.0);
+
+        // --- 2. Reflectance at Normal Incidence (F0) ---
+        // Dielectrics (non-metals) use ~0.04 base reflectivity, metals use their albedo color
+        float3 F0 = float3(0.04);
+        F0 = lerp(F0, albedo, metallic);
+
+        // --- 3. Cook-Torrance Specular BRDF Term ---
+
+        float  D = distribution_ggx(NdotH, roughness);
+        float  G = geometry_smith(NdotV, NdotL, roughness);
+        float3 F = fresnel_schlick(HdotV, F0);
+
+        // Specular BRDF numerator and denominator
+        float3 numerator   = D * G * F;
+        float  denominator = 4.0 * NdotV * NdotL;
+        float3 specular    = numerator / max(denominator, 0.000001);
+
+        // --- 4. Energy Conservation (Diffuse vs Specular Split) ---
+
+        // kS equals Fresnel reflectance ratio
+        float3 kS = F;
+
+        // kD is the remaining light that gets refracted into diffuse scattering
+        float3 kD = (float3(1.0) - kS) * (1.0 - metallic); // Metals have zero diffuse reflection
+
+        float3 diffuse = kD * (albedo / PI);
+
+        radiance_out += (diffuse + specular) * light_color * NdotL;
+    }
+
+    return radiance_out;
+}

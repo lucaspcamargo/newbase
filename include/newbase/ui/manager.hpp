@@ -28,6 +28,7 @@ namespace nb
 
         glm::ivec4 update_viewports() override;
         glm::vec4 central_viewport(bool pixel_coords = false) override;
+        void set_viewport_insets(float top, float right = 0.f, float bottom = 0.f, float left = 0.f) override;
 
         bool toggle_tool_window(const char *name) override;
         unsigned int dockspace_id() const override;

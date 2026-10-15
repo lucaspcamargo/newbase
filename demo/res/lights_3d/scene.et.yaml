@@ -1,0 +1,98 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/lights_3d/scene.lua"
+
+- name: environment
+  comps:
+    environment:
+        ambient: [0.0, 0.0, 0.0] # tested, but black is better for this demo
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 2, 4]
+      rot: [-20, 0, 0]
+      scale: [1.0, 1.0, 1.0]
+    camera:
+      3d: {}
+
+- name: base
+  comps:
+    mesh:
+      mesh: "res/lights_3d/base.glb?msh=0"
+    spatial:
+      pos: [0, 0, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+
+- name: mesh
+  comps:
+    mesh:
+      mesh: "res/hello_3d/DamagedHelmet.glb?msh=0"
+    spatial:
+      pos: [0, 1, 0]
+      rot: [90, 0, 0]
+      scale: [1, 1, 1]
+
+# Kinda boring so it was left out
+# Just a simple directional light
+#- name: light_dir
+#  comps:
+#    light:
+#      type: 0
+#      color: [1.0, 1.0, 1.0]
+#      intensity: 0.25
+#    spatial:
+#      pos: [0, 0, 0]
+#      rot: [0, 0, 0]
+#      scale: [1, 1, 1]
+
+
+- name: light_point_r
+  comps:
+    light:
+      type: 1
+      color: [1.0, 0.0, 0.0]
+      range: 10
+      intensity: 2.0
+    spatial:
+      pos: [0, 2, 2.89]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+
+- name: light_point_g
+  comps:
+    light:
+      type: 1
+      color: [0.0, 1.0, 0.0]
+      range: 10
+      intensity: 2.0
+    spatial:
+      pos: [-2.5, 2, -1.44]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+
+- name: light_point_b
+  comps:
+    light:
+      type: 1
+      color: [0.0, 0.0, 1.0]
+      range: 10
+      intensity: 2.0
+    spatial:
+      pos: [2.5, 2, -1.44]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]
+
+- name: light_spot
+  comps:
+    light:
+      type: 2
+      color: [1.0, 1.0, 1.0]
+      range: 20
+      intensity: 2.0
+    spatial:
+      pos: [0, 6, 0]
+      rot: [0, 0, 0]
+      scale: [1, 1, 1]

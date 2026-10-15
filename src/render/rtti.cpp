@@ -5,6 +5,7 @@
 #include <newbase/render/camera.hpp>
 #include <newbase/render/types.hpp>
 #include <newbase/render/target.hpp>
+#include <newbase/render/mat/pbr.hpp>
 #include <newbase/layer.hpp>
 #include <newbase/reflection/data.hpp>
 
@@ -113,4 +114,16 @@ void nb::render::_rtti_init_render()
     .custom<rtti::data_info>(rtti::data_info{"fit_anchor"})
     .func<&camera_2d::calc_world_bounds>("calc_world_bounds"_hs)
     .custom<rtti::func_info>(rtti::func_info{"calc_world_bounds"});
+
+    entt::meta_factory<pipeline_params>{}
+    .type("render_pipeline_params"_hs)
+    .custom<rtti::type_info>(rtti::type_info{.identifier="render_pipeline_params", .type_class=rtti::TYPE_CLASS_NONE})
+    .ctor<>()
+    .data<&pipeline_params::depth_test, entt::as_ref_t>("depth_test"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"depth_test"})
+    .data<&pipeline_params::depth_write, entt::as_ref_t>("depth_write"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"depth_write"});
+
+    // material parameter types
+    pbr_mat_controller::_init_rtti();
 }

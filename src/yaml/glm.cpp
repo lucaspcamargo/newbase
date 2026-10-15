@@ -56,6 +56,12 @@ namespace nb {
         return load_vec2(in, dst);
     }
 
+    bool try_load_vec3(ryml::ConstNodeRef in, glm::vec3 &dst)
+    {
+        if (in.invalid() || !in.is_seq() || in.num_children() < 3) return false;
+        return load_vec3(in, dst);
+    }
+
     bool try_load_vec4(ryml::ConstNodeRef in, glm::vec4 &dst)
     {
         if (in.invalid() || !in.is_seq() || in.num_children() < 4) return false;

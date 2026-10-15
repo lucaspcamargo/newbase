@@ -25,6 +25,7 @@ newbase_declare_resources(TARGET newbase_demo ${BUILD_SYMLINKS} INDEX
     FILES
         res
         "${CMAKE_CURRENT_BINARY_DIR}/config.yaml"
+        "${NEWBASE_ROOT}/res/_nb_editor"
 )
 
 if(NEWBASE_LTO)

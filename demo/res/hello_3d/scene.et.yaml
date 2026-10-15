@@ -13,7 +13,7 @@
     spatial:
       pos: [0, 0, 2.5]
       rot: [0, 0, 0]
-      scale: [1, 1, 1]
+      scale: [0.5, 0.5, 0.5]
     camera:
       3d: {}
 

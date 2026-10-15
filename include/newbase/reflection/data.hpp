@@ -141,6 +141,7 @@ enum data_subtype_t {
     DATA_SUBTYPE_NONE     = 0,
     DATA_SUBTYPE_RESOURCE = 1,  // field holds a resource id (entt::id_type / hashed_string value)
     DATA_SUBTYPE_COLOR    = 2,  // glm::vec4 displayed as an RGBA color picker
+    DATA_SUBTYPE_META_ANY = 3   // an entt::meta_any ad a data field
 };
 
 struct data_info

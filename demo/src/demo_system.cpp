@@ -30,6 +30,7 @@ struct demo_entry {
 
 static const demo_entry s_demos[] = {
     { "Hello 3D",    "res/hello_3d/scene.et.yaml"_hs,      "res/hello_3d/README.md"_hs, true},
+    { "Lights 3D",   "res/lights_3d/scene.et.yaml"_hs,     "res/lights_3d/README.md"_hs, true},
     { "Asteroids",   "res/asteroids/title.et.yaml"_hs,     "res/asteroids/README.md"_hs     },
     { "Physics 2D",  "res/physics2d_demo/scene.et.yaml"_hs,"res/physics2d_demo/README.md"_hs},
     { "Platformer",  "res/platformer/scene.et.yaml"_hs,    "res/platformer/README.md"_hs    },

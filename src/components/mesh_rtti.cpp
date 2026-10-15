@@ -1,3 +1,4 @@
+#include "entt/meta/policy.hpp"
 #include <newbase/components/mesh.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/log.hpp>
@@ -20,13 +21,13 @@ void cmesh::_ensure_rtti()
         }
     })
     .ctor<>()
-    .data<&cmesh::mesh>("mesh"_hs)
+    .data<&cmesh::mesh, entt::as_ref_t>("mesh"_hs)
     .custom<rtti::data_info>(rtti::data_info{
         .identifier     = "mesh",
         .subtype        = rtti::DATA_SUBTYPE_RESOURCE,
         .resource_type_id = "rmesh"_hs.value()
     })
-    .data<&cmesh::materials>("materials"_hs)
+    .data<&cmesh::materials, entt::as_ref_t>("materials"_hs)
     .custom<rtti::data_info>(rtti::data_info{
         .identifier     = "materials",
         .subtype        = rtti::DATA_SUBTYPE_RESOURCE,

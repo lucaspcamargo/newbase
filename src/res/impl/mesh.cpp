@@ -33,6 +33,7 @@ struct attribute_binding
     uint32_t size;            // Attribute byte size from descriptor
     accessor_info info;       // glTF buffer accessor source
     std::array<uint8_t, 16> default_value; // Fallback if primitive lacks attribute
+    bool is_pos {false}; // flag for position
 };
 
 
@@ -94,6 +95,36 @@ std::shared_ptr<rmesh> rmesh::make_fullscreen_quad()
     std::memcpy(mesh->m_data.data(), vertices, sizeof(vertices));
     std::memcpy(mesh->m_data.data() + mesh->m_data_index_offset, indices, sizeof(indices));
     mesh->m_submeshes.push_back({0, 0, 0, 6});
+    return mesh;
+}
+
+std::shared_ptr<rmesh> rmesh::make_skybox_cube()
+{
+    auto mesh = std::make_shared<rmesh>();
+    mesh->m_vtx_type = vertex_type::POS_3D;
+    const vertex3d_only_pos vertices[] = {
+        {{-1.0f, -1.0f, -1.0f}},
+        {{ 1.0f, -1.0f, -1.0f}},
+        {{ 1.0f,  1.0f, -1.0f}},
+        {{-1.0f,  1.0f, -1.0f}},
+        {{-1.0f, -1.0f,  1.0f}},
+        {{ 1.0f, -1.0f,  1.0f}},
+        {{ 1.0f,  1.0f,  1.0f}},
+        {{-1.0f,  1.0f,  1.0f}}
+    };
+    const uint32_t indices[] = {
+        4, 5, 6, 4, 6, 7,
+        0, 2, 1, 0, 3, 2,
+        1, 2, 6, 1, 6, 5,
+        0, 4, 7, 0, 7, 3,
+        3, 7, 6, 3, 6, 2,
+        0, 1, 5, 0, 5, 4
+    };
+    mesh->m_data_index_offset = (sizeof(vertices) + 15) & ~size_t(15);
+    mesh->m_data.resize(mesh->m_data_index_offset + sizeof(indices));
+    std::memcpy(mesh->m_data.data(), vertices, sizeof(vertices));
+    std::memcpy(mesh->m_data.data() + mesh->m_data_index_offset, indices, sizeof(indices));
+    mesh->m_submeshes.push_back({0, 0, 0, static_cast<uint32_t>(std::size(indices))});
     return mesh;
 }
 
@@ -220,6 +251,7 @@ bool rmesh::_load_gltf_model_mesh( const tg3_model* model, const tg3_mesh* mesh,
             attribute_binding binding{};
             binding.offset = attr_desc.offset;
             binding.size   = conv::get_vertex_data_type_size(attr_desc.format);
+            binding.is_pos = attr_desc.attr == render::vertex_attribute_type::POSITION;
 
             const char* gltf_name = semantic_to_gltf_name(attr_desc.attr);
             int acc_idx = gltf_name ? find_attribute_accessor(prim, gltf_name) : -1;
@@ -231,6 +263,7 @@ bool rmesh::_load_gltf_model_mesh( const tg3_model* model, const tg3_mesh* mesh,
                 binding.info = get_accessor_info(model, acc_idx);
                 if(attr_desc.attr == render::vertex_attribute_type::TANGENT)
                     has_tangent_mesh = true;
+
             } else {
                 // Populate default bytes if the primitive doesn't provide this attribute
                 write_default_attribute_value(attr_desc.attr, binding.default_value.data(), binding.size);
@@ -252,6 +285,8 @@ bool rmesh::_load_gltf_model_mesh( const tg3_model* model, const tg3_mesh* mesh,
                 if (binding.info.data) {
                     const uint8_t* attr_src = binding.info.data + (v * binding.info.stride);
                     std::memcpy(attr_dst, attr_src, binding.size);
+                    if(binding.is_pos)
+                        m_aabb.grow(*(glm::vec3*)attr_dst);
                 } else {
                     std::memcpy(attr_dst, binding.default_value.data(), binding.size);
                 }

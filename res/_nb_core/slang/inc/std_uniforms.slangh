@@ -1,3 +1,7 @@
+#pragma once
+
+#include "./lights.slangh"
+
 // standard per-scene-pass and per-model uniform structs
 
 
@@ -9,14 +13,60 @@ struct SceneUniforms
     column_major float4x4 inv_view;
     float3   camera_pos;
     float    _pad0;
-    float3   light_dir;      // Normalized direction towards light source
-    float    _pad1;
-    float3   light_color;    // Light radiance (color * intensity)
-    float    _pad2;
+
+    LightsBlock light_data;
 };
 
 struct ModelUniforms
 {
     column_major float4x4 model;
-    column_major float4x4 normal_matrix;  // Transpose(Inverse(Model)) to scale normals correctly
+    float4 normal_row_0; // w is padding
+    float4 normal_row_1; // w is padding
+    float4 normal_row_2; // w is padding
+
+    float3x3 unpack_normal_matrix()
+    {
+        return float3x3(
+            float3(normal_row_0.x, normal_row_1.x, normal_row_2.x),
+            float3(normal_row_0.y, normal_row_1.y, normal_row_2.y),
+            float3(normal_row_0.z, normal_row_1.z, normal_row_2.z)
+        );
+    }
+};
+
+
+struct LitModelUniforms
+{
+    column_major float4x4 model;
+    float4 normal_row_0; // w is padding
+    float4 normal_row_1; // w is padding
+    float4 normal_row_2; // w is padding
+
+    uint light_count;
+    float _pad0;
+    float _pad1;
+    float _pad2;
+    uint4 light_indices[MODEL_LIGHTS_MAX/4];
+
+
+    float3x3 unpack_normal_matrix()
+    {
+        return float3x3(
+            float3(normal_row_0.x, normal_row_1.x, normal_row_2.x),
+            float3(normal_row_0.y, normal_row_1.y, normal_row_2.y),
+            float3(normal_row_0.z, normal_row_1.z, normal_row_2.z)
+        );
+    }
+
+    uint get_light_index(uint index)
+    {
+        uint array_idx = index / 4u;
+        uint component = index % 4u;
+        uint4 packed_indices = light_indices[array_idx];
+
+        if (component == 0u) return packed_indices.x;
+        if (component == 1u) return packed_indices.y;
+        if (component == 2u) return packed_indices.z;
+        return packed_indices.w;
+    }
 };

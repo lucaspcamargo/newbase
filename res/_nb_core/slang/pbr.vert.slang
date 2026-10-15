@@ -5,7 +5,7 @@ ConstantBuffer<SceneUniforms>     g_scene    : register(b0);
 
 
 [[vk::binding(1, 1)]]
-ConstantBuffer<ModelUniforms>     g_model    : register(b1);
+ConstantBuffer<LitModelUniforms>     g_model    : register(b1);
 
 struct VSInput
 {
@@ -43,7 +43,7 @@ VSOutput main(VSInput input)
     output.position = mul(g_scene.view_proj, world_pos);
 
     // Transform normal to world space (using 3x3 subset of normal_matrix)
-    output.world_norm = normalize(mul((float3x3)g_model.normal_matrix, input.normal));
+    output.world_norm = normalize(mul(g_model.unpack_normal_matrix(), input.normal));
 
     // Apply material UV tiling and offset
     output.uv = input.uv;

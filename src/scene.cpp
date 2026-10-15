@@ -6,6 +6,7 @@
 #include <newbase/components/sprite.hpp>
 #include <newbase/components/script.hpp>
 #include <newbase/components/body2d.hpp>
+#include <newbase/components/light.hpp>
 #include <newbase/components/mesh2d.hpp>
 #include <newbase/components/particle_emitter.hpp>
 #include <newbase/components/textext.hpp>
@@ -142,6 +143,11 @@ entt::entity nb::scene::build_etree(entt::id_type retree_id, entt::id_type paren
             {
                 auto &s = reg.emplace<nb::cmesh>(eid);
                 nb::build_mesh(comp, s);
+            }
+            else if(compname == "light")
+            {
+                auto &s = reg.emplace<nb::clight>(eid);
+                nb::build_light(comp, s);
             }
             else
             {

@@ -1,3 +1,4 @@
+#include "entt/meta/policy.hpp"
 #include <newbase/components/environment.hpp>
 #include <newbase/reflection/data.hpp>
 #include <newbase/log.hpp>
@@ -25,6 +26,8 @@ void cenvironment::_ensure_rtti()
                 .identifier = "equirectangular",
                 .subtype = rtti::DATA_SUBTYPE_RESOURCE,
                 .resource_type_id = "rtexture"_hs.value()
-            });
+            })
+        .data<&cenvironment::ambient, entt::as_ref_t>("ambient"_hs)
+        .custom<rtti::data_info>(rtti::data_info{.identifier = "ambient", .subtype=rtti::DATA_SUBTYPE_COLOR});
     log::info("[cenvironment] registered");
 }

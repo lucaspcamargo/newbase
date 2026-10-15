@@ -5,6 +5,7 @@
 #include <memory>
 #include <newbase/res/resource.hpp>
 #include <newbase/render/vertex.hpp>
+#include <newbase/geom/aabb.hpp>
 
 // Our engine-native mesh resource
 // Currently madde to load and extract data from gltf resources,
@@ -27,6 +28,7 @@ public:
     explicit rmesh(entt::id_type id = 0);
     ~rmesh() override;
     static std::shared_ptr<rmesh> make_fullscreen_quad();
+    static std::shared_ptr<rmesh> make_skybox_cube();
 
     const std::vector<dependency_t>* dependencies() const override { return &m_deps; }
 
@@ -46,6 +48,7 @@ public:
     uint32_t get_data_index_offset() const { return m_data_index_offset; }
     const std::vector<submesh>& submeshes() const { return m_submeshes; }
     render::vertex_type vertex_type() const { return m_vtx_type; }
+    const aabb & get_aabb() const { return m_aabb; }
     const std::vector<entt::id_type>& material_slots() const { return m_mat_slots; }
 
     entt::entity tmp_add_to_default_scene();  // TEST
@@ -70,6 +73,7 @@ private:
     std::vector<entt::id_type> m_mat_slots {}; // maps local submesh material indices to material res ids
     int m_empty_mat_slot = -1;
     std::vector<submesh> m_submeshes {};
+    aabb m_aabb {glm::vec3{0.0f}, glm::vec3{0.0f}};
     std::vector<dependency_t> m_deps {};
 };
 

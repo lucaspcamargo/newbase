@@ -55,7 +55,8 @@ namespace nb::render
         uint32_t mat_frag_uniforms_offset {UINT32_MAX};
         uint32_t mat_frag_uniforms_len {0};
 
-        uint32_t model_uniforms_offset {UINT32_MAX}; // model_uniforms_std in arena
+        uint32_t model_uniforms_offset {UINT32_MAX};
+        uint32_t model_uniforms_len {0};
 
         uint16_t pipeline_index {0xffff}; // in collector's pipeline data arrays
         uint16_t mesh_index {0xffff}; // in collector's mesh registry
@@ -195,6 +196,11 @@ namespace nb::render
         void _sort(const collected_pass &pass);
         void _collect_pass(const render_layer &layer, const render_pass &pass,
                            const mat_env_data *env_data);
+        bool _append_draw_command(const render_pass &pass,
+                                  std::shared_ptr<rmaterial> material,
+                                  std::shared_ptr<rmesh> mesh,
+                                  const model_uniforms_std *model_uniforms,
+                                  uint64_t sort_key);
         uint16_t _get_pipeline_index(const pipeline_descriptor & desc);
         uint16_t _add_staging_texture(rtexture* tex);
         uint16_t _add_staging_shader(rshader* shd);

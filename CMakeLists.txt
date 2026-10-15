@@ -110,6 +110,7 @@ add_library(newbase STATIC
     src/components/environment_rtti.cpp
     src/components/character2d_rtti.cpp
     src/components/layers_rtti.cpp
+    src/components/mesh_rtti.cpp
     src/components/mesh2d_rtti.cpp
     src/components/particle_emitter_rtti.cpp
     src/components/script_rtti.cpp
@@ -137,6 +138,7 @@ add_library(newbase STATIC
     src/render/camera.cpp
     src/render/collector2d.cpp
     src/render/collector3d.cpp
+    src/render/lights.cpp
     src/render/material.cpp
     src/render/rtti.cpp
     src/render/vertex.cpp
@@ -144,6 +146,7 @@ add_library(newbase STATIC
     src/render/mat/pbr.cpp
     src/render/mat/std_2d.cpp
     src/render/mat/matcap.cpp
+    src/render/mat/skybox.cpp
     src/render/mat/ibl_integration.cpp
     src/render/pass/ibl_integration.cpp
 

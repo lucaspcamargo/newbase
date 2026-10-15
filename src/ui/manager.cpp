@@ -44,6 +44,12 @@ struct nb::ui_manager_p
     glm::ivec4 viewport_px {0};
     glm::vec2 ui_scale {1.0f};
 
+    // Central-node insets (GUI units), set each frame by callers before update_viewports()
+    float inset_top    = 0.f;
+    float inset_right  = 0.f;
+    float inset_bottom = 0.f;
+    float inset_left   = 0.f;
+
     std::unordered_map<ui_manager::texture_handle_t, ui_manager::texture_ref_t> textures;
     ui_manager::texture_handle_t texture_next_handle {1};
 };
@@ -135,6 +141,7 @@ void ui_manager_simple::ui_new_frame(int safe_x, int safe_y, int safe_w, int saf
 
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
+    _d->inset_top = _d->inset_right = _d->inset_bottom = _d->inset_left = 0.f;
     _d->dockspace_id = ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::GetMainViewport()->WorkPos.x = static_cast<float>(safe_x);
     ImGui::GetMainViewport()->WorkPos.y = static_cast<float>(safe_y);
@@ -206,6 +213,12 @@ glm::ivec4 ui_manager_simple::update_viewports()
         work_size = central_node->Size;
     }
 
+    // Apply registered insets (e.g. viewport toolbar on top)
+    work_pos.x  += _d->inset_left;
+    work_pos.y  += _d->inset_top;
+    work_size.x -= _d->inset_left + _d->inset_right;
+    work_size.y -= _d->inset_top  + _d->inset_bottom;
+
     float sx = _d->ui_scale.x;
     float sy = _d->ui_scale.y;
 
@@ -231,6 +244,14 @@ glm::ivec4 ui_manager_simple::update_viewports()
 glm::vec4 ui_manager_simple::central_viewport(bool pixel_coords)
 {
     return pixel_coords? glm::vec4{_d->viewport_px} : _d->viewport_gui;
+}
+
+void ui_manager_simple::set_viewport_insets(float top, float right, float bottom, float left)
+{
+    _d->inset_top    = top;
+    _d->inset_right  = right;
+    _d->inset_bottom = bottom;
+    _d->inset_left   = left;
 }
 
 bool ui_manager_simple::toggle_tool_window(const char *name)
@@ -360,6 +381,11 @@ static void draw_frametimes_bar_graph(const engine::framecounter_data& fc, int f
 
 void ui_manager_simple::draw_perf()
 {
+    // Hide when a viewport toolbar (or any other inset) is active
+    if (_d->inset_top > 0.f || _d->inset_bottom > 0.f ||
+        _d->inset_left > 0.f || _d->inset_right > 0.f)
+        return;
+
     const float PAD = ImGui::GetFontSize() * 0.75f;
     const ImGuiIO &io = ImGui::GetIO();
     const ImGuiViewport* viewport = ImGui::GetMainViewport();

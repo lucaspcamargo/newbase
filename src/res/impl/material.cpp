@@ -304,7 +304,13 @@ void rmaterial::_init_rtti()
                 return std::make_shared<rmaterial>(id);
             }
         }}
-    });
+    })
+    .data<&rmaterial::mat_type, entt::as_ref_t>("type"_hs)
+    .custom<data_info>(rtti::data_info{.identifier = "type"})
+    .data<&rmaterial::mat_params, entt::as_ref_t>("parameters"_hs)
+    .custom<data_info>(rtti::data_info{.identifier = "parameters", .subtype=data_subtype_t::DATA_SUBTYPE_META_ANY})
+    .data<&rmaterial::pipeline_params, entt::as_ref_t>("pipeline"_hs)
+    .custom<data_info>(rtti::data_info{.identifier = "pipeline"});
 
     // TODO data fields
 

@@ -1,19 +1,27 @@
 #pragma once
 
 #include <newbase/res/texture.hpp>
+#include <newbase/utility/glm.hpp>
 #include <memory>
 #include <utility>
 
 namespace nb
 {
 
+class rmaterial;
+class rmesh;
+
 /// Environment input and generated resources used for scene lighting.
 struct cenvironment
 {
+    glm::vec3 ambient {0.f};
+
     std::shared_ptr<rtexture> equirectangular;
     std::shared_ptr<rtexture> environment_cubemap;
     std::shared_ptr<rtexture> irradiance_cubemap;
     std::shared_ptr<rtexture> prefiltered_cubemap;
+    std::shared_ptr<rmesh> skybox_mesh;
+    std::shared_ptr<rmaterial> skybox_material;
 
     /// Assigning a different source schedules environment preparation.
     void set_equirectangular(std::shared_ptr<rtexture> source)
