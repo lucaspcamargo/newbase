@@ -15,7 +15,9 @@
       rot: [-20, 0, 0]
       scale: [1.0, 1.0, 1.0]
     camera:
-      3d: {}
+      3d:
+        clip_near: 0.1
+        clip_far: 30.0
 
 - name: base
   comps:
@@ -29,10 +31,10 @@
 - name: mesh
   comps:
     mesh:
-      mesh: "res/hello_3d/DamagedHelmet.glb?msh=0"
+      mesh: "res/lights_3d/suzanne_marble.glb?msh=0"
     spatial:
       pos: [0, 1, 0]
-      rot: [90, 0, 0]
+      rot: [0, 0, 0]
       scale: [1, 1, 1]
 
 # Kinda boring so it was left out
@@ -60,6 +62,8 @@
       pos: [0, 2, 2.89]
       rot: [0, 0, 0]
       scale: [1, 1, 1]
+    mesh:
+      mesh: "res/lights_3d/light_r.glb?msh=0"
 
 - name: light_point_g
   comps:
@@ -72,6 +76,8 @@
       pos: [-2.5, 2, -1.44]
       rot: [0, 0, 0]
       scale: [1, 1, 1]
+    mesh:
+      mesh: "res/lights_3d/light_g.glb?msh=0"
 
 - name: light_point_b
   comps:
@@ -84,14 +90,17 @@
       pos: [2.5, 2, -1.44]
       rot: [0, 0, 0]
       scale: [1, 1, 1]
+    mesh:
+      mesh: "res/lights_3d/light_b.glb?msh=0"
 
 - name: light_spot
   comps:
     light:
       type: 2
       color: [1.0, 1.0, 1.0]
-      range: 20
-      intensity: 2.0
+      range: 30
+      intensity: 3.0
+      casts_shadows: true
     spatial:
       pos: [0, 6, 0]
       rot: [0, 0, 0]

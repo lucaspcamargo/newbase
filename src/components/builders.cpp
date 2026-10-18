@@ -274,5 +274,6 @@ bool nb::build_light(ryml::ConstNodeRef def, clight &dst)
     if (def.has_child("range")) def["range"] >> dst.range;
     if (def.has_child("linear")) def["linear"] >> dst.linear;
     if (def.has_child("quadratic")) def["quadratic"] >> dst.quadratic;
+    if (def.has_child("casts_shadows")) def["casts_shadows"] >> dst.casts_shadows;
     return true;
 }

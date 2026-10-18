@@ -110,6 +110,7 @@ add_library(newbase STATIC
     src/components/environment_rtti.cpp
     src/components/character2d_rtti.cpp
     src/components/layers_rtti.cpp
+    src/components/light_rtti.cpp
     src/components/mesh_rtti.cpp
     src/components/mesh2d_rtti.cpp
     src/components/particle_emitter_rtti.cpp

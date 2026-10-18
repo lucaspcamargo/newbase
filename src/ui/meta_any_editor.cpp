@@ -34,7 +34,11 @@ bool draw_meta_any_editor(const char* label, entt::meta_any& ref, bool recursing
         if (ImGui::DragFloat2(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
     } else if (ti == entt::type_id<glm::vec3>()) {
         glm::vec3 v = *ref.try_cast<glm::vec3>();
-        if (ImGui::DragFloat3(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+        if (hint && hint->subtype == rtti::DATA_SUBTYPE_COLOR) {
+            if (ImGui::ColorEdit3(label, &v.x)) { ref.assign(v); changed = true; }
+        } else {
+            if (ImGui::DragFloat3(label, &v.x, 0.01f)) { ref.assign(v); changed = true; }
+        }
     } else if (ti == entt::type_id<glm::vec4>()) {
         glm::vec4 v = *ref.try_cast<glm::vec4>();
         if (hint && hint->subtype == rtti::DATA_SUBTYPE_COLOR) {

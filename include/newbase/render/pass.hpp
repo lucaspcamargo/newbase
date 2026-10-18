@@ -15,11 +15,20 @@ namespace nb
     struct render_layer;
 }
 
-// render target information for a render pass
+// Engine-native render pass and render target information constructs.
+// Also describes the target-dependent formats that inform pipeline
+// building, extending it with details used build render passes and binds
+// the actual target textures and slices.
 
-// used for pipeline differentiation by the 3D command collector
-// ideally also used by the renderer to drive its own render pass target setup
-// matching collector pipeline ids 1:1
+// TODO this is currently a bit messy
+//      perhaps we should drop the "managed" part from pass_target
+//      and also make target management in render_gpu just use target
+//      textures with standard texture management via prepare(), and drop
+//      the separate texture preparation codepath.
+//      We shall try to us a standard target manager in render_gles and then
+//      move render_gpu and render_2d to it, dripping the duplicate sizing
+//      code. (to be fair, this is more abut targets than passes :)
+
 
 namespace nb::render
 {
@@ -70,7 +79,8 @@ enum class pass_type: uint8_t
     FORWARD,
     EQUIRECTANGULAR_TO_CUBEMAP,
     DIFFUSE_IRRADIANCE,
-    SPECULAR_PREFILTER
+    SPECULAR_PREFILTER,
+    DEPTH_ONLY
 };
 
 /// A pass can target either a renderer-managed target (including the default

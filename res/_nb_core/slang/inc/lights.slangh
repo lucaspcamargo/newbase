@@ -23,6 +23,10 @@ struct LightEntry
     // z = Inner cone angle cosine (Spot)
     // w = Outer cone angle cosine (Spot)
     float4 params;
+
+    // shadow mapping shit
+    float4x4 light_view_proj;
+    uint4 map_layer_idx;
 };
 
 

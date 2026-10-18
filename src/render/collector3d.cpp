@@ -2,6 +2,7 @@
 #include "newbase/render/material.hpp"
 #include "newbase/render/pipeline.hpp"
 #include "newbase/render/types.hpp"
+#include <cstdint>
 #include <newbase/render/collector3d.hpp>
 #include <newbase/render/pass/ibl_integration.hpp>
 #include <newbase/render/mat/skybox.hpp>
@@ -277,7 +278,6 @@ bool collector3d::_append_draw_command(const render_pass &pass,
 void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
                                 const mat_env_data *env_data)
 {
-    auto cmd_start = (uint32_t) m_cmds.size();
 
     // get some basic layer info
     float aspect = l.viewport.w/(float)l.viewport.h;
@@ -320,7 +320,26 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
         u_scn.light_data.ambient = env_data->ambient;
     }
 
-    // write scene uniforrms to rean and take offset
+    // emit shadow rendering passes
+    lights.for_each_shadow_map(cam_sp->pos, [&](const clight *light,
+                                                int map_count,
+                                                const glm::mat4 *lvps) -> bool
+    {
+        bool directional = light->type == light_type::DIRECTIONAL;
+        int sm_idx = m_shadows.allocate_shadow_map(directional);
+        if(sm_idx == -1)
+            return false;
+        render_pass sp;
+        sp.target.depth_texture = m_shadows.texture(directional);
+        sp.targets.depth_layer_index = sm_idx;
+        sp.targets.depth_target = sp.target.depth_texture->format;
+        sp.type = pass_type::DEPTH_ONLY;
+        sp.viewport = VIEWPORT_DEFAULT;
+        _collect_depth_pass(l.scene_id, lvps[0], sp);
+        return true;
+    });
+
+    // write scene uniforms to arena and take offset
     const uint32_t scene_uniforms_offset =
         m_arena.byte_offset(m_arena.alloc_raw(&u_scn, sizeof(u_scn)));
 
@@ -335,6 +354,9 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
             _add_staging_texture(texture);
     if(pass_desc.target.depth_texture)
         _add_staging_texture(pass_desc.target.depth_texture);
+
+
+    auto cmd_start = (uint32_t) m_cmds.size();
 
     const auto pass_desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass_desc));
     const uint32_t pass_index = static_cast<uint32_t>(m_passes.size());
@@ -529,6 +551,29 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
     auto &collected = m_passes[pass_index];
     collected.cmd_count = static_cast<uint32_t>(m_cmds.size() - cmd_start);
     _sort(collected);
+}
+
+void collector3d::_collect_depth_pass(entt::id_type scene_id, glm::mat4 vp, const render_pass &pass)
+{
+    auto *scn = engine::instance().find_scene(scene_id);
+    if(!scn)
+        return;
+
+    // TODO prepare scene uniform
+
+    auto &collected = m_passes.emplace_back(collected_pass {
+        .desc_offset = UINT32_MAX,
+        .cmd_start = static_cast<uint32_t>(m_cmds.size()),
+                                            .cmd_count = 0,
+                                            .scene_uniforms_offset = UINT32_MAX,
+                                            .scene_uniforms_size = static_cast<uint32_t>(0)
+    });
+    collected.desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass));
+    _add_staging_texture(pass.target.depth_texture);
+
+    // TODO add commands here
+
+    collected.cmd_count = static_cast<uint32_t>(m_cmds.size() - collected.cmd_start);
 }
 
 // sorts rendering commands belonging to one pass

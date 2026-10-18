@@ -23,13 +23,13 @@ local ent_l_b = entity_find("light_point_b")
 local ent_spot = entity_find("light_spot")
 
 time = 0
-rot_spd = 10.0;
+rot_spd = -15.0;
 
 local update_handle = clock_update_add(function(delta)
     time = time + delta
 
     local sp = get_spatial(ent_helmet)
-    sp.rot.z = sp.rot.z + rot_spd*delta
+    sp.rot.y = sp.rot.y + rot_spd*delta
 
     local dir = input_action_direction(hs("dir"))
     local sp_cam = get_spatial(ent_cam)
@@ -48,7 +48,6 @@ local update_handle = clock_update_add(function(delta)
     sp_g.pos.z = math.cos(angle_g)*3
     sp_g.pos.y = 2
 
-
     local sp_b = get_spatial(ent_l_b)
     local angle_b = time + math.rad(-120)
     sp_b.pos.x = math.sin(angle_b)*3
@@ -56,7 +55,7 @@ local update_handle = clock_update_add(function(delta)
     sp_b.pos.y = 2
 
     local sp_spot = get_spatial(ent_spot)
-    sp_spot.rot.z = math.sin(time) * 30
+    sp_spot.rot.z = math.sin(time/2.0) * 30
 end)
 
 script_on_destroy(function()

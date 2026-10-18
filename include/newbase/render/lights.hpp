@@ -16,6 +16,13 @@ namespace nb::render
     static constexpr size_t SCENE_LIGHTS_MAX = 32;
     static constexpr size_t MODEL_LIGHTS_MAX = 8;
 
+    /// callback for emitting shadow map passes
+    /// callback is callled with light component reference,
+    /// the number of necessary layers, and a list of light-view-proj matrices
+    using shadow_map_callback_t = std::function<bool(const clight *light,
+                                                     int map_count,
+                                                     const glm::mat4 *lvps)>;
+
     /// light data entry as passed to gpu
     struct light_uniform_entry {
         // xyz = World Position (Point/Spot) or Direction (Directional)
@@ -33,6 +40,11 @@ namespace nb::render
         // z = Inner cone angle cosine (Spot)
         // w = Outer cone angle cosine (Spot)
         glm::vec4 params;
+
+        // shadow mapping shit
+        glm::mat4 light_view_proj; // from world space to shadow map clip space
+        uint32_t map_layer_index;  // -1 means no shadow map
+        float _pad0[3];
     };
 
     /// light data block as passed to the gpu
@@ -94,14 +106,20 @@ namespace nb::render
         /// @returns the number of scene light affecting the model
         int write_culled_model_lights(light_model_uniform_block &mublock, const aabb& model_world_aabb);
 
+        /// execute a callback for each registered light that casts shadows, once
+        /// per shadow map
+        void for_each_shadow_map(glm::vec3 cam_pos, shadow_map_callback_t);
+
     private:
         // internal structure that keeps track of a light
         struct light_entry
         {
             clight const *light;
+            cspatial const *spatial;
             aabb world_aabb;
-            bool positional;
             glm::vec3 pos_center;
+            float cam_dist_sq;
+            bool positional;
             light_uniform_entry data;
         };
 

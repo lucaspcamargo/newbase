@@ -1,8 +1,11 @@
 #pragma once
 
+#include "entt/core/fwd.hpp"
+#include "newbase/render/config.hpp"
 #include "newbase/render/pass.hpp"
 #include <newbase/render/pipeline.hpp>
 #include <newbase/render/material.hpp>
+#include <newbase/render/shadows.hpp>
 #include <newbase/layer.hpp>
 #include <cstdint>
 #include <memory>
@@ -196,6 +199,7 @@ namespace nb::render
         void _sort(const collected_pass &pass);
         void _collect_pass(const render_layer &layer, const render_pass &pass,
                            const mat_env_data *env_data);
+        void _collect_depth_pass(entt::id_type scene_id, glm::mat4 vp, const render_pass &pass);
         bool _append_draw_command(const render_pass &pass,
                                   std::shared_ptr<rmaterial> material,
                                   std::shared_ptr<rmesh> mesh,
@@ -220,5 +224,8 @@ namespace nb::render
         uint16_t m_staging_mesh_count {0};
         std::vector<std::shared_ptr<rmaterial>> m_internal_materials;
         coll3d_frame_arena m_arena {COLLECTOR_3D_DEFAULT_ARENA_ALLOC_BYTES};
+
+        config3d m_config3d; // TODO get from renderer as ref, in ctor
+        shadow_manager m_shadows {m_config3d};
     };
 }

@@ -28,7 +28,7 @@ struct clight {
     float outer_cone_angle = 0.785398f; // ~45 deg
 
     // control flags
-    bool casts_shadows = true;
+    bool casts_shadows = false;
 
     static void _ensure_rtti();
 

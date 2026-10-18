@@ -115,6 +115,17 @@ void nb::render::_rtti_init_render()
     .func<&camera_2d::calc_world_bounds>("calc_world_bounds"_hs)
     .custom<rtti::func_info>(rtti::func_info{"calc_world_bounds"});
 
+    entt::meta_factory<camera_3d>{}
+    .type("render_camera_3d"_hs)
+    .custom<rtti::type_info>(rtti::type_info{.identifier="render_camera_3d", .type_class=rtti::TYPE_CLASS_NONE})
+    .ctor<>()
+    .data<&camera_3d::fov, entt::as_ref_t>("fov"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"fov"})
+    .data<&camera_3d::clip_near, entt::as_ref_t>("clip_near"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"clip_near"})
+    .data<&camera_3d::clip_far, entt::as_ref_t>("clip_far"_hs)
+    .custom<rtti::data_info>(rtti::data_info{"clip_far"});
+
     entt::meta_factory<pipeline_params>{}
     .type("render_pipeline_params"_hs)
     .custom<rtti::type_info>(rtti::type_info{.identifier="render_pipeline_params", .type_class=rtti::TYPE_CLASS_NONE})

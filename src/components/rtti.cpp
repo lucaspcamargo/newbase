@@ -9,6 +9,7 @@
 #include <newbase/components/environment.hpp>
 #include <newbase/components/layers.hpp>
 #include <newbase/components/mesh.hpp>
+#include <newbase/components/light.hpp>
 
 namespace nb::rtti
 {
@@ -23,5 +24,6 @@ namespace nb::rtti
         cenvironment::_ensure_rtti();
         clayers::_ensure_rtti();
         cmesh::_ensure_rtti();
+        clight::_ensure_rtti();
     }
 }
