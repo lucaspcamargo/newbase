@@ -42,6 +42,7 @@ namespace nb::render
                 tex = std::make_shared<rtexture>();
                 tex->width = tex->height = dims;
                 tex->depth = 1;
+                tex->type = render::texture_type::IMAGE_2D_ARRAY;
                 tex->flags = render::texture_flags::TARGET;
                 tex->format = render::texture_format::DEPTH_16;
                 tex->layer_count = cap;
@@ -83,6 +84,13 @@ namespace nb::render
             m_dir.setup(m_cfg.dir_shadow_layers_max,
                         m_cfg.dir_shadow_layers_init,
                         m_cfg.dir_shadow_resolution);
+            auto tex = m_fallback = std::make_shared<rtexture>();
+            tex->width = tex->height = 1;
+            tex->depth = 1;
+            tex->type = render::texture_type::IMAGE_2D_ARRAY;
+            tex->flags = render::texture_flags::TARGET;
+            tex->format = render::texture_format::DEPTH_16;
+            tex->layer_count = 1;
             return true;
         }
 
@@ -106,12 +114,18 @@ namespace nb::render
             return arr.allocate_layer(); // pool exhausted, no shadow map for you, honey
         }
 
-        rtexture* texture(bool directional) const { return (directional? m_dir : m_punct).tex.get(); }
+        rtexture* texture(bool directional) const
+        {
+            auto real = (directional? m_dir : m_punct).tex.get();
+            return real? real : m_fallback.get();
+        }
+
         uint32_t resolution(bool directional) const { return (directional? m_dir : m_punct).dims; }
 
     private:
         const config3d &m_cfg;
         map_array m_punct;
         map_array m_dir;
+        std::shared_ptr<rtexture> m_fallback;
     };
 }

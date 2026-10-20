@@ -4,6 +4,7 @@
 #include <newbase/render/mat/std_2d.hpp>
 #include <newbase/render/mat/ibl_integration.hpp>
 #include <newbase/render/mat/skybox.hpp>
+#include <newbase/render/mat/depth.hpp>
 #include <unordered_map>
 
 namespace nb::render
@@ -18,6 +19,7 @@ static auto& _mat_ctrl_map()
         map.emplace(material_type::STANDARD_2D, std::make_unique<mat_std_2d>());
         map.emplace(material_type::IBL_INTEGRATION, std::make_unique<ibl_integration_controller>());
         map.emplace(material_type::SKYBOX, std::make_unique<skybox_mat_controller>());
+        map.emplace(material_type::DEPTH, std::make_unique<depth_material>());
         return map;
     }();
     return map;

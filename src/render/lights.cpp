@@ -112,6 +112,10 @@ void light_culler::for_each_shadow_map(glm::vec3 cam_pos, shadow_map_callback_t 
     for(auto &le: m_culled_lights)
     {
         auto &light = *le.light;
+
+        // init layer index with sentinel
+        le.data.map_layer_index = UINT32_MAX;
+
         if(!light.casts_shadows)
             continue;
         switch(light.type)
@@ -146,7 +150,13 @@ void light_culler::for_each_shadow_map(glm::vec3 cam_pos, shadow_map_callback_t 
 
                 auto lvp = light_proj * light_view;
 
-                cb(&light, 1, &lvp);
+                auto map_idx = cb(&light, 1, &lvp);
+                if(map_idx == UINT32_MAX)
+                    continue;
+
+                // we got a shadow map layer and a depth pass
+                le.data.map_layer_index = map_idx;
+                le.data.light_view_proj = lvp;
             }
 
             default:

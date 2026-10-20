@@ -25,7 +25,7 @@ struct LightEntry
     float4 params;
 
     // shadow mapping shit
-    float4x4 light_view_proj;
+    column_major float4x4 light_view_proj;
     uint4 map_layer_idx;
 };
 
@@ -36,3 +36,42 @@ struct LightsBlock
     float _pad0;
     LightEntry lights[SCENE_LIGHTS_MAX];
 };
+
+float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float3 worldPosition)
+{
+    if (light.map_layer_idx.x == 0xffffffff)
+    {
+        return 1.0; // no shadow map :)
+    }
+
+    float4 lightSpacePos = mul(light.light_view_proj, float4(worldPosition, 1.0));
+
+    if (lightSpacePos.w <= 0.0)
+    {
+        return 0.5;
+    }
+
+    lightSpacePos.xyz /= lightSpacePos.w;
+
+    // NDC to UV space
+    float2 shadowUV = lightSpacePos.xy * float2(0.5, -0.5) + float2(0.5, 0.5);
+
+    // check frustum
+    if (shadowUV.x < 0.0 || shadowUV.x > 1.0 ||
+        shadowUV.y < 0.0 || shadowUV.y > 1.0 ||
+        lightSpacePos.z < 0.0 || lightSpacePos.z > 1.0)
+    {
+        return 0.25;
+    }
+
+    float currentDepth = lightSpacePos.z;
+
+    // sample depth
+    float sampledDepth = shadowTex.Sample(
+        float3(shadowUV, float(light.map_layer_idx.x))
+    ).r;
+
+    // we use front-face culling, there is no bias
+    // this might need to change for billboards, vegetation, etc
+    return (currentDepth <= sampledDepth) ? 1.0 : 0.0;
+}

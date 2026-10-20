@@ -173,7 +173,7 @@ void pbr_mat_controller::pack_fragment_uniforms(const rmaterial &mat,
 size_t pbr_mat_controller::get_num_texture_bindings(const rmaterial& mat,
         const pipeline_descriptor &dest, const mat_env_data *env_data) const
 {
-    return 5 + (dest.shader_variant == 1 ? 3 : 0);
+    return 6 + (dest.shader_variant == 1 ? 3 : 0);
 }
 
 void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
@@ -227,8 +227,10 @@ void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
         .sampler = param_data->emissive_color_sampling,
         .vertex = false
     };
+    bool ibl = false;
     if(dst_desc.shader_variant == 1 && env_data)
     {
+        ibl = true;
         out_bindings[5] = material_texture_binding{
             .texture = env_data->irradiance_cubemap,
             .slot = 5,
@@ -250,6 +252,13 @@ void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
             .vertex = false
         };
     }
+
+    out_bindings[ibl? 8 : 5] = material_texture_binding{
+        .texture = env_data->point_light_shadow_maps,
+        .slot = (ibl? 8u : 5u),
+        .sampler = {},
+        .vertex = false
+    };
 
     // set SRGB GPU format hints on textures that benefit from it
     if(param_data->base_color_tex)

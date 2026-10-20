@@ -98,6 +98,7 @@ void collector3d::clear()
     m_staging_texture_count = 0;
     m_staging_shader_count = 0;
     m_internal_materials.clear();
+    m_shadows.new_frame();
 }
 
 
@@ -276,7 +277,7 @@ bool collector3d::_append_draw_command(const render_pass &pass,
 }
 
 void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
-                                const mat_env_data *env_data)
+                                mat_env_data *env_data)
 {
 
     // get some basic layer info
@@ -314,16 +315,11 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
     {
         lights.add_light(light, &spa);
     }
-    lights.write_culled_lights(u_scn.light_data);
-    if(env_data)
-    {
-        u_scn.light_data.ambient = env_data->ambient;
-    }
 
     // emit shadow rendering passes
-    lights.for_each_shadow_map(cam_sp->pos, [&](const clight *light,
+    lights.for_each_shadow_map(cam_sp? cam_sp->pos : glm::vec3{0.0f}, [&](const clight *light,
                                                 int map_count,
-                                                const glm::mat4 *lvps) -> bool
+                                                const glm::mat4 *lvps) -> uint32_t
     {
         bool directional = light->type == light_type::DIRECTIONAL;
         int sm_idx = m_shadows.allocate_shadow_map(directional);
@@ -333,11 +329,22 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
         sp.target.depth_texture = m_shadows.texture(directional);
         sp.targets.depth_layer_index = sm_idx;
         sp.targets.depth_target = sp.target.depth_texture->format;
-        sp.type = pass_type::DEPTH_ONLY;
+        sp.type = pass_type::DEPTH_ONLY_SHADOW_MAP;
         sp.viewport = VIEWPORT_DEFAULT;
         _collect_depth_pass(l.scene_id, lvps[0], sp);
-        return true;
+        return sm_idx;
     });
+
+    // write final scene lighting data
+    // also, update shadow map textures in material env data
+    lights.write_culled_lights(u_scn.light_data);
+    if(env_data)
+    {
+        u_scn.light_data.ambient = env_data->ambient;
+        env_data->point_light_shadow_maps = m_shadows.texture(false);
+        // ensure texture is prepared even if not targeted
+        _add_staging_texture(env_data->point_light_shadow_maps);
+    }
 
     // write scene uniforms to arena and take offset
     const uint32_t scene_uniforms_offset =
@@ -553,27 +560,181 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
     _sort(collected);
 }
 
-void collector3d::_collect_depth_pass(entt::id_type scene_id, glm::mat4 vp, const render_pass &pass)
+void collector3d::_collect_depth_pass(entt::id_type scene_id, glm::mat4 vp, const render_pass &pass_desc)
 {
     auto *scn = engine::instance().find_scene(scene_id);
     if(!scn)
         return;
 
-    // TODO prepare scene uniform
+    auto depth_mat = material_controller::get_controller(material_type::DEPTH);
 
-    auto &collected = m_passes.emplace_back(collected_pass {
+    // TODO use lighter-weight scene unifor for depth passes
+    //      just viewproj
+    render::scene_uniform_std u_scn;
+    u_scn.view = vp;
+    u_scn.proj = vp;
+    u_scn.view_proj = vp;
+    u_scn.inv_view = vp;
+    u_scn.camera_pos = {};
+
+    const uint32_t scene_uniforms_offset =
+    m_arena.byte_offset(m_arena.alloc_raw(&u_scn, sizeof(u_scn)));
+    auto scene_uniforms_sz = sizeof(u_scn);
+
+    auto &coll_pass = m_passes.emplace_back(collected_pass {
         .desc_offset = UINT32_MAX,
         .cmd_start = static_cast<uint32_t>(m_cmds.size()),
                                             .cmd_count = 0,
-                                            .scene_uniforms_offset = UINT32_MAX,
-                                            .scene_uniforms_size = static_cast<uint32_t>(0)
+                                            .scene_uniforms_offset = scene_uniforms_offset,
+                                            .scene_uniforms_size = (uint32_t) scene_uniforms_sz
     });
-    collected.desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass));
-    _add_staging_texture(pass.target.depth_texture);
+    coll_pass.desc_offset = m_arena.byte_offset(m_arena.alloc<render_pass>(pass_desc));
+    _add_staging_texture(pass_desc.target.depth_texture);
 
-    // TODO add commands here
 
-    collected.cmd_count = static_cast<uint32_t>(m_cmds.size() - collected.cmd_start);
+    aabb::frustum_culler frustum_culler {vp};
+
+    // iterate over meshes
+    auto mesh_view = scn->registry().view<cmesh, cspatial>();
+    for(const auto &[eid, msh, spa]: mesh_view.each())
+    {
+        if(!msh.mesh || !msh.mesh->submeshes().size())
+            continue;
+
+        // do a simple aabb frustum cull check
+        aabb model_aabb = msh.mesh->get_aabb().transform(spa.world);
+        if(!frustum_culler.intersects(model_aabb))
+            continue;
+
+        // stage mesh
+        const auto msh_idx = _add_staging_mesh(msh.mesh.get());
+
+        // TODO use lighter model matrix (world-only)
+        model_uniforms_std * u_model = m_arena.alloc<model_uniforms_std>(
+            spa.world,
+            glm::mat3{spa.world}
+        );
+        const auto u_model_offset = m_arena.byte_offset(u_model);
+        const auto u_model_len = sizeof(model_uniforms_lit_std);
+
+        for (int sub_i = 0; sub_i < msh.mesh->submeshes().size(); ++sub_i)
+        {
+            const auto &subm = msh.mesh->submeshes()[sub_i];
+            if(!subm.index_count)
+                continue;
+
+            assert(subm.material_idx < cmesh::MAX_MATERIALS && "Material index past max mesh component entries!");
+            const auto &mat_ptr = msh.materials[subm.material_idx];
+
+            if(!mat_ptr)
+                continue; // NOTE fallback material support goes here
+
+            auto &material = *mat_ptr;
+
+            // prepare pipeline descriptor
+            pipeline_descriptor pd;
+            pd.targets = pass_desc.targets;
+            depth_mat->make_pipeline_desc(material, nullptr, pass_desc.type,
+                                         msh.mesh->vertex_type(), pd);
+            auto pd_index = _get_pipeline_index(pd);
+
+            // make material vert uniforms
+            auto u_vtx_sz = depth_mat->get_vertex_ubo_size(pd, nullptr);
+            auto u_vtx_offset = 0;
+            if(u_vtx_sz)
+            {
+                auto alloc = m_arena.alloc_raw(nullptr, u_vtx_sz);
+                depth_mat->pack_vertex_uniforms(material, pd, nullptr,
+                                               (uint8_t*) alloc, u_vtx_sz);
+                u_vtx_offset = m_arena.byte_offset(alloc);
+            }
+
+            // make material frag uniforms
+            auto u_frag_sz = depth_mat->get_fragment_ubo_size(pd, nullptr);
+            auto u_frag_offset = 0;
+            if(u_frag_sz)
+            {
+                auto alloc = m_arena.alloc_raw(nullptr, u_frag_sz);
+                depth_mat->pack_fragment_uniforms(material, pd, nullptr,
+                                                 (uint8_t*) alloc, u_frag_sz);
+                u_frag_offset = m_arena.byte_offset(alloc);
+            }
+
+            uint8_t tex_bind_count = depth_mat->get_num_texture_bindings(material, pd, nullptr);
+            uint32_t tex_bind_offset = 0;
+            if(tex_bind_count)
+            {
+                auto alloc = m_arena.alloc_raw(nullptr, tex_bind_count*sizeof(material_texture_binding));
+                material_texture_binding* bind_dest = (material_texture_binding*) alloc;
+                depth_mat->collect_texture_bindings(material, pd, nullptr, bind_dest);
+                tex_bind_offset = m_arena.byte_offset(alloc);
+
+                // stage textures
+                for(int bi = 0; bi < tex_bind_count; bi++)
+                {
+                    const auto tex_ptr = bind_dest[bi].texture;
+                    if(tex_ptr)
+                        _add_staging_texture(tex_ptr);
+                }
+            }
+
+            // stage shaders
+            _add_staging_shader(depth_mat->get_vertex_program(pd).get());
+            _add_staging_shader(depth_mat->get_fragment_program(pd).get());
+
+            // calculate mesh center depth
+            auto mesh_center_proj = u_scn.view_proj * glm::vec4(spa.pos, 1.0f);
+            auto depth_norm = glm::clamp(mesh_center_proj.z, 0.0f, 1.0f);
+
+            // build command sort key
+            uint64_t sort_key {0};
+            if(pd.params.blend != blendmode::NONE)
+            {
+                // transparent
+                sort_key = CMD_3D_GROUP_TRANSPARENT;
+                uint64_t depth_bits = depth_norm * ((1<<CMD_3D_TRANSP_DPTH_BITS)-1);
+                sort_key |= CMD_3D_TRANSP_DPTH_MASK & ~(depth_bits << CMD_3D_TRANSP_DPTH_SHFT);
+                sort_key |= CMD_3D_TRANSP_PIPE_MASK & (((uint64_t)pd_index) << CMD_3D_TRANSP_PIPE_SHFT);
+                sort_key |= CMD_3D_TRANSP_MATL_MASK & (((uintptr_t)mat_ptr.get()) << (CMD_3D_TRANSP_MATL_SHFT-2));
+                const auto eid_int = (uint32_t) eid;
+                const auto eid_mix = eid_int ^ (eid_int >> 8);
+                sort_key |= CMD_3D_TRANSP_DRAW_MASK & (eid_mix << CMD_3D_TRANSP_DRAW_SHFT);
+            }
+            else
+            {
+                // opaque
+                sort_key = CMD_3D_GROUP_OPAQUE;
+                sort_key |= CMD_3D_OPAQUE_PIPE_MASK & (((uint64_t)pd_index) << CMD_3D_OPAQUE_PIPE_SHFT);
+                sort_key |= CMD_3D_OPAQUE_MATL_MASK & (((uintptr_t)mat_ptr.get()) << (CMD_3D_OPAQUE_MATL_SHFT-2));
+                uint64_t depth_bits = depth_norm * ((1<<CMD_3D_OPAQUE_DPTH_BITS)-1);
+                sort_key |= CMD_3D_OPAQUE_DPTH_MASK & ~(depth_bits << CMD_3D_OPAQUE_DPTH_SHFT);
+                const auto eid_int = (uint32_t) eid;
+                const auto eid_mix = eid_int ^ (eid_int >> 8);
+                sort_key |= CMD_3D_OPAQUE_DRAW_MASK & (eid_mix << CMD_3D_OPAQUE_DRAW_SHFT);
+            }
+
+            // add command
+            m_cmds.emplace_back( command3d{
+                .sort_key = sort_key,
+                .material = &material,
+                .mat_vert_uniforms_offset = (uint32_t) u_vtx_offset,
+                                 .mat_vert_uniforms_len = (uint32_t) u_vtx_sz,
+                                 .mat_frag_uniforms_offset = (uint32_t) u_frag_offset,
+                                 .mat_frag_uniforms_len = (uint32_t) u_frag_sz,
+                                 .model_uniforms_offset = (uint32_t) u_model_offset,
+                                 .model_uniforms_len = (uint32_t) u_model_len,
+                                 .pipeline_index = pd_index,
+                                 .mesh_index = msh_idx,
+                                 .submesh = (uint16_t)sub_i,
+                                 ._pad0 = 0,
+                                 .tex_bind_count = tex_bind_count,
+                                 .tex_binds_offset = tex_bind_offset
+            } );
+        }
+    }
+
+    coll_pass.cmd_count = static_cast<uint32_t>(m_cmds.size() - coll_pass.cmd_start);
+    // TODO sort
 }
 
 // sorts rendering commands belonging to one pass

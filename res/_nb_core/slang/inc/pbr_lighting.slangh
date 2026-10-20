@@ -6,7 +6,7 @@
 
 float3 pbr_lighting(SceneUniforms g_scene, LitModelUniforms g_model,
     float3 world_pos, float3 N,
-    float3 albedo, float metallic, float roughness)
+    float3 albedo, float metallic, float roughness, Sampler2DArray s_point)
 {
     float3 radiance_out = float3(0.0);
 
@@ -45,6 +45,7 @@ float3 pbr_lighting(SceneUniforms g_scene, LitModelUniforms g_model,
 
             // spot light cone attenuation
             if (light_type == 2) {
+
                 float3 spot_dir = normalize(light.spot_dir.xyz);
 
                 // Vector from the light source TO the fragment
@@ -64,6 +65,8 @@ float3 pbr_lighting(SceneUniforms g_scene, LitModelUniforms g_model,
                 spot_factor = spot_factor * spot_factor;
 
                 attenuation *= spot_factor;
+
+                attenuation *= calculateSpotLightShadow(light, s_point, world_pos);
             }
         }
 

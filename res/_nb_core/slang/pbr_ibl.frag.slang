@@ -43,6 +43,7 @@ ConstantBuffer<PBRMaterialParams> g_material : register(b2);
 [[vk::binding(5, 2)]] SamplerCube<float4> s_irradiance;
 [[vk::binding(6, 2)]] SamplerCube<float4> s_prefiltered;
 [[vk::binding(7, 2)]] Sampler2D s_brdf_lut;
+[[vk::binding(8, 2)]] Sampler2DArray s_shadows_point;
 
 
 [shader("fragment")]
@@ -69,7 +70,10 @@ float4 main(VSOutput input) : SV_Target
 
     float3 F0 = lerp(float3(0.04), albedo, metallic);
 
-    float3 direct = pbr_lighting(g_scene, g_model, input.world_pos, N, albedo, metallic, roughness);
+    float3 direct = pbr_lighting(g_scene, g_model,
+                                 input.world_pos, N,
+                                 albedo, metallic, roughness,
+                                 s_shadows_point);
 
     // since we have IBL, global scene ambient is ignored here
 

@@ -242,7 +242,8 @@ namespace nb::render
         IBL_INTEGRATION,
         DYNAMIC,  // TODO for custom/scriptable material types in the future
         MATCAP,
-        SKYBOX
+        SKYBOX,
+        DEPTH
     };
 
 };

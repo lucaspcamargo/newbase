@@ -41,7 +41,7 @@ ConstantBuffer<PBRMaterialParams> g_material : register(b2);
 [[vk::binding(2, 2)]] Sampler2D s_metallic_roughness;
 [[vk::binding(3, 2)]] Sampler2D s_occlusion;
 [[vk::binding(4, 2)]] Sampler2D s_emissive;
-
+[[vk::binding(5, 2)]] Sampler2DArray s_shadows_point;
 
 
 
@@ -73,7 +73,10 @@ float4 main(VSOutput input) : SV_Target
 
 
     // PBR direct lighting
-    float3 radiance_out = pbr_lighting(g_scene, g_model, input.world_pos, N, albedo, metallic, roughness);
+    float3 radiance_out = pbr_lighting(g_scene, g_model,
+                                       input.world_pos, N,
+                                       albedo, metallic, roughness,
+                                       s_shadows_point);
 
     // Ambient Occlusion
     float raw_ao = s_occlusion.Sample(input.uv).r;

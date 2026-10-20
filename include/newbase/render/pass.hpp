@@ -80,7 +80,8 @@ enum class pass_type: uint8_t
     EQUIRECTANGULAR_TO_CUBEMAP,
     DIFFUSE_IRRADIANCE,
     SPECULAR_PREFILTER,
-    DEPTH_ONLY
+    DEPTH_ONLY,
+    DEPTH_ONLY_SHADOW_MAP
 };
 
 /// A pass can target either a renderer-managed target (including the default

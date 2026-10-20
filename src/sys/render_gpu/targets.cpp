@@ -310,7 +310,7 @@ bool target_manager::prepare_gpu_pipeline_target_info(SDL_GPUGraphicsPipelineTar
                                       render::pipeline_target_info native)
 {
     int num_color_targets = 0;
-    if(native.color_targets[0] == render::texture_format::INVALID)
+    if(native.color_targets[0] == render::texture_format::INVALID && native.depth_target == render::texture_format::INVALID)
         return false;
     for(int i = 0; i < render::PASS_MAX_COLOR_TARGETS; ++i)
         if(native.color_targets[i] != render::texture_format::INVALID)

@@ -44,6 +44,7 @@ namespace nb::render
         rtexture *environment_cubemap {nullptr};
         rtexture *irradiance_cubemap {nullptr};
         rtexture *prefiltered_cubemap {nullptr};
+        rtexture *point_light_shadow_maps {nullptr};
     };
 
     struct pipeline_descriptor; //fwd

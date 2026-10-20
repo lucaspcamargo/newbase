@@ -198,7 +198,7 @@ namespace nb::render
     private:
         void _sort(const collected_pass &pass);
         void _collect_pass(const render_layer &layer, const render_pass &pass,
-                           const mat_env_data *env_data);
+                           mat_env_data *env_data);
         void _collect_depth_pass(entt::id_type scene_id, glm::mat4 vp, const render_pass &pass);
         bool _append_draw_command(const render_pass &pass,
                                   std::shared_ptr<rmaterial> material,

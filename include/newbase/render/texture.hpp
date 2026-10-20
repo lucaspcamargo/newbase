@@ -40,6 +40,7 @@ enum class texture_type : uint8_t
 {
     INVALID,
     IMAGE_2D,
+    IMAGE_2D_ARRAY,
     IMAGE_3D,
     CUBEMAP
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include "glm/ext/vector_uint4.hpp"
+#include <cstdint>
 #include <newbase/utility/glm.hpp>
 #include <newbase/geom/aabb.hpp>
 
@@ -13,13 +14,14 @@ namespace nb
 
 namespace nb::render
 {
-    static constexpr size_t SCENE_LIGHTS_MAX = 32;
+    static constexpr size_t SCENE_LIGHTS_MAX = 16;
     static constexpr size_t MODEL_LIGHTS_MAX = 8;
 
     /// callback for emitting shadow map passes
     /// callback is callled with light component reference,
     /// the number of necessary layers, and a list of light-view-proj matrices
-    using shadow_map_callback_t = std::function<bool(const clight *light,
+    /// returns index of first shadow layer allocated, or UINT32_MAX if none
+    using shadow_map_callback_t = std::function<uint32_t(const clight *light,
                                                      int map_count,
                                                      const glm::mat4 *lvps)>;
 
@@ -43,7 +45,7 @@ namespace nb::render
 
         // shadow mapping shit
         glm::mat4 light_view_proj; // from world space to shadow map clip space
-        uint32_t map_layer_index;  // -1 means no shadow map
+        uint32_t map_layer_index {UINT32_MAX};  // -1 means no shadow map
         float _pad0[3];
     };
 

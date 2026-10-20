@@ -2,5 +2,5 @@
 
 static const float PI = 3.14159265359;
 
-static const uint SCENE_LIGHTS_MAX = 32;
+static const uint SCENE_LIGHTS_MAX = 16;
 static const uint MODEL_LIGHTS_MAX = 8;

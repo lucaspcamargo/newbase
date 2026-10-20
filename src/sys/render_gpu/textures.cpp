@@ -114,7 +114,11 @@ bool texture_manager::prepare(SDL_GPUDevice * device, SDL_GPUCommandBuffer *cmd,
                     return false;
                 gpu_type = tex->layer_count == 1
                     ? SDL_GPU_TEXTURETYPE_2D : SDL_GPU_TEXTURETYPE_2D_ARRAY;
-                break;
+                    break;
+            case render::texture_type::IMAGE_2D_ARRAY:
+                gpu_type = SDL_GPU_TEXTURETYPE_2D_ARRAY;
+                layer_count_or_depth = tex->layer_count;
+            break;
             case render::texture_type::IMAGE_3D:
                 if(tex->layer_count != 1)
                     return false;
@@ -242,6 +246,11 @@ bool texture_manager::prepare(SDL_GPUDevice * device, SDL_GPUCommandBuffer *cmd,
                 if(depth != 1 || layers == 0)
                     return false;
                 gpu_type = layers == 1 ? SDL_GPU_TEXTURETYPE_2D : SDL_GPU_TEXTURETYPE_2D_ARRAY;
+                break;
+            case render::texture_type::IMAGE_2D_ARRAY:
+                if(depth != 1 || layers == 0)
+                    return false;
+                gpu_type = SDL_GPU_TEXTURETYPE_2D_ARRAY;
                 break;
             case render::texture_type::IMAGE_3D:
                 if(depth == 0 || layers != 1)
