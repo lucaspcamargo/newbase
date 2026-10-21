@@ -233,7 +233,7 @@ namespace nb::gpu
                     ? SDL_GPU_STOREOP_DONT_CARE : SDL_GPU_STOREOP_STORE;
                 depth_info.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
                 depth_info.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
-                depth_info.cycle = true;
+                depth_info.cycle = (depth_info.store_op == SDL_GPU_STOREOP_DONT_CARE);
             }
 
             m_curr_pass = SDL_BeginGPURenderPass(

@@ -1,5 +1,4 @@
 #pragma once
-#include "glm/ext/vector_uint4.hpp"
 #include <cstdint>
 #include <newbase/utility/glm.hpp>
 #include <newbase/geom/aabb.hpp>

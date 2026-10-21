@@ -76,7 +76,7 @@ float4 main(VSOutput input) : SV_Target
     float3 radiance_out = pbr_lighting(g_scene, g_model,
                                        input.world_pos, N,
                                        albedo, metallic, roughness,
-                                       s_shadows_point);
+                                       s_shadows_point, input.position.xy);
 
     // Ambient Occlusion
     float raw_ao = s_occlusion.Sample(input.uv).r;

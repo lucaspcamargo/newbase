@@ -3,6 +3,7 @@
 #include "newbase/render/texture.hpp"
 #include <newbase/render/config.hpp>
 #include <newbase/res/texture.hpp>
+#include <newbase/log.hpp>
 #include <memory>
 
 // our renderer-agnostic facilities for shadow mapping
@@ -21,6 +22,7 @@ namespace nb::render
 
             void setup(uint32_t max_layers, uint32_t initial_capacity, uint32_t layer_dims)
             {
+                log::info("[shadow_manager] map_array: setup: %u max, %u initial, size %ux%u", max_layers, initial_capacity, layer_dims, layer_dims);
                 max = max_layers;
                 cap = std::min(initial_capacity, max_layers);
                 dims = layer_dims;
@@ -48,20 +50,29 @@ namespace nb::render
                 tex->layer_count = cap;
             }
 
-            int allocate_layer()
+            int allocate_layers(int count)
             {
-                if(alloc == max)
-                    return -1; // already full
+                // Check if the requested layers exceed the absolute maximum limit
+                if (alloc + count > max)
+                    return -1; // Not enough total space available
 
-                if(!tex)
-                    allocate_texture();
-                else if(alloc >= cap)
+                // Ensure capacity is large enough to fit the new allocation request
+                if (!tex || (alloc + count > cap))
                 {
-                    cap = std::min(max, cap*2);
+                    while(cap < (alloc + count))
+                        cap = std::min(cap * 2, max);
+
                     allocate_texture();
                 }
 
-                return alloc++;
+                int start_index = alloc;
+                alloc += count; // Advance allocation pointer by the requested count
+                return start_index;
+            }
+
+            int allocate_layer()
+            {
+                return allocate_layers(1);
             }
         };
 
@@ -78,6 +89,8 @@ namespace nb::render
 
         bool init()
         {
+            log::info("[shadow_manager] init");
+
             m_punct.setup(m_cfg.point_shadow_layers_max,
                           m_cfg.point_shadow_layers_init,
                           m_cfg.point_shadow_resolution);
@@ -107,11 +120,14 @@ namespace nb::render
             m_dir.alloc = 0;
         }
 
-        int allocate_shadow_map(bool directional)
+        int allocate_shadow_maps(bool directional, int count)
         {
+            if(count <= 0)
+                return -1;
+
             map_array &arr = directional? m_dir : m_punct;
 
-            return arr.allocate_layer(); // pool exhausted, no shadow map for you, honey
+            return arr.allocate_layers(count);
         }
 
         rtexture* texture(bool directional) const

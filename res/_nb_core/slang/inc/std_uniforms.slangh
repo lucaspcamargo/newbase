@@ -13,6 +13,7 @@ struct SceneUniforms
     column_major float4x4 inv_view;
     float3   camera_pos;
     float    _pad0;
+    float4   shadow_map_texel_size; // xy = point , zw = dir
 
     LightsBlock light_data;
 };

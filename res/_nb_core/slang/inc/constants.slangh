@@ -4,3 +4,31 @@ static const float PI = 3.14159265359;
 
 static const uint SCENE_LIGHTS_MAX = 16;
 static const uint MODEL_LIGHTS_MAX = 8;
+
+static const float SHADOW_BIAS = 0.00001;
+static const int SHADOW_POISSON_SAMPLES = 4;
+
+static const float2 POISSON_DISK[16] = {
+    float2(-0.613392, 0.617481),
+    float2(0.170019, 0.041387),
+    float2(-0.299417, -0.791995),
+    float2(0.645680, 0.493210),
+    float2(-0.651949, -0.717884),
+    float2(0.421003, -0.027097),
+    float2(-0.817194, -0.271096),
+    float2(-0.705374, 0.168280),
+    float2(0.758707, -0.133655),
+    float2(-0.063887, -0.018826),
+    float2(-0.100693, 0.551390),
+    float2(0.339257, 0.627393),
+    float2(-0.301550, 0.166170),
+    float2(0.563547, -0.553934),
+    float2(-0.485128, 0.457852),
+    float2(0.145415, -0.444535)
+};
+
+// poisson sampling
+float getRandomAngle(float2 screenPos)
+{
+    return frac(sin(dot(screenPos, float2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+}

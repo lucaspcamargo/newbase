@@ -73,7 +73,7 @@ float4 main(VSOutput input) : SV_Target
     float3 direct = pbr_lighting(g_scene, g_model,
                                  input.world_pos, N,
                                  albedo, metallic, roughness,
-                                 s_shadows_point);
+                                 s_shadows_point, input.position.xy);
 
     // since we have IBL, global scene ambient is ignored here
 

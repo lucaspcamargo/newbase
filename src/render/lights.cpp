@@ -32,6 +32,7 @@ bool light_culler::add_light(const clight &light, const cspatial *spatial)
     glm::vec4 spot_dir {0.0f};
     if(light.type == light_type::SPOT)
         spot_dir = glm::vec4{glm::normalize(glm::vec3(spatial->world * glm::vec4(dir, 0.0f))), 0.0f};
+
     m_culled_lights.emplace_back(light_entry{
         .light = &light,
         .spatial = spatial,
@@ -79,7 +80,7 @@ int light_culler::write_culled_model_lights(light_model_uniform_block &mublock, 
     if(m_candidates.size() > MODEL_LIGHTS_MAX)
     {
         std::sort(m_candidates.begin(), m_candidates.end(), [](const auto& a, const auto& b) {
-            return a.dist2 < b.dist2;
+            return a.dist2 > b.dist2;
         });
     }
 
@@ -118,6 +119,7 @@ void light_culler::for_each_shadow_map(glm::vec3 cam_pos, shadow_map_callback_t 
 
         if(!light.casts_shadows)
             continue;
+
         switch(light.type)
         {
             case light_type::SPOT:
@@ -152,12 +154,48 @@ void light_culler::for_each_shadow_map(glm::vec3 cam_pos, shadow_map_callback_t 
 
                 auto map_idx = cb(&light, 1, &lvp);
                 if(map_idx == UINT32_MAX)
-                    continue;
+                    continue; // shadow map alloc failed
 
                 // we got a shadow map layer and a depth pass
                 le.data.map_layer_index = map_idx;
                 le.data.light_view_proj = lvp;
             }
+            break;
+
+            case light_type::POINT:
+            {
+                glm::vec3 light_pos = glm::vec3{0.0f};
+                if (le.spatial)
+                {
+                    const auto transform = le.spatial->world;
+                    light_pos = glm::vec3{transform[3]}; // last column
+                }
+
+                float fov = glm::radians(90.0f);
+                float aspect = 1.0f; // Cubemap faces must be square
+                float near_plane = 0.1f;
+                float far_plane = light.range;
+
+                glm::mat4 light_proj = glm::perspective(fov, aspect, near_plane, far_plane);
+
+                glm::mat4 lvps[6];
+
+                lvps[0] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // +X
+                lvps[1] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // -X
+                lvps[2] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)); // +Y
+                lvps[3] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)); // -Y
+                lvps[4] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // +Z
+                lvps[5] = light_proj * glm::lookAt(light_pos, light_pos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // -Z
+
+                auto map_idx = cb(&light, 6, lvps);
+
+                if (map_idx == UINT32_MAX)
+                    continue; // shadow map allocation failed
+
+                le.data.map_layer_index = map_idx;
+                le.data.light_view_proj = lvps[0]; // for completeness
+            }
+            break;
 
             default:
                 break; // only spot for now

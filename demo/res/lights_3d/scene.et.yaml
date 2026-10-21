@@ -58,6 +58,7 @@
       color: [1.0, 0.0, 0.0]
       range: 10
       intensity: 2.0
+      casts_shadows: true
     spatial:
       pos: [0, 2, 2.89]
       rot: [0, 0, 0]
@@ -72,6 +73,7 @@
       color: [0.0, 1.0, 0.0]
       range: 10
       intensity: 2.0
+      casts_shadows: true
     spatial:
       pos: [-2.5, 2, -1.44]
       rot: [0, 0, 0]
@@ -86,6 +88,7 @@
       color: [0.0, 0.0, 1.0]
       range: 10
       intensity: 2.0
+      casts_shadows: true
     spatial:
       pos: [2.5, 2, -1.44]
       rot: [0, 0, 0]

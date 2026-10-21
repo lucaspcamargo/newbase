@@ -122,6 +122,7 @@ namespace nb::render
         glm::mat4   inv_view;
         glm::vec3   camera_pos;
         float    _pad0;
+        glm::vec4   shadow_map_texel_size; // xy = point , zw = dir
 
         light_uniform_block light_data;
     };

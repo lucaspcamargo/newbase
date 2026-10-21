@@ -306,6 +306,10 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
         u_scn.inv_view = glm::inverse(view);
         u_scn.camera_pos = cam_sp->pos;
     }
+    float f_texel_point = m_shadows.resolution(false)/1.0f;
+    float f_texel_dir = m_shadows.resolution(true)/1.0f;
+    u_scn.shadow_map_texel_size = {1.f/f_texel_point, 1.f/f_texel_point,
+                                   1.f/f_texel_dir, 1.f/f_texel_dir};
 
     // collect and cull lights
     aabb::frustum_culler frustum_culler {u_scn.view_proj};
@@ -322,16 +326,21 @@ void collector3d::_collect_pass(const render_layer &l, const render_pass &pass,
                                                 const glm::mat4 *lvps) -> uint32_t
     {
         bool directional = light->type == light_type::DIRECTIONAL;
-        int sm_idx = m_shadows.allocate_shadow_map(directional);
+        int sm_idx = m_shadows.allocate_shadow_maps(directional, map_count);
         if(sm_idx == -1)
-            return false;
-        render_pass sp;
-        sp.target.depth_texture = m_shadows.texture(directional);
-        sp.targets.depth_layer_index = sm_idx;
-        sp.targets.depth_target = sp.target.depth_texture->format;
-        sp.type = pass_type::DEPTH_ONLY_SHADOW_MAP;
-        sp.viewport = VIEWPORT_DEFAULT;
-        _collect_depth_pass(l.scene_id, lvps[0], sp);
+            return UINT32_MAX;
+
+        for(int i = 0; i < map_count; ++i)
+        {
+            render_pass sp;
+            sp.target.depth_texture = m_shadows.texture(directional);
+            sp.targets.depth_layer_index = sm_idx + i;
+            sp.targets.depth_target = sp.target.depth_texture->format;
+            sp.targets.depth_mip_level = 0;
+            sp.type = pass_type::DEPTH_ONLY_SHADOW_MAP;
+            sp.viewport = VIEWPORT_DEFAULT;
+            _collect_depth_pass(l.scene_id, lvps[i], sp);
+        }
         return sm_idx;
     });
 

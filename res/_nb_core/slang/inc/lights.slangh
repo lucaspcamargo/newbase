@@ -26,7 +26,10 @@ struct LightEntry
 
     // shadow mapping shit
     column_major float4x4 light_view_proj;
-    uint4 map_layer_idx;
+    uint map_layer_idx;
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
 };
 
 
@@ -37,7 +40,7 @@ struct LightsBlock
     LightEntry lights[SCENE_LIGHTS_MAX];
 };
 
-float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float3 worldPosition)
+float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float3 worldPosition, float2 texelSize, float2 screenPos)
 {
     if (light.map_layer_idx.x == 0xffffffff)
     {
@@ -48,7 +51,7 @@ float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float
 
     if (lightSpacePos.w <= 0.0)
     {
-        return 0.5;
+        return 1.0;
     }
 
     lightSpacePos.xyz /= lightSpacePos.w;
@@ -61,9 +64,74 @@ float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float
         shadowUV.y < 0.0 || shadowUV.y > 1.0 ||
         lightSpacePos.z < 0.0 || lightSpacePos.z > 1.0)
     {
-        return 0.25;
+        return 0.0;
     }
 
+    float currentDepth = lightSpacePos.z;
+
+
+    // POISSON DISK SAMPLING PCF
+    // Filter radius controls the softness of the shadow edge (adjust multiplier as needed)
+    float2 filterRadius = 2.0 * texelSize;
+
+    // Generate a unique rotation matrix for this specific pixel
+    float angle = getRandomAngle(screenPos);
+    float sinA = sin(angle);
+    float cosA = cos(angle);
+    float2x2 rotMatrix = float2x2(cosA, -sinA, sinA, cosA);
+
+    float shadowFactor = 0.0;
+    const int numSamples = SHADOW_POISSON_SAMPLES;
+
+    [unroll]
+    for (int i = 0; i < numSamples; i++)
+    {
+        // Rotate the Poisson offset and scale it by the filter radius
+        float2 rotatedOffset = mul(POISSON_DISK[i], rotMatrix) * filterRadius;
+        float3 sampleCoords = float3(shadowUV + rotatedOffset, float(light.map_layer_idx.x));
+
+        float sampledDepth = shadowTex.Sample(sampleCoords).r;
+
+        if (currentDepth - SHADOW_BIAS <= sampledDepth)
+        {
+            shadowFactor += 1.0;
+        }
+    }
+    return shadowFactor / float(numSamples);
+
+
+
+    /* STANDARD PCF
+    float shadowFactor = 0.0;
+    float totalSamples = 9.0; // 3x3 grid
+
+    // Loop through a 3x3 kernel neighborhood
+    [unroll]
+    for (int x = -1; x <= 1; x++)
+    {
+        [unroll]
+        for (int y = -1; y <= 1; y++)
+        {
+            // Calculate offset UV coordinates
+            float2 offset = float2(x, y) * texelSize;
+            float3 sampleCoords = float3(shadowUV + offset, float(light.map_layer_idx.x));
+
+            // Sample the raw depth value using standard .Sample()
+            float sampledDepth = shadowTex.Sample(sampleCoords).r;
+
+            // Perform individual depth comparison and accumulate
+            if (currentDepth - SHADOW_BIAS <= sampledDepth)
+            {
+                shadowFactor += 1.0;
+            }
+        }
+    }
+
+    return shadowFactor / totalSamples;
+    */
+
+
+    /* NO PCF
     float currentDepth = lightSpacePos.z;
 
     // sample depth
@@ -71,7 +139,105 @@ float calculateSpotLightShadow(LightEntry light, Sampler2DArray shadowTex, float
         float3(shadowUV, float(light.map_layer_idx.x))
     ).r;
 
-    // we use front-face culling, there is no bias
-    // this might need to change for billboards, vegetation, etc
-    return (currentDepth <= sampledDepth) ? 1.0 : 0.0;
+    return (currentDepth - SHADOW_BIAS <= sampledDepth) ? 1.0 : 0.0;*/
+}
+
+
+float calculatePointLightShadow(LightEntry light, Sampler2DArray shadowTex, float3 world_pos, float2 texelSize, float2 screenPos)
+{
+    if (light.map_layer_idx.x == 0xffffffff)
+    {
+        return 1.0; // no shadow map
+    }
+
+    float3 light_to_frag = world_pos - light.pos_dir.xyz;
+    float3 abs_v = abs(light_to_frag);
+    float max_val = max(max(abs_v.x, abs_v.y), abs_v.z);
+
+    int face_index = 0;
+    float2 uv = float2(0.0);
+
+    // determine face and project coordinates to [-1, 1] range
+    if (max_val == abs_v.x) {
+        if (light_to_frag.x > 0.0) {
+            face_index = 0; // +X
+            uv = float2(-light_to_frag.z, -light_to_frag.y) / abs_v.x;
+        } else {
+            face_index = 1; // -X
+            uv = float2(light_to_frag.z, -light_to_frag.y) / abs_v.x;
+        }
+    } else if (max_val == abs_v.y) {
+        if (light_to_frag.y > 0.0) {
+            face_index = 2; // +Y
+            uv = float2(light_to_frag.x, light_to_frag.z) / abs_v.y;
+        } else {
+            face_index = 3; // -Y
+            uv = float2(light_to_frag.x, -light_to_frag.z) / abs_v.y;
+        }
+    } else {
+        if (light_to_frag.z > 0.0) {
+            face_index = 4; // +Z
+            uv = float2(light_to_frag.x, -light_to_frag.y) / abs_v.z;
+        } else {
+            face_index = 5; // -Z
+            uv = float2(-light_to_frag.x, -light_to_frag.y) / abs_v.z;
+        }
+    }
+
+    // map from [-1, 1] to [0, 1] texture coordinates
+    float2 shadowUV = uv * float2(0.5, -0.5) + float2(0.5, 0.5);
+
+    // sample the correct layer in the Texture2DArray
+    float3 sampleCoords = float3(shadowUV, float(light.map_layer_idx.x + face_index));
+    float sampledDepth = shadowTex.Sample(sampleCoords).r;
+
+    // projection depth analytically to match the depth pass
+    float near_plane = 0.1;               // near plane used in nb::render::light_culler
+    float far_plane = light.color.w;      // light range stored in color.w
+    float dist = max_val;                 // view-space depth is the dominant component magnitude
+
+    if (dist >= far_plane)
+        return 1.0;
+
+    // std 0..1 perspective projection depth formula
+    float currentDepth = (far_plane / (far_plane - near_plane)) * (1.0 - (near_plane / dist));
+
+
+    // POISSON PCF (with seams)
+
+    float angle = getRandomAngle(screenPos);
+    float cosA = cos(angle);
+    float sinA = sin(angle);
+
+    float shadowSum = 0.0;
+    int sampleCount = 4;
+    float2 filterRadius = 2.0 * texelSize;
+
+    for (int i = 0; i < sampleCount; ++i)
+    {
+        float2 diskOffset = POISSON_DISK[i]; // Kernel radius
+
+        // Rotate the Poisson sample offset
+        float2 rotatedOffset = float2(
+            diskOffset.x * cosA - diskOffset.y * sinA,
+            diskOffset.x * sinA + diskOffset.y * cosA
+        );
+
+        float2 sampleUV = shadowUV + (rotatedOffset * filterRadius);
+
+        float3 sampleCoords = float3(sampleUV, float(light.map_layer_idx.x + face_index));
+        float sampledDepth = shadowTex.Sample(sampleCoords).r;
+
+        if (currentDepth - SHADOW_BIAS  <= sampledDepth)
+        {
+            shadowSum += 1.0;
+        }
+    }
+
+    return shadowSum / float(sampleCount);
+
+
+    // NO PCF
+    //float shadow = (currentDepth - SHADOW_BIAS > sampledDepth) ? 0.0f : 1.0f;
+    //return shadow;
 }

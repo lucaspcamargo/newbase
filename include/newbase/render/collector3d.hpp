@@ -225,7 +225,7 @@ namespace nb::render
         std::vector<std::shared_ptr<rmaterial>> m_internal_materials;
         coll3d_frame_arena m_arena {COLLECTOR_3D_DEFAULT_ARENA_ALLOC_BYTES};
 
-        config3d m_config3d; // TODO get from renderer as ref, in ctor
+        config3d m_config3d {}; // TODO get from renderer as ref, in ctor
         shadow_manager m_shadows {m_config3d};
     };
 }
