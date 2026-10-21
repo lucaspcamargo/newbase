@@ -256,7 +256,10 @@ void pbr_mat_controller::collect_texture_bindings(const rmaterial &mat,
     out_bindings[ibl? 8 : 5] = material_texture_binding{
         .texture = env_data->point_light_shadow_maps,
         .slot = (ibl? 8u : 5u),
-        .sampler = {},
+        .sampler = {
+            .addr_mode_u = sampler_addressing::CLAMP_TO_EDGE,
+            .addr_mode_v = sampler_addressing::CLAMP_TO_EDGE
+        },
         .vertex = false
     };
 
