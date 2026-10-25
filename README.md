@@ -1,7 +1,10 @@
 # newbase engine
 
+<!-- Irrelevant, gotta take my gitea off the public internet
+This are wild times, people...
 ![linux build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/linux_build.yaml/badge.svg?branch=main&event=push)
 ![emscripten build badge](https://gt.camargo.eng.br/camargo/newbase/actions/workflows/emscripten_build.yaml/badge.svg?branch=main&event=push)
+-->
 
 A *new base* for making games and interactive stuff. Yet another ECS engine, with random experiments bolted on.
 
@@ -36,16 +39,16 @@ It is also availaable on [itch.io](https://camarguinho.itch.io/newbase-demo).
 ## Features
 
 For now, we have:
-- Data-driven Entity-Component-System architecture, with RTTI
-- Integrated editor (WIP)
-- Lua scripting
-- SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform)
-- Graph-based audio playback and processing engine
-- 2D Physics and collision handling
-- Particle system
-- Resource management
+- Data-driven Entity-Component-System architecture, with RTTI;
+- Integrated editor (WIP);
+- Lua scripting;
+- SDL\_Renderer for basic 2D (uses appropriate GPU-accelerated render solution depending on platform);
+- SDL_GPU for for a full 3D rendering pipeline (Vulkan-only). Forward PBR, with basic shadow mapping;
+- Graph-based audio playback and processing engine;
+- 2D Physics and collision handling;
+- 2D CPU particle system;
+- Resource management;
 - Some extras: tilemaps, textured text, etc...
-- A Lupi-compatible runtime system
 
 ## Platforms
 
@@ -78,65 +81,31 @@ There are many articles and primers around the web written about ECSs, if that i
 
 Functionality is grouped in systems, that can be linked to the final executable as per its configuration. Systems work cooperatively to process the entities' component data and provide functionality used by the applications.
 
-Here is a high-level description of the currently-implemented systems:
+Here is a table with description and status of current systems:
 
-### render_2d
+| **System**      | **Status** | **Description**                                                             |
+|-----------------|------------|-----------------------------------------------------------------------------|
+| render_gpu      | 👷 WIP     | A 3D-enabled renderer built atop SDL_GPU, targeting Vulkan. Desktop-only.   |
+| render_2d       | ✅ Good    | A basic 2D renderer built atop SDL_Renderer. Works everywhere.              |
+| audio           | ✅ Good    | Functional for what it is. Spatial audio still missing.                     |
+| script_lua      | ✅ Good    | Works fine as it is. Some improvements planned alongside RTTI.              |
+| input           | 👷 WIP     | Fine for one player. Needs more fleshing out.                               |
+| editor          | 👷 WIP     | Needs a lot fo work still. Mostly a runtime inspector at this point.        |
+| physics2d       | ✅ Good    | Good enough for collisions and dynamics. Could have more joints support.    |
+| spatial         | ✅ Good    | Works properly. When more complex culling comes, shall be extended.         |
+| sensors         | ✅ Good    | Basically a wrapper around what SDL3 offers. Would benefit from more usage. |
+| sprite_anim     | ✅ Good    | Works ok, not much to be done unless there is a need for it.                |
+| textext         | ✅ Good    | Simple 2D textured text from TTF fonts. Simple but functional as it is.     |
+| tilemap         | ✅ Good    | Works fine for simple use cases. Some optimization low hanging fruits.      |
+| particle_system | ✅ Good    | Pretty good 2D particles on the CPU. Further changes only if necessary.     |
+| voxel_world     | 🧃 Toy     | Mesh generation for Minecraft-like worlds. Still WIP.                       |
+| clock           | ✅ Good    | General updates with dynamic time scales. Can be extended on demand.        |
+| lupi            | 🧃 Toy     | Lupi-compatible runtime. Works fine, but needs a refactor.                  |
+| mcp             | 🧃 Toy     | MCP server that works on a basic level. Not thoroughly tested.              |
+| fluid_2d        | 🧃 Toy     | Just a little experiment.                                                   |
+| steam           | 🎫 Stub    | Links and inits Steamworks SDK, and does nothing with it.                   |
+| sgdk            | 🎫 Stub    | SGDK compatibility API. Took a wrong turn. Needs a rewrite.                 |
 
-This is a simple video rendering system based on SDL3's Render system. It can draw textured sprites and geometry, with color modulation, in 2D. Its relative simplicity, from relying on SDL3's renderers, means it can work atop all of SDL3's render backends: Vulkan, OpenGL \[ES\], DX, Metal, software, all of them. This ensures that whatever platform is targeted, we can rely on SDL for basic 2D rendering support, with proper hardware acceleration in all major platforms.
-
-ImGui is supported for debug and tooling (as it should be when using any render system of the engine).
-
-### audio
-
-The audio system is custom-made for the engine. It is based on an acyclic directed processing graph, that processes data in a pull fashion, generating samples as requested. Feedback is not directly supported by the graph, but can be used internally by the processing nodes when required (e.g. echo and reverb).
-
-Audio sources can use in-memory buffers, or be streamed. In both cases they can be looped, and arbitrary loop points are supported.
-
-There is a simple api (with Lua bindings) for playing sound effects and background music, just by specifying the resources to use. Simpler games can use it to play sound the easiest possible way. When using this API, the audio graph is managed automatically.
-
-More complex games can use the audio graph directly, to chain effects and do more advanced processing. This requires usage of the C++ API.
-
-See [the audio system documentation](doc/system_audio) for more detailed info.
-
-### input
-
-The base input system is a basic layer atop SDL's keyboard and joypad. It maps possible controller and keyboard
-inputs to defined player actions.
-
-Mouse input and multiple players are not yet supported, but is planned for the future.
-
-### script_lua
-
-This system provides Lua scripting support for the engine, written from the bottom-up using our RTTI system.
-
-The initial idea was to allow for different scripting engines to be implementable, and this is still doable if a project requires it. But Lua has shown itself to be capable and performant enough. So it remains the one and only scripting interface supported by the engine.
-
-### physics2d
-
-This system implements 2D rigid-body physics, via the industry-standard Box2D library.
-
-(TODO add more details)
-
-<!--
-
-### sgdk
-
-The "sgdk" system is a bit of a black sheep. It does not interoperate with the ECS system as much. It is instead, a compatibility layer through which games written for the [SGDK](https://github.com/Stephane-D/SGDK) (Sega Genesis Development Kit) can work within newbase. It uses the engine's structures to consume input, and present video and audio. 
-
-Games are compiled to native code, and no CPUs from the original system are emulated. The VDP is emulated in software, but can support different output resolutions, and other goodies. Therefore, a game may use some additional features when using the compatibility layer, and mix-and-match code meant for the Mega Drive and for newbase. This allows for (possibly enhanced) ports to be published for whatever platform is supported by newbase, without much compromise.
-
--->
-
-### lupi
-
-The "lupi" system is a compatibility layer for games written in Lua against the [Lupi console API](https://lupi.api.br/docs/), a 480x270, 256-color indexed retro console. Each cart runs its own Lua source, unmodified, in an isolated `lua_State`, driven by a single `update(frame)` callback per simulation step.
-
-Real carts ship no source assets. Lupi's own build pipeline normally slices sprite sheets, builds a color palette, and compiles Tiled maps ahead of time. "lupi" reimplements that pipeline itself at cart-boot instead, so a cart's original source tree runs directly with no separate compiler or devkit involved. See `doc/system_lupi.md` for the full picture.
-
-
-### spatial, clock
-
-These are core systems of the engine, that implement standard data flows that other systems rely upon. The engine can run without them, but otherwise expected functionality may not work correctly.
 
 ## Dependencies
 
