@@ -227,6 +227,7 @@ add_subdirectory(src/sys/spatial)
 add_subdirectory(src/sys/sprite_anim)
 add_subdirectory(src/sys/textext)
 add_subdirectory(src/sys/tilemap)
+add_subdirectory(src/sys/voxel_world)
 
 # OPTIONAL SYSTEMS
 if(NEWBASE_STEAM)

@@ -83,9 +83,9 @@ Functionality is grouped in systems, that can be linked to the final executable 
 
 Here is a table with description and status of current systems:
 
-| **System**      | **Status** | **Description**                                                             |
+| **System**      | **State**  | **Description**                                                             |
 |-----------------|------------|-----------------------------------------------------------------------------|
-| render_gpu      | 👷 WIP     | A 3D-enabled renderer built atop SDL_GPU, targeting Vulkan. Desktop-only.   |
+| render_gpu      | 👷 WIP     | A 3D-enabled renderer built on SDL_GPU, targeting Vulkan. Desktop-only.     |
 | render_2d       | ✅ Good    | A basic 2D renderer built atop SDL_Renderer. Works everywhere.              |
 | audio           | ✅ Good    | Functional for what it is. Spatial audio still missing.                     |
 | script_lua      | ✅ Good    | Works fine as it is. Some improvements planned alongside RTTI.              |
@@ -98,7 +98,7 @@ Here is a table with description and status of current systems:
 | textext         | ✅ Good    | Simple 2D textured text from TTF fonts. Simple but functional as it is.     |
 | tilemap         | ✅ Good    | Works fine for simple use cases. Some optimization low hanging fruits.      |
 | particle_system | ✅ Good    | Pretty good 2D particles on the CPU. Further changes only if necessary.     |
-| voxel_world     | 🧃 Toy     | Mesh generation for Minecraft-like worlds. Still WIP.                       |
+| voxel_world     | 🧃 Toy     | Mesh generation for Minecraft-like worlds. WIP.                       |
 | clock           | ✅ Good    | General updates with dynamic time scales. Can be extended on demand.        |
 | lupi            | 🧃 Toy     | Lupi-compatible runtime. Works fine, but needs a refactor.                  |
 | mcp             | 🧃 Toy     | MCP server that works on a basic level. Not thoroughly tested.              |
@@ -121,7 +121,6 @@ Here is a table with description and status of current systems:
 - [stb](https://github.com/nothings/stb) - Single-header C++ libraries for specific uses (OGG decoding, TTF fonts)  
 - [tracy](https://github.com/wolfpld/tracy) - A frame profiler for CPU and interactive graphics workloads 
 - [box2d](https://box2d.org/) - The 2D physics engine for games
-<!--- jolt physics ? -->
 
 These dependencies were carefully chosen for a good mix of power, flexibility, and portability. All of them are linked statically into the resulting binaries, optionally with LTO.
 

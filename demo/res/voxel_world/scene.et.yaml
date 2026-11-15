@@ -1,0 +1,20 @@
+- name: scene
+  comps:
+    script:
+      lua: "res/voxel_world/scene.lua"
+
+- name: environment
+  comps:
+    environment:
+        ambient: [0.05, 0.1, 0.2]
+
+- name: camera
+  comps:
+    spatial:
+      pos: [0, 2, 4]
+      rot: [-20, 0, 0]
+      scale: [1.0, 1.0, 1.0]
+    camera:
+      3d:
+        clip_near: 0.1
+        clip_far: 30.0

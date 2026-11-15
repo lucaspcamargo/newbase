@@ -28,6 +28,7 @@ systems:
   lupi: {}
 #  mcp:
 #    port: 8765
+  voxel_world: {}
 resources:
   scanners:
     - type: "fs_raw"
